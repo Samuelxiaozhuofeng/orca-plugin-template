@@ -14,6 +14,7 @@ type Props = {
   busy: boolean;
   onViewChange: (view: CanvasView) => void;
   onMoveEnd: (blockId: DbId, x: number, y: number) => Promise<void>;
+  onResizeEnd: (blockId: DbId, w: number, h: number) => Promise<void>;
   onPlaceWeek: () => void;
   onViewportWidth: (width: number) => void;
 };
@@ -25,6 +26,7 @@ export function Canvas({
   busy,
   onViewChange,
   onMoveEnd,
+  onResizeEnd,
   onPlaceWeek,
   onViewportWidth,
 }: Props) {
@@ -32,6 +34,7 @@ export function Canvas({
   const viewRef = useRef(view);
   viewRef.current = view;
   const [panning, setPanning] = useState(false);
+  const [editingId, setEditingId] = useState<DbId | null>(null);
 
   useEffect(() => {
     const el = viewportRef.current;
@@ -171,7 +174,11 @@ export function Canvas({
                 panelId={panelId}
                 card={card}
                 scale={view.scale}
+                editing={editingId === card.blockId}
+                onStartEdit={setEditingId}
+                onEndEdit={() => setEditingId(null)}
                 onMoveEnd={onMoveEnd}
+                onResizeEnd={onResizeEnd}
               />
             ))}
           </div>

@@ -54,10 +54,10 @@ export default function BoardPanel({ panelId, blockId }: Props) {
     [blockId],
   );
 
-  const onMoveEnd = useCallback(
-    async (cardBlockId: DbId, x: number, y: number) => {
+  const persistPatch = useCallback(
+    async (cardBlockId: DbId, patch: Partial<WhiteboardCard>) => {
       const next = cards.map((card) =>
-        card.blockId === cardBlockId ? { ...card, x, y } : card,
+        card.blockId === cardBlockId ? { ...card, ...patch } : card,
       );
       try {
         await persistCards(next);
@@ -72,6 +72,20 @@ export default function BoardPanel({ panelId, blockId }: Props) {
       }
     },
     [cards, persistCards],
+  );
+
+  const onMoveEnd = useCallback(
+    async (cardBlockId: DbId, x: number, y: number) => {
+      await persistPatch(cardBlockId, { x, y });
+    },
+    [persistPatch],
+  );
+
+  const onResizeEnd = useCallback(
+    async (cardBlockId: DbId, w: number, h: number) => {
+      await persistPatch(cardBlockId, { w, h });
+    },
+    [persistPatch],
   );
 
   const placeWeekJournals = useCallback(async () => {
@@ -145,6 +159,7 @@ export default function BoardPanel({ panelId, blockId }: Props) {
         busy={busy}
         onViewChange={setView}
         onMoveEnd={onMoveEnd}
+        onResizeEnd={onResizeEnd}
         onPlaceWeek={() => void placeWeekJournals()}
         onViewportWidth={setViewportWidth}
       />

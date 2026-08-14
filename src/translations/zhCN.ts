@@ -19,6 +19,11 @@ const zhCN = {
   "${count} cards": "${count} 张卡片",
   "Empty board. Right-click here or use the toolbar button.":
     "白板还是空的。在这里右键，或点上方的「放入本周日记」。",
+  "Double-click to edit": "双击进入编辑",
+  Editing: "编辑中",
+  "Drag to resize": "拖动调整大小",
+  "Fit content height": "适应内容高度",
+  "Editor unavailable": "宿主编辑器不可用",
 };
 
 export default zhCN;

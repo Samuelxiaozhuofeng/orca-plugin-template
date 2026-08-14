@@ -1,20 +1,84 @@
 import type { DbId } from "../orca.d.ts";
-import { formatCardTitle, type WhiteboardCard } from "./data";
+import { t } from "../libs/l10n";
+import {
+  clampCardSize,
+  formatCardTitle,
+  MIN_CARD_HEIGHT,
+  type WhiteboardCard,
+} from "./data";
 
-const { useState } = window.React;
+const { useEffect, useRef, useState } = window.React;
+const { useSnapshot } = window.Valtio;
 
 type Props = {
   panelId: string;
   card: WhiteboardCard;
   scale: number;
+  editing: boolean;
+  onStartEdit: (blockId: DbId) => void;
+  onEndEdit: () => void;
   onMoveEnd: (blockId: DbId, x: number, y: number) => Promise<void>;
+  onResizeEnd: (blockId: DbId, w: number, h: number) => Promise<void>;
 };
 
-export function JournalCard({ panelId, card, scale, onMoveEnd }: Props) {
+function JournalEditor({ blockId }: { blockId: DbId }) {
+  const { panelRenderers } = useSnapshot(orca.state);
+  const BlockPanel = panelRenderers.block;
+  if (BlockPanel == null) {
+    return <div className="owb-card-editor-missing">{t("Editor unavailable")}</div>;
+  }
+  return (
+    <div className="owb-card-editor">
+      <div className="orca-panel" data-panel-id="_reference">
+        <div className="orca-hideable">
+          <BlockPanel
+            panelId="_reference"
+            blockId={blockId}
+            preview="content"
+            active
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function JournalCard({
+  panelId,
+  card,
+  scale,
+  editing,
+  onStartEdit,
+  onEndEdit,
+  onMoveEnd,
+  onResizeEnd,
+}: Props) {
+  const cardRef = useRef<HTMLDivElement | null>(null);
   const [draft, setDraft] = useState<{ x: number; y: number } | null>(null);
+  const [size, setSize] = useState<{ w: number; h: number } | null>(null);
   const x = draft?.x ?? card.x;
   const y = draft?.y ?? card.y;
+  const w = size?.w ?? card.w;
+  const h = size?.h ?? card.h;
   const zoom = scale === 0 ? 1 : scale;
+
+  useEffect(() => {
+    if (!editing) return;
+    const onDown = (event: MouseEvent) => {
+      const target = event.target as Node | null;
+      if (target && cardRef.current?.contains(target)) return;
+      onEndEdit();
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onEndEdit();
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [editing, onEndEdit]);
 
   const onTitleMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
@@ -52,22 +116,126 @@ export function JournalCard({ panelId, card, scale, onMoveEnd }: Props) {
     window.addEventListener("mouseup", onUp);
   };
 
+  const onResizeMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+
+    const originW = w;
+    const originH = h;
+    const startX = event.clientX;
+    const startY = event.clientY;
+
+    const onMove = (moveEvent: MouseEvent) => {
+      setSize(
+        clampCardSize(
+          originW + (moveEvent.clientX - startX) / zoom,
+          originH + (moveEvent.clientY - startY) / zoom,
+        ),
+      );
+    };
+
+    const onUp = (upEvent: MouseEvent) => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      const next = clampCardSize(
+        originW + (upEvent.clientX - startX) / zoom,
+        originH + (upEvent.clientY - startY) / zoom,
+      );
+      if (next.w === card.w && next.h === card.h) {
+        setSize(null);
+        return;
+      }
+      setSize(next);
+      void onResizeEnd(card.blockId, next.w, next.h).finally(() => {
+        setSize(null);
+      });
+    };
+
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+
+  const fitContentHeight = () => {
+    const el = cardRef.current;
+    if (!el) return;
+    const title = el.querySelector(".owb-card-title") as HTMLElement | null;
+    const inner = el.querySelector(
+      ".orca-block, .orca-block-editor-blocks",
+    ) as HTMLElement | null;
+    const body = el.querySelector(".owb-card-body") as HTMLElement | null;
+    const contentH =
+      inner?.scrollHeight ?? body?.scrollHeight ?? MIN_CARD_HEIGHT;
+    const nextH = Math.max(
+      MIN_CARD_HEIGHT,
+      (title?.offsetHeight ?? 0) + contentH + 8,
+    );
+    if (nextH === card.h) return;
+    void onResizeEnd(card.blockId, card.w, nextH);
+  };
+
+  const className = [
+    "owb-card",
+    draft ? "is-dragging" : "",
+    size ? "is-resizing" : "",
+    editing ? "is-editing" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <div
-      className={`owb-card${draft ? " is-dragging" : ""}`}
-      style={{ left: x, top: y, width: card.w, height: card.h }}
+    <orca.components.ContextMenu
+      menu={(close) => (
+        <orca.components.Menu>
+          <orca.components.MenuText
+            title={t("Fit content height")}
+            onClick={() => {
+              close();
+              fitContentHeight();
+            }}
+          />
+        </orca.components.Menu>
+      )}
     >
-      <div className="owb-card-title" onMouseDown={onTitleMouseDown}>
-        {formatCardTitle(card.date)}
-      </div>
-      <div className="owb-card-body">
-        <orca.components.Block
-          panelId={panelId}
-          blockId={card.blockId}
-          blockLevel={0}
-          indentLevel={0}
-        />
-      </div>
-    </div>
+      {(open) => (
+        <div
+          ref={cardRef}
+          className={className}
+          style={{ left: x, top: y, width: w, height: h }}
+          onContextMenu={(event) => {
+            if (editing) return;
+            open(event);
+          }}
+        >
+          <div className="owb-card-title" onMouseDown={onTitleMouseDown}>
+            {formatCardTitle(card.date)}
+            {editing ? ` · ${t("Editing")}` : ""}
+          </div>
+          <div
+            className="owb-card-body"
+            title={editing ? undefined : t("Double-click to edit")}
+            onDoubleClick={() => {
+              if (!editing) onStartEdit(card.blockId);
+            }}
+          >
+            {editing ? (
+              <JournalEditor blockId={card.blockId} />
+            ) : (
+              <orca.components.Block
+                panelId={panelId}
+                blockId={card.blockId}
+                blockLevel={0}
+                indentLevel={0}
+              />
+            )}
+          </div>
+          <div
+            className="owb-card-resize"
+            title={t("Drag to resize")}
+            onMouseDown={onResizeMouseDown}
+          />
+        </div>
+      )}
+    </orca.components.ContextMenu>
   );
 }

@@ -143,6 +143,60 @@ export const WHITEBOARD_CSS = `
   overflow: auto;
   padding: 4px 6px 8px;
 }
+
+.owb-card.is-editing,
+.owb-card.is-resizing {
+  z-index: 3;
+}
+
+.owb-card.is-editing {
+  outline: 2px solid var(--orca-color-primary-5, #3b82f6);
+}
+
+.owb-card-resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+  background:
+    linear-gradient(
+      135deg,
+      transparent 0 46%,
+      var(--orca-color-text-2, #888) 46% 54%,
+      transparent 54% 70%,
+      var(--orca-color-text-2, #888) 70% 78%,
+      transparent 78%
+    );
+  opacity: 0.35;
+}
+
+.owb-card:hover .owb-card-resize,
+.owb-card.is-resizing .owb-card-resize {
+  opacity: 0.9;
+}
+
+.owb-card-editor,
+.owb-card-editor .orca-panel,
+.owb-card-editor .orca-hideable,
+.owb-card-editor .orca-block-editor,
+.owb-card-editor .orca-block-editor-main {
+  height: 100%;
+  min-height: 0;
+}
+
+.owb-card-editor .orca-block-breadcrumb,
+.owb-card-editor .orca-scrolling-breadcrumb,
+.owb-card-editor .orca-block-editor-cover {
+  display: none !important;
+}
+
+.owb-card-editor-missing {
+  padding: 8px;
+  color: var(--orca-color-text-2, #777);
+  font-size: 12px;
+}
 `.trim();
 
 export function injectWhiteboardStyles(): void {

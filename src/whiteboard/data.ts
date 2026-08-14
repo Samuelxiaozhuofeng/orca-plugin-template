@@ -7,6 +7,8 @@ export const CARDS_PROP = "cards";
 export const PROP_TYPE_TEXT = 1;
 export const CARD_WIDTH = 260;
 export const CARD_HEIGHT = 200;
+export const MIN_CARD_WIDTH = 160;
+export const MIN_CARD_HEIGHT = 120;
 export const GRID_GAP = 16;
 export const GRID_ORIGIN = 24;
 export const MIN_SCALE = 0.25;
@@ -81,17 +83,39 @@ export function clampScale(scale: number): number {
   return Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale));
 }
 
-function isCard(value: unknown): value is WhiteboardCard {
-  if (value == null || typeof value !== "object") return false;
+export function clampCardSize(width: number, height: number): {
+  w: number;
+  h: number;
+} {
+  return {
+    w: Math.max(MIN_CARD_WIDTH, width),
+    h: Math.max(MIN_CARD_HEIGHT, height),
+  };
+}
+
+function normalizeCard(value: unknown): WhiteboardCard | null {
+  if (value == null || typeof value !== "object") return null;
   const card = value as Record<string, unknown>;
-  return (
-    typeof card.blockId === "number" &&
-    typeof card.date === "string" &&
-    typeof card.x === "number" &&
-    typeof card.y === "number" &&
-    typeof card.w === "number" &&
-    typeof card.h === "number"
+  if (
+    typeof card.blockId !== "number" ||
+    typeof card.date !== "string" ||
+    typeof card.x !== "number" ||
+    typeof card.y !== "number"
+  ) {
+    return null;
+  }
+  const size = clampCardSize(
+    typeof card.w === "number" && card.w > 0 ? card.w : CARD_WIDTH,
+    typeof card.h === "number" && card.h > 0 ? card.h : CARD_HEIGHT,
   );
+  return {
+    blockId: card.blockId,
+    date: card.date,
+    x: card.x,
+    y: card.y,
+    w: size.w,
+    h: size.h,
+  };
 }
 
 function parseCardsValue(value: unknown): WhiteboardCard[] {
@@ -106,7 +130,9 @@ function parseCardsValue(value: unknown): WhiteboardCard[] {
     }
   }
   if (!Array.isArray(parsed)) return [];
-  return parsed.filter(isCard);
+  return parsed
+    .map(normalizeCard)
+    .filter((card): card is WhiteboardCard => card != null);
 }
 
 export function readCards(
