@@ -13,11 +13,16 @@ import { clearAllPendingCardFocus } from "./whiteboard/cardFocus";
 import BoardBlock from "./whiteboard/BoardBlock";
 import BoardPanel from "./whiteboard/BoardPanel";
 import {
+  boardName,
   insertedBlockId,
   openBoard,
   PANEL_TYPE,
   WHITEBOARD_TYPE,
 } from "./whiteboard/data";
+import {
+  mountOpenBoardHost,
+  openBoardPicker,
+} from "./whiteboard/openBoardDialog";
 import { flushAllCardWrites } from "./whiteboard/cardPersist";
 import { flushAllEdgeWrites } from "./whiteboard/edgePersist";
 import {
@@ -31,10 +36,13 @@ import {
 
 let pluginName: string;
 let unmountAddToBoard: (() => void) | null = null;
+let unmountOpenBoard: (() => void) | null = null;
 
 const INSERT_COMMAND = "insertWhiteboard";
 const INSERT_SLASH = "insertWhiteboardSlash";
 const LOCATE_COMMAND = "locateBlockOnWhiteboard";
+const OPEN_COMMAND = "openWhiteboard";
+const OPEN_HEADBAR = "openWhiteboardButton";
 const LOCATE_SHORTCUT = "alt+shift+w";
 
 function commandId(name: string): string {
@@ -51,7 +59,9 @@ export async function load(_name: string) {
 
   orca.panels.registerPanel(PANEL_TYPE, BoardPanel);
   orca.renderers.registerBlock(WHITEBOARD_TYPE, false, BoardBlock);
-  orca.converters.registerBlock("plain", WHITEBOARD_TYPE, () => t("Whiteboard"));
+  orca.converters.registerBlock("plain", WHITEBOARD_TYPE, (_content, _repr, block) =>
+    boardName(block),
+  );
 
   orca.commands.registerEditorCommand(
     commandId(INSERT_COMMAND),
@@ -132,6 +142,25 @@ export async function load(_name: string) {
   );
   unmountAddToBoard = mountAddToBoardHost();
 
+  const openId = commandId(OPEN_COMMAND);
+  orca.commands.registerCommand(
+    openId,
+    () => {
+      openBoardPicker();
+    },
+    t("Open whiteboard…"),
+  );
+  orca.headbar.registerHeadbarButton(commandId(OPEN_HEADBAR), () => (
+    <orca.components.Button
+      variant="plain"
+      title={t("Open whiteboard…")}
+      onClick={() => void orca.commands.invokeCommand(openId)}
+    >
+      <i className="ti ti-chalkboard" />
+    </orca.components.Button>
+  ));
+  unmountOpenBoard = mountOpenBoardHost();
+
   console.log(`${pluginName} loaded.`);
 }
 
@@ -151,9 +180,13 @@ export async function unload() {
     orca.blockMenuCommands.unregisterBlockMenuCommand(
       locateOnBoardCommandId(pluginName),
     );
+    orca.commands.unregisterCommand(commandId(OPEN_COMMAND));
+    orca.headbar.unregisterHeadbarButton(commandId(OPEN_HEADBAR));
   }
   unmountAddToBoard?.();
   unmountAddToBoard = null;
+  unmountOpenBoard?.();
+  unmountOpenBoard = null;
   clearAllPendingCardFocus();
   stopBlockMarks();
   removeWhiteboardStyles();

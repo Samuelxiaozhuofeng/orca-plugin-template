@@ -34,12 +34,30 @@ function getOrCreate(boardId: DbId): BoardHistory {
   return history;
 }
 
+const retainCounts = new Map<DbId, number>();
+
 export function clearBoardHistory(boardId: DbId): void {
   histories.delete(boardId);
+  retainCounts.delete(boardId);
+}
+
+/** Keep undo history until the last panel of this board unmounts. */
+export function retainBoardHistory(boardId: DbId): () => void {
+  retainCounts.set(boardId, (retainCounts.get(boardId) ?? 0) + 1);
+  return () => {
+    const next = (retainCounts.get(boardId) ?? 1) - 1;
+    if (next <= 0) {
+      retainCounts.delete(boardId);
+      histories.delete(boardId);
+      return;
+    }
+    retainCounts.set(boardId, next);
+  };
 }
 
 export function resetAllHistory(): void {
   histories.clear();
+  retainCounts.clear();
   holdCount = 0;
   blankUndoTold = false;
 }
@@ -173,7 +191,7 @@ export function cardPatchesChange(
     if (patch.y != null && patch.y !== card.y) return true;
     if (patch.w != null && patch.w !== card.w) return true;
     if (patch.h != null && patch.h !== card.h) return true;
-    if (patch.color !== undefined && patch.color !== card.color) return true;
+    if ("color" in patch && patch.color !== card.color) return true;
   }
   return false;
 }

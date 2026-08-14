@@ -1,4 +1,5 @@
 import { ADD_TO_BOARD_CSS } from "./addToBoardStyles";
+import { BOARD_TITLE_CSS } from "./boardTitleStyles";
 import { CARD_EDITOR_CSS } from "./cardEditorStyles";
 import { CARD_CSS } from "./cardStyles";
 import { CARD_CHROME_CSS } from "./cardToolbarStyles";
@@ -63,18 +64,6 @@ const SHELL_CSS = `
   box-shadow:
     var(--owb-shadow-toolbar),
     0 0 0 1px var(--orca-color-border);
-}
-
-.owb-toolbar-title {
-  max-width: 200px;
-  padding: 0 var(--owb-space-2);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.4;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--orca-color-text-1);
 }
 
 .owb-toolbar-sep {
@@ -469,6 +458,7 @@ export const WHITEBOARD_CSS = [
   CARD_CHROME_CSS,
   EDGE_CSS,
   ADD_TO_BOARD_CSS,
+  BOARD_TITLE_CSS,
 ].join("\n");
 
 export function injectWhiteboardStyles(): void {

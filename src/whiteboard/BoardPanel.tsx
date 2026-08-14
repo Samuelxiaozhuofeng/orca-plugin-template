@@ -10,7 +10,6 @@ import {
   canRedo,
   canUndo,
   cardPatchesChange,
-  clearBoardHistory,
   edgesMatchIgnoringLinked,
   holdHistory,
   preserveLinked,
@@ -18,12 +17,14 @@ import {
   discardLastRecord,
   restoreFailedRedo,
   restoreFailedUndo,
+  retainBoardHistory,
   shouldTellBlankCardUndo,
   takeRedo,
   takeUndo,
   type BoardSnapshot,
 } from "./boardHistory";
-import { useCardPersist } from "./cardPersist";
+import { useBoardPersist } from "./useBoardPersist";
+import { tryReadCards, type WhiteboardCard } from "./cards";
 import { Canvas } from "./Canvas";
 import {
   boardName,
@@ -32,14 +33,11 @@ import {
   defaultGridColumns,
   edgesEqual,
   placeJournalCards,
-  readCards,
-  readEdges,
   viewportOrigin,
   type CanvasOrigin,
-  type WhiteboardCard,
 } from "./data";
-import { useEdgePersist } from "./edgePersist";
-import type { WhiteboardEdge } from "./edges";
+import { tryReadEdges, type WhiteboardEdge } from "./edges";
+import { BoardTitle } from "./BoardTitle";
 import { PlaceDialog, type PlaceDialogValue } from "./PlaceDialog";
 import {
   DEFAULT_VIEW,
@@ -60,17 +58,20 @@ type Props = {
 export default function BoardPanel({ panelId, blockId }: Props) {
   const { blocks } = useSnapshot(orca.state);
   const block = blockId == null ? undefined : blocks[blockId];
-  const serverCards = readCards(block);
-  const { cards, patchCards, commitCards, appendCards } = useCardPersist(
-    blockId ?? null,
-    serverCards,
-  );
-  const serverEdges = readEdges(block, cards);
-  const { edges, commitEdges } = useEdgePersist(
-    blockId ?? null,
-    serverEdges,
-    cards.map((card) => card.blockId),
-  );
+  const cardsRead = tryReadCards(block);
+  const edgesRead = tryReadEdges(block);
+  const protect = block != null && (!cardsRead.ok || !edgesRead.ok);
+  const serverCards = cardsRead.ok ? cardsRead.value : [];
+  const serverEdges = edgesRead.ok ? edgesRead.value : [];
+  const {
+    cards,
+    edges,
+    patchCards,
+    commitCards,
+    appendCards,
+    commitEdges,
+    commitBoard,
+  } = useBoardPersist(blockId ?? null, serverCards, serverEdges, protect);
   const [view, setView] = useState<CanvasView>(DEFAULT_VIEW);
   const [busy, setBusy] = useState(false);
   const [viewportWidth, setViewportWidth] = useState(800);
@@ -106,7 +107,13 @@ export default function BoardPanel({ panelId, blockId }: Props) {
     (
       entries: ReadonlyArray<{
         blockId: DbId;
-        patch: { x?: number; y?: number; w?: number; h?: number };
+        patch: {
+          x?: number;
+          y?: number;
+          w?: number;
+          h?: number;
+          color?: string;
+        };
       }>,
     ) => {
       if (cardPatchesChange(cardsRef.current, entries)) record();
@@ -189,9 +196,8 @@ export default function BoardPanel({ panelId, blockId }: Props) {
   }, [pendingFocus]);
 
   useEffect(() => {
-    return () => {
-      if (blockId != null) clearBoardHistory(blockId);
-    };
+    if (blockId == null) return;
+    return retainBoardHistory(blockId);
   }, [blockId]);
 
   useLayoutEffect(() => {
@@ -222,23 +228,16 @@ export default function BoardPanel({ panelId, blockId }: Props) {
       if (ids.length === 0) return true;
       const drop = new Set(ids);
       const next = cards.filter((card) => !drop.has(card.blockId));
+      const leftover = edges.filter(
+        (edge) => !drop.has(edge.from) && !drop.has(edge.to),
+      );
       record();
       const release = holdHistory();
       try {
-        const saved = await commitCards(next);
+        const saved = await commitBoard(next, leftover);
         if (!saved) {
           if (blockId != null) discardLastRecord(blockId);
           return false;
-        }
-        const leftover = edges.filter(
-          (edge) => !drop.has(edge.from) && !drop.has(edge.to),
-        );
-        if (leftover.length !== edges.length) {
-          const edgesOk = await commitEdges(
-            leftover,
-            new Set(next.map((card) => card.blockId)),
-          );
-          if (!edgesOk) return false;
         }
       } finally {
         release();
@@ -252,7 +251,7 @@ export default function BoardPanel({ panelId, blockId }: Props) {
       );
       return true;
     },
-    [blockId, cards, commitCards, commitEdges, edges, record],
+    [blockId, cards, commitBoard, edges, record],
   );
 
   const applySnapshot = useCallback(
@@ -260,19 +259,9 @@ export default function BoardPanel({ panelId, blockId }: Props) {
       const nextEdges = preserveLinked(next.edges, current.edges);
       const cardsChanged = !cardsEqual(next.cards, current.cards);
       const edgesChanged = !edgesEqual(nextEdges, current.edges);
-      if (cardsChanged) {
-        const ok = await commitCards(next.cards);
+      if (cardsChanged || edgesChanged) {
+        const ok = await commitBoard(next.cards, nextEdges);
         if (!ok) return false;
-      }
-      if (edgesChanged) {
-        const ok = await commitEdges(
-          nextEdges,
-          new Set(next.cards.map((card) => card.blockId)),
-        );
-        if (!ok) {
-          if (cardsChanged) await commitCards(current.cards);
-          return false;
-        }
       }
       const removed = current.cards.filter(
         (card) =>
@@ -292,7 +281,7 @@ export default function BoardPanel({ panelId, blockId }: Props) {
       }
       return true;
     },
-    [blockId, commitCards, commitEdges],
+    [blockId, commitBoard],
   );
 
   const onUndo = useCallback(() => {
@@ -392,7 +381,7 @@ export default function BoardPanel({ panelId, blockId }: Props) {
         focusApiRef={focusApiRef}
       />
       <div className="owb-toolbar">
-        <div className="owb-toolbar-title">{boardName(block)}</div>
+        <BoardTitle blockId={blockId} name={boardName(block)} />
         <div className="owb-toolbar-sep" />
         <button
           type="button"

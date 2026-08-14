@@ -18,6 +18,7 @@ import {
 import { MIN_CARD_HEIGHT, type WhiteboardCard } from "./data";
 import type { Side } from "./edges";
 import type { ArrangeAction } from "./selection";
+import { isHostOverlayTarget } from "./hostOverlay";
 import { cachedBlockPlainText, cardExcerpt } from "./viewTransform";
 
 const ANCHOR_SIDES: Side[] = ["t", "r", "b", "l"];
@@ -174,6 +175,7 @@ export function Card({
   onMoveFrame,
 }: Props) {
   const cardRef = useRef<HTMLDivElement | null>(null);
+  const bodyRef = useRef(document.body);
   const liveRef = useRef<CardBox>({
     x: card.x,
     y: card.y,
@@ -205,6 +207,7 @@ export function Card({
     const onDown = (event: MouseEvent) => {
       const target = event.target as Node | null;
       if (target && cardRef.current?.contains(target)) return;
+      if (isHostOverlayTarget(target)) return;
       onEndEdit();
     };
     const onKey = (event: KeyboardEvent) => {
@@ -294,6 +297,8 @@ export function Card({
 
   return (
     <orca.components.ContextMenu
+      container={bodyRef}
+      allowBeyondContainer
       menu={(close) => (
         <orca.components.Menu>
           <orca.components.MenuText
@@ -334,10 +339,9 @@ export function Card({
           style={{ left: box.x, top: box.y, width: box.w, height: box.h }}
           onMouseDown={onRootMouseDown}
           onContextMenu={(event) => {
-            if (editing) {
-              event.preventDefault();
-              return;
-            }
+            // Editing: do not intercept. The hosted Orca editor owns
+            // contextmenu (and Canvas already skips .owb-card).
+            if (editing) return;
             if (!selected) onSelectOnly(card.blockId);
             open(event);
           }}

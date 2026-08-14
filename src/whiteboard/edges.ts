@@ -1,5 +1,7 @@
-import type { Block, DbId } from "../orca.d.ts";
+import type { DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n";
+import { assertBoardWritable, writeProperties } from "./boardWrite";
+import type { JsonParseResult } from "./cards";
 
 export const EDGES_PROP = "edges";
 export const PROP_TYPE_TEXT = 1;
@@ -85,15 +87,15 @@ export function normalizeEdge(value: unknown): WhiteboardEdge | null {
   return edge;
 }
 
+/** Drops self-loops and duplicate pairs. Does not drop edges whose cards are missing. */
 export function sanitizeEdges(
   edges: readonly WhiteboardEdge[],
-  cardIds: ReadonlySet<DbId>,
+  _cardIds?: ReadonlySet<DbId>,
 ): WhiteboardEdge[] {
   const seen = new Set<string>();
   const out: WhiteboardEdge[] = [];
   for (const edge of edges) {
     if (edge.from === edge.to) continue;
-    if (!cardIds.has(edge.from) || !cardIds.has(edge.to)) continue;
     const key = pairKey(edge.from, edge.to);
     if (seen.has(key)) continue;
     seen.add(key);
@@ -102,51 +104,53 @@ export function sanitizeEdges(
   return out;
 }
 
-export function parseEdges(value: unknown): WhiteboardEdge[] {
-  let parsed: unknown = value;
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    if (trimmed === "") return [];
-    try {
-      parsed = JSON.parse(trimmed);
-    } catch {
-      return [];
-    }
-  }
-  if (!Array.isArray(parsed)) return [];
+function edgesFromArray(parsed: unknown[]): WhiteboardEdge[] {
   return parsed
     .map(normalizeEdge)
     .filter((edge): edge is WhiteboardEdge => edge != null);
+}
+
+export function tryParseEdges(value: unknown): JsonParseResult<WhiteboardEdge[]> {
+  if (value == null) return { ok: true, value: [] };
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "") return { ok: true, value: [] };
+    try {
+      const parsed: unknown = JSON.parse(trimmed);
+      if (!Array.isArray(parsed)) return { ok: false };
+      return { ok: true, value: edgesFromArray(parsed) };
+    } catch {
+      return { ok: false };
+    }
+  }
+  if (Array.isArray(value)) return { ok: true, value: edgesFromArray(value) };
+  return { ok: false };
+}
+
+export function parseEdges(value: unknown): WhiteboardEdge[] {
+  const parsed = tryParseEdges(value);
+  return parsed.ok ? parsed.value : [];
+}
+
+export function tryReadEdges(
+  block:
+    | { properties?: readonly { name: string; value?: unknown }[] }
+    | undefined,
+): JsonParseResult<WhiteboardEdge[]> {
+  if (block == null) return { ok: true, value: [] };
+  const prop = block.properties?.find((item) => item.name === EDGES_PROP);
+  if (prop == null) return { ok: true, value: [] };
+  return tryParseEdges(prop.value);
 }
 
 export function readEdges(
   block:
     | { properties?: readonly { name: string; value?: unknown }[] }
     | undefined,
-  cards?: ReadonlyArray<{ blockId: DbId }>,
+  _cards?: ReadonlyArray<{ blockId: DbId }>,
 ): WhiteboardEdge[] {
-  if (block == null) return [];
-  const prop = block.properties?.find((item) => item.name === EDGES_PROP);
-  if (prop == null) return [];
-  const parsed = parseEdges(prop.value);
-  if (cards == null) return parsed;
-  return sanitizeEdges(parsed, new Set(cards.map((card) => card.blockId)));
-}
-
-function applyReturnedBlocks(result: unknown): void {
-  const blocks = Array.isArray(result)
-    ? Array.isArray(result[1])
-      ? result[1]
-      : result
-    : [];
-  for (const item of blocks) {
-    if (item != null && typeof item === "object" && "id" in item) {
-      const next = item as Block;
-      if (typeof next.id === "number") {
-        orca.state.blocks[next.id] = next;
-      }
-    }
-  }
+  const parsed = tryReadEdges(block);
+  return parsed.ok ? parsed.value : [];
 }
 
 function storedEdge(edge: WhiteboardEdge): WhiteboardEdge {
@@ -181,53 +185,35 @@ export function edgesEqual(
   return true;
 }
 
+export function preparedEdges(edges: WhiteboardEdge[]): WhiteboardEdge[] {
+  return sanitizeEdges(edges.map(storedEdge));
+}
+
 export async function writeEdges(
   blockId: DbId,
   edges: WhiteboardEdge[],
-  cardIds?: ReadonlySet<DbId>,
+  _cardIds?: ReadonlySet<DbId>,
 ): Promise<void> {
-  const stored = (cardIds == null
-    ? edges.map(storedEdge)
-    : sanitizeEdges(edges.map(storedEdge), cardIds));
-  const payload = JSON.stringify(stored);
+  await assertBoardWritable(blockId);
+  const stored = preparedEdges(edges);
   // Must not use invokeEditorCommand here: that API no-ops when the active
   // panel has no viewState.editor (the whiteboard panel never has one).
-  const result = await orca.invokeBackend(
-    "set-properties",
-    [blockId],
-    [
-      {
-        name: EDGES_PROP,
-        type: PROP_TYPE_TEXT,
-        value: payload,
-      },
-    ],
-  );
-  applyReturnedBlocks(result);
+  const fresh = await writeProperties(blockId, [
+    {
+      name: EDGES_PROP,
+      type: PROP_TYPE_TEXT,
+      value: JSON.stringify(stored),
+    },
+  ]);
 
-  const fresh = (await orca.invokeBackend("get-block", blockId)) as
-    | Block
-    | null;
-  if (fresh != null && typeof fresh.id === "number") {
-    orca.state.blocks[fresh.id] = fresh;
-  }
-
-  const readBack = parseEdges(
-    (fresh ?? orca.state.blocks[blockId])?.properties?.find(
-      (item) => item.name === EDGES_PROP,
-    )?.value,
-  );
-  const expected = stored;
-  if (!edgesEqual(readBack, expected)) {
+  const readBack = tryReadEdges(fresh ?? orca.state.blocks[blockId]);
+  if (!readBack.ok || !edgesEqual(readBack.value, stored)) {
     console.error("[whiteboard] edges write verify failed", {
       blockId,
-      expected,
-      readBack,
-      backendResult: result,
+      expected: stored,
+      readBack: readBack.ok ? readBack.value : "(unreadable)",
       freshProperties: fresh?.properties,
     });
     throw new Error(t("Whiteboard connections were not saved"));
   }
-
-  orca.broadcasts.broadcast("orca.refresh-blocks", [blockId]);
 }

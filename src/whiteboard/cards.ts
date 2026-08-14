@@ -1,6 +1,7 @@
-import type { Block, DbId } from "../orca.d.ts";
+import type { DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n";
 import { emitBoardCardsChanged } from "./boardEvents";
+import { assertBoardWritable, writeProperties } from "./boardWrite";
 import {
   CARD_HEIGHT,
   CARD_WIDTH,
@@ -80,21 +81,47 @@ export function normalizeCard(value: unknown): WhiteboardCard | null {
   };
 }
 
-export function parseCards(value: unknown): WhiteboardCard[] {
-  let parsed: unknown = value;
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    if (trimmed === "") return [];
-    try {
-      parsed = JSON.parse(trimmed);
-    } catch {
-      return [];
-    }
-  }
-  if (!Array.isArray(parsed)) return [];
+export type JsonParseResult<T> =
+  | { ok: true; value: T }
+  | { ok: false };
+
+function cardsFromArray(parsed: unknown[]): WhiteboardCard[] {
   return parsed
     .map(normalizeCard)
     .filter((card): card is WhiteboardCard => card != null);
+}
+
+export function tryParseCards(value: unknown): JsonParseResult<WhiteboardCard[]> {
+  if (value == null) return { ok: true, value: [] };
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "") return { ok: true, value: [] };
+    try {
+      const parsed: unknown = JSON.parse(trimmed);
+      if (!Array.isArray(parsed)) return { ok: false };
+      return { ok: true, value: cardsFromArray(parsed) };
+    } catch {
+      return { ok: false };
+    }
+  }
+  if (Array.isArray(value)) return { ok: true, value: cardsFromArray(value) };
+  return { ok: false };
+}
+
+export function parseCards(value: unknown): WhiteboardCard[] {
+  const parsed = tryParseCards(value);
+  return parsed.ok ? parsed.value : [];
+}
+
+export function tryReadCards(
+  block:
+    | { properties?: readonly { name: string; value?: unknown }[] }
+    | undefined,
+): JsonParseResult<WhiteboardCard[]> {
+  if (block == null) return { ok: true, value: [] };
+  const prop = block.properties?.find((item) => item.name === CARDS_PROP);
+  if (prop == null) return { ok: true, value: [] };
+  return tryParseCards(prop.value);
 }
 
 export function readCards(
@@ -102,26 +129,8 @@ export function readCards(
     | { properties?: readonly { name: string; value?: unknown }[] }
     | undefined,
 ): WhiteboardCard[] {
-  if (block == null) return [];
-  const prop = block.properties?.find((item) => item.name === CARDS_PROP);
-  if (prop == null) return [];
-  return parseCards(prop.value);
-}
-
-function applyReturnedBlocks(result: unknown): void {
-  const blocks = Array.isArray(result)
-    ? Array.isArray(result[1])
-      ? result[1]
-      : result
-    : [];
-  for (const item of blocks) {
-    if (item != null && typeof item === "object" && "id" in item) {
-      const block = item as Block;
-      if (typeof block.id === "number") {
-        orca.state.blocks[block.id] = block;
-      }
-    }
-  }
+  const parsed = tryReadCards(block);
+  return parsed.ok ? parsed.value : [];
 }
 
 function storedCard(card: WhiteboardCard): WhiteboardCard {
@@ -156,46 +165,36 @@ export function cardsEqual(
   return true;
 }
 
+export function preparedCards(cards: WhiteboardCard[]): WhiteboardCard[] {
+  return cards.map(storedCard);
+}
+
 export async function writeCards(
   blockId: DbId,
   cards: WhiteboardCard[],
 ): Promise<void> {
-  const stored = cards.map(storedCard);
-  const payload = JSON.stringify(stored);
+  await assertBoardWritable(blockId);
+  const stored = preparedCards(cards);
   // Must not use invokeEditorCommand here: that API no-ops when the active
   // panel has no viewState.editor (the whiteboard panel never has one).
-  const result = await orca.invokeBackend(
-    "set-properties",
-    [blockId],
-    [
-      {
-        name: CARDS_PROP,
-        type: PROP_TYPE_TEXT,
-        value: payload,
-      },
-    ],
-  );
-  applyReturnedBlocks(result);
+  const fresh = await writeProperties(blockId, [
+    {
+      name: CARDS_PROP,
+      type: PROP_TYPE_TEXT,
+      value: JSON.stringify(stored),
+    },
+  ]);
 
-  const fresh = (await orca.invokeBackend("get-block", blockId)) as
-    | Block
-    | null;
-  if (fresh != null && typeof fresh.id === "number") {
-    orca.state.blocks[fresh.id] = fresh;
-  }
-
-  const readBack = readCards(fresh ?? orca.state.blocks[blockId]);
-  if (!cardsEqual(readBack, stored)) {
+  const readBack = tryReadCards(fresh ?? orca.state.blocks[blockId]);
+  if (!readBack.ok || !cardsEqual(readBack.value, stored)) {
     console.error("[whiteboard] cards write verify failed", {
       blockId,
       expected: stored,
-      readBack,
-      backendResult: result,
+      readBack: readBack.ok ? readBack.value : "(unreadable)",
       freshProperties: fresh?.properties,
     });
     throw new Error(t("Whiteboard cards were not saved"));
   }
 
-  orca.broadcasts.broadcast("orca.refresh-blocks", [blockId]);
   emitBoardCardsChanged(blockId);
 }

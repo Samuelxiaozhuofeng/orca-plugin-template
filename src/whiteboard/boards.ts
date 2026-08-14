@@ -36,17 +36,35 @@ export type OpenBoard = {
 
 const PARENT_WALK_LIMIT = 20;
 
-const openBoards = new Map<DbId, OpenBoard>();
+const openBoards = new Map<DbId, OpenBoard[]>();
 
 export function registerOpenBoard(id: DbId, api: OpenBoard): () => void {
-  openBoards.set(id, api);
+  const list = openBoards.get(id) ?? [];
+  list.push(api);
+  openBoards.set(id, list);
   return () => {
-    if (openBoards.get(id) === api) openBoards.delete(id);
+    const current = openBoards.get(id);
+    if (current == null) return;
+    const next = current.filter((item) => item !== api);
+    if (next.length === 0) openBoards.delete(id);
+    else openBoards.set(id, next);
   };
 }
 
 export function getOpenBoard(id: DbId): OpenBoard | null {
-  return openBoards.get(id) ?? null;
+  const list = openBoards.get(id);
+  if (list == null || list.length === 0) return null;
+  const primary = list[list.length - 1];
+  return {
+    getCards: () => primary.getCards(),
+    appendCards: (incoming) => primary.appendCards(incoming),
+    focusCard: (cardBlockId) => {
+      for (const api of list) {
+        if (api.focusCard(cardBlockId)) return true;
+      }
+      return false;
+    },
+  };
 }
 
 function asBlockId(value: unknown): DbId | null {

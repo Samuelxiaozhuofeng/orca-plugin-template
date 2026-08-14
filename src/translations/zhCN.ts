@@ -139,8 +139,14 @@ const zhCN = {
     "还没有白板。在笔记里输入 / 新建白板。",
   "No matching whiteboards": "没有匹配的白板",
   "Open whiteboard": "打开这块白板",
+  "Open whiteboard…": "打开白板…",
+  "Rename whiteboard": "重命名白板",
+  "Whiteboard name": "白板名称",
+  "Failed to rename whiteboard": "无法重命名白板",
   "Undo removed the card from the board. The note is still under this whiteboard in the outline.":
     "卡片已从白板上拿掉，笔记还在这块白板下面，没有被删除。",
+  "This whiteboard's data could not be read. Saving has been stopped so nothing is overwritten.":
+    "这块白板的数据读不出来，已停止保存以免覆盖",
 };
 
 export default zhCN;

@@ -92,6 +92,7 @@ export function Canvas({
   const marqueeRef = useRef<HTMLDivElement | null>(null);
   const guidesRef = useRef<HTMLDivElement | null>(null);
   const edgeApiRef = useRef<EdgeLayerApi | null>(null);
+  const bodyRef = useRef(document.body);
   const settings = useWhiteboardSettings();
   const settingsRef = useRef(settings);
   editingRef.current = editingId;
@@ -349,7 +350,11 @@ export function Canvas({
   );
 
   return (
-    <orca.components.ContextMenu menu={boardMenu}>
+    <orca.components.ContextMenu
+      container={bodyRef}
+      allowBeyondContainer
+      menu={boardMenu}
+    >
       {(open) => (
         <div
           ref={viewportRef}
