@@ -11,15 +11,13 @@ export const CARD_CSS = `
   overflow: hidden;
   cursor: grab;
   background: var(--orca-color-bg-1);
-  border: none;
-  border-radius: 14px;
-  box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.04),
-    0 8px 24px rgba(0, 0, 0, 0.06),
-    0 0 0 1px var(--orca-color-border-2, rgba(0, 0, 0, 0.08));
+  border: 2px solid var(--orca-color-border);
+  border-radius: var(--owb-radius-card, 6px);
+  box-shadow: var(--owb-shadow-rest);
   transition:
     box-shadow var(--owb-duration) var(--owb-ease),
-    transform var(--owb-duration) var(--owb-ease);
+    transform var(--owb-duration) var(--owb-ease),
+    border-color var(--owb-duration) var(--owb-ease);
 }
 
 .owb-card:not(.is-editing) {
@@ -27,27 +25,21 @@ export const CARD_CSS = `
 }
 
 .owb-card:hover:not(.is-dragging):not(.is-resizing):not(.is-selected):not(.is-editing):not(.is-marquee-hit) {
-  transform: translateY(-1px);
-  box-shadow:
-    0 4px 12px rgba(0, 0, 0, 0.06),
-    0 12px 32px rgba(0, 0, 0, 0.08),
-    0 0 0 1px var(--orca-color-border-2, rgba(0, 0, 0, 0.12));
+  transform: translate(-2px, -2px);
+  box-shadow: var(--owb-shadow-hover);
 }
 
 .owb-card.is-selected:hover:not(.is-dragging):not(.is-editing),
 .owb-card.is-editing:hover:not(.is-dragging) {
-  transform: translateY(-1px);
+  transform: translate(-2px, -2px);
 }
 
 .owb-card.is-dragging {
   z-index: 4;
   cursor: grabbing;
-  transform: scale(1.02);
+  transform: translate(-3px, -3px) scale(1.01);
   transition: none;
-  box-shadow:
-    0 8px 24px rgba(0, 0, 0, 0.12),
-    0 20px 48px rgba(0, 0, 0, 0.16),
-    0 0 0 1px var(--orca-color-border-2, rgba(0, 0, 0, 0.12));
+  box-shadow: var(--owb-shadow-drag);
 }
 
 .owb-card.is-resizing {
@@ -55,28 +47,23 @@ export const CARD_CSS = `
   transition: none;
 }
 
-/* Selected state with Apple Blue border and glow */
+/* Selected state with Bamboo Jade border and hard shadow */
 .owb-card.is-selected:not(.is-editing):not(.is-dragging):not(.is-resizing) {
   z-index: 2;
-  box-shadow:
-    0 4px 16px rgba(0, 0, 0, 0.08),
-    0 0 0 2.5px var(--orca-color-primary-5, #2F80ED),
-    0 0 0 6px color-mix(in oklab, var(--orca-color-primary-5, #2F80ED) 16%, transparent);
+  border-color: var(--orca-color-primary-5, #00a896);
+  box-shadow: 4px 4px 0px 0px var(--orca-color-primary-5, #00a896);
 }
 
 .owb-card.is-marquee-hit:not(.is-selected):not(.is-editing) {
-  box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.04),
-    0 0 0 2px color-mix(in oklab, var(--orca-color-primary-5, #2F80ED) 45%, transparent);
+  border-color: var(--orca-color-primary-5, #00a896);
+  box-shadow: 3px 3px 0px 0px color-mix(in oklab, var(--orca-color-primary-5, #00a896) 50%, transparent);
 }
 
-/* Editing state */
+/* Editing state with Imperial Amber border and hard shadow */
 .owb-card.is-editing:not(.is-dragging):not(.is-resizing) {
   z-index: 3;
-  box-shadow:
-    0 4px 16px rgba(0, 0, 0, 0.08),
-    0 0 0 2.5px var(--orca-color-primary-5, #2F80ED),
-    0 0 0 6px color-mix(in oklab, var(--orca-color-primary-5, #2F80ED) 12%, transparent);
+  border-color: var(--orca-color-warning-5, #f4a259);
+  box-shadow: 4px 4px 0px 0px var(--orca-color-warning-5, #f4a259);
 }
 
 .owb-card.is-editing .owb-card-body {
@@ -88,13 +75,14 @@ export const CARD_CSS = `
   display: flex;
   align-items: center;
   gap: var(--owb-space-2);
-  padding: 12px 14px 4px 14px;
+  padding: 10px 14px 6px 14px;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 800;
   line-height: 1.4;
   user-select: none;
   cursor: grab;
   color: var(--orca-color-text-1);
+  border-bottom: 1.5px solid color-mix(in srgb, var(--orca-color-border) 15%, transparent);
   transition: padding-right var(--owb-duration) var(--owb-ease);
 }
 
@@ -126,35 +114,44 @@ export const CARD_CSS = `
   white-space: nowrap;
 }
 
-/* Minimalist top-left floating weekday badge for journal notes */
+/* Stamped seal specific journal badge (朱印闲章风格) */
 .owb-card-journal-badge {
   position: absolute;
-  top: 12px;
-  left: 14px;
+  top: 10px;
+  left: 12px;
   z-index: 5;
   display: inline-flex;
   align-items: center;
   gap: 4px;
   padding: 2px 7px;
-  border-radius: 6px;
+  border-radius: var(--owb-radius-sm, 3px);
   font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  background: color-mix(in oklab, var(--orca-color-text-3) 12%, transparent);
-  color: var(--orca-color-text-2);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  background: linear-gradient(135deg, #d9381e 0%, #b82810 100%);
+  color: #fffdf0;
+  border: 1.5px solid var(--orca-color-border);
+  box-shadow: 2px 2px 0px 0px #701305;
   user-select: none;
   pointer-events: none;
-  transition: background 150ms ease, color 150ms ease;
+  transition: background var(--owb-duration) var(--owb-ease),
+              box-shadow var(--owb-duration) var(--owb-ease);
+}
+
+@media (prefers-color-scheme: dark) {
+  .owb-card-journal-badge {
+    background: linear-gradient(135deg, #ff4d4d 0%, #d9381e 100%);
+    color: #111417;
+    box-shadow: 2px 2px 0px 0px #8f2415;
+  }
 }
 
 .owb-card-journal-badge.is-weekend {
-  color: var(--orca-color-text-red, #E5484D);
-  background: color-mix(in oklab, var(--orca-color-text-red, #E5484D) 12%, transparent);
+  background: linear-gradient(135deg, #b71c1c 0%, #7f0000 100%);
 }
 
 .owb-card-journal-badge.is-today {
-  color: var(--orca-color-primary-5, #2F80ED);
-  background: color-mix(in oklab, var(--orca-color-primary-5, #2F80ED) 12%, transparent);
+  border-color: var(--orca-color-warning-5, #f4a259);
 }
 
 .owb-card-today-dot {
@@ -162,7 +159,7 @@ export const CARD_CSS = `
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: currentColor;
+  background: var(--orca-color-warning-5, #ffb703);
 }
 
 .owb-card-badge-weekday {
@@ -245,6 +242,7 @@ export const CARD_CSS = `
   min-width: 0;
 }
 
+/* Stamped cinnabar ink-drop extract bullet */
 .owb-extract-bullet {
   flex: 0 0 7px;
   width: 7px;
@@ -253,26 +251,26 @@ export const CARD_CSS = `
   min-height: 7px;
   margin-top: 0.55em;
   margin-right: 2px;
-  border: none;
+  border: 1px solid var(--orca-color-border);
   border-radius: 50%;
-  background: var(--orca-color-text-2, #666);
-  opacity: 0.8;
+  background: var(--orca-color-dangerous-5, #d9381e);
   cursor: grab;
   user-select: none;
   display: inline-block;
-  transition: transform 0.15s ease, background 0.15s ease;
+  transition: transform var(--owb-duration) var(--owb-ease),
+              background var(--owb-duration) var(--owb-ease);
 }
 
 .owb-extract-bullet.is-root {
-  opacity: 0.4;
+  opacity: 0.35;
   cursor: default;
   pointer-events: none;
+  background: var(--orca-color-text-2, #666);
 }
 
 .owb-extract-bullet:not(.is-root):hover {
-  background: var(--orca-color-primary-5, #2F80ED);
-  opacity: 1;
-  transform: scale(1.25);
+  background: var(--orca-color-primary-5, #00a896);
+  transform: scale(1.4);
 }
 
 .owb-extract-bullet:active {
@@ -350,16 +348,12 @@ export const CARD_CSS = `
 
 @keyframes owb-card-focus-flash {
   0%, 50%, 100% {
-    box-shadow:
-      0 4px 16px rgba(0, 0, 0, 0.08),
-      0 0 0 2.5px var(--orca-color-primary-5, #2F80ED),
-      0 0 0 6px color-mix(in oklab, var(--orca-color-primary-5, #2F80ED) 16%, transparent);
+    border-color: var(--orca-color-primary-5, #00a896);
+    box-shadow: 4px 4px 0px 0px var(--orca-color-primary-5, #00a896);
   }
   25%, 75% {
-    box-shadow:
-      0 4px 16px rgba(0, 0, 0, 0.08),
-      0 0 0 3px var(--orca-color-primary-5, #2F80ED),
-      0 0 0 12px color-mix(in oklab, var(--orca-color-primary-5, #2F80ED) 28%, transparent);
+    border-color: var(--orca-color-warning-5, #f4a259);
+    box-shadow: 6px 6px 0px 0px var(--orca-color-warning-5, #f4a259);
   }
 }
 

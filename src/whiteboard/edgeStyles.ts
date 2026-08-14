@@ -19,8 +19,8 @@ export const EDGE_CSS = `
 
 .owb-edge-visible {
   fill: none;
-  stroke: var(--orca-color-text-2);
-  stroke-width: 2;
+  stroke: var(--orca-color-border);
+  stroke-width: 2.5;
   stroke-linecap: round;
   vector-effect: non-scaling-stroke;
 }
@@ -39,19 +39,18 @@ export const EDGE_CSS = `
 }
 
 .owb-edge:hover:not(.is-selected) .owb-edge-visible {
-  stroke: var(--orca-color-text-1);
-  stroke-width: 2.5;
+  stroke: var(--orca-color-primary-5, #00a896);
+  stroke-width: 3;
 }
 
 .owb-edge.is-linked:not(.is-selected) .owb-edge-visible {
-  stroke: var(--orca-color-primary-5);
-  stroke-width: 2;
+  stroke: var(--orca-color-primary-5, #00a896);
+  stroke-width: 2.5;
 }
 
 .owb-edge.is-selected .owb-edge-visible {
-  stroke: var(--orca-color-primary-5);
-  stroke-width: 2;
-  filter: drop-shadow(0 0 2.5px var(--orca-color-primary-5));
+  stroke: var(--orca-color-primary-5, #00a896);
+  stroke-width: 3;
 }
 
 .owb-edge.is-ref .owb-edge-visible {
@@ -62,8 +61,8 @@ export const EDGE_CSS = `
 
 .owb-edge-ghost {
   fill: none;
-  stroke: var(--orca-color-text-2);
-  stroke-width: 2;
+  stroke: var(--orca-color-border);
+  stroke-width: 2.5;
   stroke-dasharray: 6 5;
   stroke-linecap: round;
   pointer-events: none;
@@ -72,8 +71,8 @@ export const EDGE_CSS = `
 
 .owb-edge-handle {
   fill: var(--orca-color-bg-1);
-  stroke: var(--orca-color-primary-5);
-  stroke-width: 1.5;
+  stroke: var(--orca-color-primary-5, #00a896);
+  stroke-width: 2;
   vector-effect: non-scaling-stroke;
   pointer-events: none;
 }
@@ -93,16 +92,18 @@ export const EDGE_CSS = `
   transform: translate(-50%, -50%);
   box-sizing: border-box;
   max-width: 220px;
-  padding: 1px 6px;
-  border-radius: var(--owb-radius-sm);
-  border: 1px solid var(--orca-color-border);
+  padding: 2px 7px;
+  border-radius: var(--owb-radius-sm, 3px);
+  border: 1.5px solid var(--orca-color-border);
   background: var(--orca-color-bg-1);
   color: var(--orca-color-text-1);
   font-size: 11px;
+  font-weight: 800;
   line-height: 1.4;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  box-shadow: 2px 2px 0px 0px var(--orca-color-border);
 }
 
 .owb-edge-label,
@@ -113,20 +114,21 @@ export const EDGE_CSS = `
 }
 
 .owb-edge-link-badge {
-  padding: 2px 5px;
+  padding: 2px 6px;
 }
 
 .owb-edge-link-icon {
   font-size: 12px;
   line-height: 1;
-  color: var(--orca-color-primary-5);
+  color: var(--orca-color-primary-5, #00a896);
 }
 
 .owb-edge-editor {
   pointer-events: auto;
   min-width: 60px;
   outline: none;
-  box-shadow: 0 0 0 1px var(--orca-color-primary-5);
+  border-color: var(--orca-color-primary-5, #00a896);
+  box-shadow: 2px 2px 0px 0px var(--orca-color-border);
 }
 
 .owb-card-anchors {
@@ -144,7 +146,7 @@ export const EDGE_CSS = `
   border-radius: 50%;
   box-sizing: border-box;
   background: var(--orca-color-bg-1);
-  box-shadow: 0 0 0 1.5px var(--orca-color-primary-5);
+  box-shadow: 0 0 0 1.5px var(--orca-color-primary-5, #00a896);
   opacity: 0;
   pointer-events: none;
   cursor: crosshair;
@@ -166,10 +168,8 @@ export const EDGE_CSS = `
 .owb-card-anchor-l { top: 50%; left: 0; }
 
 .owb-card.is-edge-target:not(.is-editing) {
-  box-shadow:
-    var(--owb-shadow-hover),
-    0 0 0 2px var(--orca-color-primary-5),
-    0 0 0 6px color-mix(in oklab, var(--orca-color-primary-5) 16%, transparent);
+  border-color: var(--orca-color-primary-5, #00a896);
+  box-shadow: 4px 4px 0px 0px var(--orca-color-primary-5, #00a896);
 }
 
 .owb-canvas.is-drawing-edge {

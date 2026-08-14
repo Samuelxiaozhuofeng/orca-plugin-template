@@ -1,28 +1,28 @@
 /** Styles for the card colour themes, floating toolbar and edge anchors. */
 export const CARD_CHROME_CSS = `
-/* Card Color Themes (Apple Color Palette) */
+/* Card Color Themes (Traditional Chinese Mineral Pigments) */
 .owb-card.owb-card-theme-blue {
-  background: color-mix(in oklab, #2F80ED 8%, var(--orca-color-bg-1));
-  border-color: color-mix(in oklab, #2F80ED 25%, transparent);
+  background: color-mix(in oklab, #00a896 12%, var(--orca-color-bg-1));
+  border-color: var(--orca-color-border);
 }
 .owb-card.owb-card-theme-green {
-  background: color-mix(in oklab, #22C55E 8%, var(--orca-color-bg-1));
-  border-color: color-mix(in oklab, #22C55E 25%, transparent);
+  background: color-mix(in oklab, #2ba870 12%, var(--orca-color-bg-1));
+  border-color: var(--orca-color-border);
 }
 .owb-card.owb-card-theme-yellow {
-  background: color-mix(in oklab, #EAB308 10%, var(--orca-color-bg-1));
-  border-color: color-mix(in oklab, #EAB308 30%, transparent);
+  background: color-mix(in oklab, #f4a259 14%, var(--orca-color-bg-1));
+  border-color: var(--orca-color-border);
 }
 .owb-card.owb-card-theme-coral {
-  background: color-mix(in oklab, #F43F5E 8%, var(--orca-color-bg-1));
-  border-color: color-mix(in oklab, #F43F5E 25%, transparent);
+  background: color-mix(in oklab, #d9381e 12%, var(--orca-color-bg-1));
+  border-color: var(--orca-color-border);
 }
 .owb-card.owb-card-theme-purple {
-  background: color-mix(in oklab, #A855F7 8%, var(--orca-color-bg-1));
-  border-color: color-mix(in oklab, #A855F7 25%, transparent);
+  background: color-mix(in oklab, #8b5cf6 12%, var(--orca-color-bg-1));
+  border-color: var(--orca-color-border);
 }
 
-/* Floating Card Micro-Toolbar (Translucent Glassmorphism) */
+/* Floating Card Micro-Toolbar (Neobrutalist Frame & Stamped Buttons) */
 .owb-card-floating-toolbar {
   position: absolute;
   top: 8px;
@@ -32,15 +32,15 @@ export const CARD_CHROME_CSS = `
   align-items: center;
   gap: 2px;
   padding: 2px 4px;
-  border-radius: 8px;
-  background: color-mix(in oklab, var(--orca-color-bg-1) 85%, transparent);
-  -webkit-backdrop-filter: saturate(180%) blur(12px);
-  backdrop-filter: saturate(180%) blur(12px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 0 0 1px var(--orca-color-border-2, rgba(0, 0, 0, 0.08));
+  border-radius: var(--owb-radius-btn, 4px);
+  background: var(--orca-color-bg-1);
+  border: 1.5px solid var(--orca-color-border);
+  box-shadow: 2px 2px 0px 0px var(--orca-color-border);
   opacity: 0;
   transform: translateY(-2px);
   pointer-events: none;
-  transition: opacity 160ms ease, transform 160ms ease;
+  transition: opacity var(--owb-duration) var(--owb-ease),
+              transform var(--owb-duration) var(--owb-ease);
 }
 
 .owb-card:hover .owb-card-floating-toolbar,
@@ -53,24 +53,35 @@ export const CARD_CHROME_CSS = `
 
 .owb-card-tb-btn {
   appearance: none;
-  border: none;
+  border: 1px solid transparent;
   background: transparent;
-  color: var(--orca-color-text-2);
+  color: var(--orca-color-text-1);
   width: 24px;
   height: 24px;
   padding: 0;
-  border-radius: 5px;
+  border-radius: var(--owb-radius-sm, 3px);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 13px;
   cursor: pointer;
-  transition: background 120ms ease, color 120ms ease;
+  transition: transform var(--owb-duration) var(--owb-ease),
+              background var(--owb-duration) var(--owb-ease),
+              color var(--owb-duration) var(--owb-ease),
+              box-shadow var(--owb-duration) var(--owb-ease);
 }
 
 .owb-card-tb-btn:hover {
-  background: color-mix(in oklab, var(--orca-color-text-3) 15%, transparent);
-  color: var(--orca-color-text-1);
+  background: var(--orca-color-warning-5, #f4a259);
+  color: #111417;
+  border-color: var(--orca-color-border);
+  box-shadow: 1.5px 1.5px 0px 0px var(--orca-color-border);
+  transform: translate(-1px, -1px);
+}
+
+.owb-card-tb-btn:active {
+  transform: translate(1px, 1px);
+  box-shadow: none;
 }
 
 .owb-card-tb-popover-wrapper {
@@ -86,57 +97,64 @@ export const CARD_CHROME_CSS = `
   align-items: center;
   gap: 5px;
   padding: 6px 8px;
-  border-radius: 8px;
+  border-radius: var(--owb-radius-card, 6px);
   background: var(--orca-color-bg-1);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12), 0 0 0 1px var(--orca-color-border);
+  border: 1.5px solid var(--orca-color-border);
+  box-shadow: 3px 3px 0px 0px var(--orca-color-border);
   z-index: 20;
 }
 
 .owb-card-color-dot {
   appearance: none;
-  border: none;
+  border: 1px solid var(--orca-color-border);
   width: 16px;
   height: 16px;
   border-radius: 50%;
   cursor: pointer;
-  transition: transform 120ms ease, box-shadow 120ms ease;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1);
+  transition: transform var(--owb-duration) var(--owb-ease),
+              box-shadow var(--owb-duration) var(--owb-ease);
 }
 
 .owb-card-color-dot:hover {
-  transform: scale(1.2);
+  transform: scale(1.25);
+  box-shadow: 1.5px 1.5px 0px 0px var(--orca-color-border);
 }
 
 .owb-card-color-dot.is-active {
-  box-shadow: 0 0 0 2px var(--orca-color-primary-5, #2F80ED);
+  border-color: var(--orca-color-border);
+  box-shadow: 0 0 0 2px var(--orca-color-primary-5, #00a896), 2px 2px 0px 0px var(--orca-color-border);
   transform: scale(1.15);
 }
 
-/* Connection Anchor Dots with Magnetic Scale Pulse */
+/* Connection Anchor Dots with Neobrutalist Frame */
 .owb-card-anchor {
   position: absolute;
   z-index: 12;
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: var(--orca-color-primary-5, #2F80ED);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  background: var(--orca-color-primary-5, #00a896);
+  border: 1.5px solid var(--orca-color-border);
+  box-shadow: 1.5px 1.5px 0px 0px var(--orca-color-border);
   opacity: 0;
-  transform: scale(0.6);
-  transition: opacity 150ms ease, transform 150ms ease;
+  transform: scale(0.7);
+  transition: opacity var(--owb-duration) var(--owb-ease),
+              transform var(--owb-duration) var(--owb-ease),
+              box-shadow var(--owb-duration) var(--owb-ease);
   cursor: pointer;
 }
 
 .owb-card:hover .owb-card-anchor,
 .owb-card.is-selected .owb-card-anchor {
-  opacity: 0.85;
+  opacity: 1;
   transform: scale(1);
 }
 
 .owb-card-anchor:hover {
   opacity: 1 !important;
-  transform: scale(1.35) !important;
-  box-shadow: 0 0 0 4px color-mix(in oklab, var(--orca-color-primary-5, #2F80ED) 25%, transparent);
+  transform: scale(1.4) !important;
+  background: var(--orca-color-warning-5, #f4a259);
+  box-shadow: 2px 2px 0px 0px var(--orca-color-border) !important;
 }
 
 .owb-card-anchor-t { top: -5px; left: 50%; margin-left: -5px; }

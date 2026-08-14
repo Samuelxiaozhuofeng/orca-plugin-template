@@ -35,8 +35,8 @@ export const CANVAS_CSS = `
   z-index: 30;
   box-sizing: border-box;
   pointer-events: none;
-  background: color-mix(in oklab, var(--orca-color-primary-5) 10%, transparent);
-  box-shadow: inset 0 0 0 1px var(--orca-color-primary-5);
+  background: color-mix(in oklab, var(--orca-color-primary-5) 15%, transparent);
+  border: 1.5px solid var(--orca-color-primary-5);
 }
 
 .owb-guides {
@@ -49,19 +49,19 @@ export const CANVAS_CSS = `
 
 .owb-guide {
   position: absolute;
-  background: color-mix(in oklab, var(--orca-color-primary-5) 55%, transparent);
+  background: var(--orca-color-primary-5);
 }
 
 .owb-guide-x {
   top: 0;
-  width: 1px;
+  width: 1.5px;
   height: 100%;
 }
 
 .owb-guide-y {
   left: 0;
   width: 100%;
-  height: 1px;
+  height: 1.5px;
 }
 
 .owb-grid {
@@ -71,8 +71,8 @@ export const CANVAS_CSS = `
   z-index: 0;
   background-image: radial-gradient(
     circle,
-    color-mix(in oklab, var(--orca-color-text-3) var(--owb-dot-alpha), transparent) 1px,
-    transparent 1.5px
+    color-mix(in srgb, var(--orca-color-border) var(--owb-dot-alpha), transparent) 1.2px,
+    transparent 1.6px
   );
 }
 
