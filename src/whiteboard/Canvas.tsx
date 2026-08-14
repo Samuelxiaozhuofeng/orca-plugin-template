@@ -6,28 +6,25 @@ import {
   isWhiteboardShortcutTarget,
 } from "./canvasKeys";
 import {
-  startMoveCards,
-  startRightButtonSession,
-  swallowNextContextMenu,
-} from "./cardGestures";
-import {
   WEEKDAY_LABELS_MON,
   type CanvasOrigin,
   type WhiteboardCard,
 } from "./data";
 import { Card } from "./Card";
-import {
-  completeBoardDrop,
-  isLeavingDragTarget,
-  isOrcaBlockDrag,
-} from "./dropBlocks";
-import { startMarquee } from "./marquee";
+import { EdgeLayer, type EdgeLayerApi } from "./EdgeLayer";
+import type { CardBox } from "./edgeGeometry";
+import { useReferenceEdges } from "./edgeRefs";
+import type { Side, WhiteboardEdge } from "./edges";
 import {
   arrangeCards,
-  toggleId,
   type ArrangeAction,
 } from "./selection";
 import { useWhiteboardSettings } from "./settings";
+import { useBoardDrop } from "./useBoardDrop";
+import {
+  useCanvasPointer,
+  type CardPatchEntry,
+} from "./useCanvasPointer";
 import { useCanvasView } from "./useCanvasView";
 import {
   CARD_LOD_SCALE,
@@ -35,12 +32,7 @@ import {
   type CanvasView,
 } from "./viewTransform";
 
-export type { CanvasView };
-
-export type CardPatchEntry = {
-  blockId: DbId;
-  patch: { x?: number; y?: number; w?: number; h?: number };
-};
+export type { CanvasView, CardPatchEntry };
 
 const { useCallback, useEffect, useMemo, useRef, useState } = window.React;
 
@@ -54,6 +46,8 @@ type Props = {
   onPatchCards: (entries: CardPatchEntry[]) => void;
   onRemoveCards: (ids: DbId[]) => Promise<boolean>;
   onAddCards: (cards: WhiteboardCard[]) => Promise<boolean>;
+  onCommitEdges: (next: WhiteboardEdge[]) => Promise<boolean>;
+  edges: WhiteboardEdge[];
   onViewportWidth: (width: number) => void;
   weekdayGuide?: CanvasOrigin | null;
 };
@@ -68,23 +62,45 @@ export function Canvas({
   onPatchCards,
   onRemoveCards,
   onAddCards,
+  onCommitEdges,
+  edges,
   onViewportWidth,
   weekdayGuide,
 }: Props) {
   const [editingId, setEditingId] = useState<DbId | null>(null);
   const [selected, setSelected] = useState<DbId[]>([]);
-  const [dropActive, setDropActive] = useState(false);
+  const [selectedEdge, setSelectedEdge] = useState<string | null>(null);
   const editingRef = useRef<DbId | null>(null);
   const selectedRef = useRef<DbId[]>([]);
+  const selectedEdgeRef = useRef<string | null>(null);
   const cardsRef = useRef(cards);
+  const edgesRef = useRef(edges);
   const marqueeRef = useRef<HTMLDivElement | null>(null);
   const guidesRef = useRef<HTMLDivElement | null>(null);
+  const edgeApiRef = useRef<EdgeLayerApi | null>(null);
   const settings = useWhiteboardSettings();
   const settingsRef = useRef(settings);
   editingRef.current = editingId;
   selectedRef.current = selected;
+  selectedEdgeRef.current = selectedEdge;
   cardsRef.current = cards;
+  edgesRef.current = edges;
   settingsRef.current = settings;
+  const refEdges = useReferenceEdges(cards, edges, settings.showReferenceEdges);
+
+  const selectCards = useCallback((ids: DbId[]) => {
+    setSelected(ids);
+    setSelectedEdge(null);
+  }, []);
+
+  const selectEdge = useCallback((id: string | null) => {
+    setSelectedEdge(id);
+    if (id != null) setSelected([]);
+  }, []);
+
+  const onMoveFrame = useCallback((boxes: Map<DbId, CardBox>) => {
+    edgeApiRef.current?.onFrame(boxes);
+  }, []);
 
   const {
     viewportRef,
@@ -104,6 +120,33 @@ export function Canvas({
     isEditing: () => editingRef.current != null,
   });
 
+  const { dropActive, onDragOver, onDragLeave, onDrop } = useBoardDrop({
+    boardBlockId,
+    cardsRef,
+    pointerToWorld,
+    onAddCards,
+  });
+
+  const { onViewportMouseDown, onCardMouseDown } = useCanvasPointer({
+    refs: {
+      viewport: viewportRef,
+      canvas: canvasRef,
+      marquee: marqueeRef,
+      guides: guidesRef,
+      spaceHeld: spaceHeldRef,
+      settings: settingsRef,
+      editing: editingRef,
+      selected: selectedRef,
+      cards: cardsRef,
+      liveView: liveViewRef,
+    },
+    pointerToWorld,
+    startPan,
+    setSelected: selectCards,
+    onPatchCards,
+    onMoveFrame,
+  });
+
   useEffect(() => {
     const ids = new Set(cards.map((card: WhiteboardCard) => card.blockId));
     setSelected((prev: DbId[]) => {
@@ -111,6 +154,13 @@ export function Canvas({
       return next.length === prev.length ? prev : next;
     });
   }, [cards]);
+
+  useEffect(() => {
+    if (selectedEdge == null) return;
+    if (!edges.some((edge: WhiteboardEdge) => edge.id === selectedEdge)) {
+      setSelectedEdge(null);
+    }
+  }, [edges, selectedEdge]);
 
   const pinned = useMemo(() => {
     const ids = new Set(selected);
@@ -142,174 +192,11 @@ export function Canvas({
 
   const startEdit = useCallback((blockId: DbId) => {
     setEditingId(blockId);
+    setSelectedEdge(null);
     setSelected((prev: DbId[]) => (prev.includes(blockId) ? prev : [blockId]));
   }, []);
 
   const endEdit = useCallback(() => setEditingId(null), []);
-
-  const focusViewport = () => {
-    viewportRef.current?.focus({ preventScroll: true });
-  };
-
-  const beginMoveSelection = (startX: number, startY: number) => {
-    const canvas = canvasRef.current;
-    if (canvas == null) return;
-    const movingIds = new Set(selectedRef.current);
-    const moving = cardsRef.current.filter((item: WhiteboardCard) =>
-      movingIds.has(item.blockId),
-    );
-    if (moving.length === 0) return;
-    const others = cardsRef.current.filter(
-      (item: WhiteboardCard) => !movingIds.has(item.blockId),
-    );
-    startMoveCards({
-      startX,
-      startY,
-      canvas,
-      guidesEl: guidesRef.current,
-      showGuides: () => settingsRef.current.showAlignGuides,
-      moving,
-      others,
-      pointerToWorld,
-      view: () => liveViewRef.current,
-      onEnd: (moves) => {
-        if (moves.length === 0) return;
-        onPatchCards(
-          moves.map((item) => ({
-            blockId: item.blockId,
-            patch: { x: item.x, y: item.y },
-          })),
-        );
-      },
-    });
-  };
-
-  const selectCardOnPointer = (
-    card: WhiteboardCard,
-    event: React.MouseEvent,
-  ): boolean => {
-    const additive = event.shiftKey || event.metaKey || event.ctrlKey;
-    let next = selectedRef.current;
-    if (additive) {
-      next = toggleId(next, card.blockId);
-      selectedRef.current = next;
-      setSelected(next);
-    } else if (!next.includes(card.blockId)) {
-      next = [card.blockId];
-      selectedRef.current = next;
-      setSelected(next);
-    }
-    return next.includes(card.blockId);
-  };
-
-  const fireAppContextMenu = (
-    clientX: number,
-    clientY: number,
-    target: EventTarget | null,
-  ) => {
-    const el =
-      target instanceof Element ? target : viewportRef.current;
-    if (el == null) return;
-    el.dispatchEvent(
-      new MouseEvent("contextmenu", {
-        bubbles: true,
-        cancelable: true,
-        view: window,
-        clientX,
-        clientY,
-        button: 2,
-      }),
-    );
-  };
-
-  const onViewportMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
-    const target = event.target as HTMLElement | null;
-    if (target?.closest(".owb-card")) return;
-    focusViewport();
-
-    const blank = target?.closest(".owb-card") == null;
-    const spacePan = spaceHeldRef.current;
-    if (event.button === 1 || spacePan || (event.button === 0 && event.altKey && blank)) {
-      event.preventDefault();
-      if (event.button === 2) swallowNextContextMenu();
-      startPan(event.clientX, event.clientY);
-      return;
-    }
-    if (
-      event.button === 2 &&
-      blank &&
-      settingsRef.current.mouseScheme === "rightDrag"
-    ) {
-      event.preventDefault();
-      startRightButtonSession({
-        startX: event.clientX,
-        startY: event.clientY,
-        onDrag: () => startPan(event.clientX, event.clientY),
-        onIdleRelease: () =>
-          fireAppContextMenu(event.clientX, event.clientY, event.target),
-      });
-      return;
-    }
-    if (event.button !== 0 || !blank) return;
-    event.preventDefault();
-    const viewport = viewportRef.current;
-    const canvas = canvasRef.current;
-    const marquee = marqueeRef.current;
-    if (viewport == null || canvas == null || marquee == null) return;
-    startMarquee({
-      startX: event.clientX,
-      startY: event.clientY,
-      additive: event.shiftKey,
-      viewport,
-      canvas,
-      marqueeEl: marquee,
-      cards: cardsRef.current,
-      selected: selectedRef.current,
-      pointerToWorld,
-      onCommit: (result) => {
-        if (result.kind === "click") {
-          if (!event.shiftKey) setSelected([]);
-          return;
-        }
-        setSelected(result.ids);
-      },
-    });
-  };
-
-  const onCardMouseDown = (
-    event: React.MouseEvent<HTMLDivElement>,
-    card: WhiteboardCard,
-  ) => {
-    if (event.button === 1 || spaceHeldRef.current) {
-      event.preventDefault();
-      if (event.button === 2) swallowNextContextMenu();
-      startPan(event.clientX, event.clientY);
-      return;
-    }
-    if (event.button === 2 && settingsRef.current.mouseScheme === "rightDrag") {
-      event.preventDefault();
-      event.stopPropagation();
-      focusViewport();
-      const canMove =
-        editingRef.current !== card.blockId && selectCardOnPointer(card, event);
-      if (canMove) beginMoveSelection(event.clientX, event.clientY);
-      startRightButtonSession({
-        startX: event.clientX,
-        startY: event.clientY,
-        onIdleRelease: () =>
-          fireAppContextMenu(event.clientX, event.clientY, event.target),
-      });
-      return;
-    }
-    if (event.button !== 0) return;
-    event.preventDefault();
-    event.stopPropagation();
-    focusViewport();
-
-    if (!selectCardOnPointer(card, event)) return;
-    if (settingsRef.current.mouseScheme === "rightDrag") return;
-    beginMoveSelection(event.clientX, event.clientY);
-  };
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -343,21 +230,30 @@ export function Canvas({
           onPatchCards(entries);
         },
         selectAll: () => {
-          setSelected(cardsRef.current.map((card: WhiteboardCard) => card.blockId));
+          selectCards(cardsRef.current.map((card: WhiteboardCard) => card.blockId));
         },
-        escape: () => setSelected([]),
+        escape: () => selectCards([]),
         remove: () => {
+          const edgeId = selectedEdgeRef.current;
+          if (edgeId != null) {
+            void onCommitEdges(
+              edgesRef.current.filter((edge: WhiteboardEdge) => edge.id !== edgeId),
+            ).then((ok) => {
+              if (ok) setSelectedEdge(null);
+            });
+            return;
+          }
           const ids = selectedRef.current;
           if (ids.length === 0) return;
           void onRemoveCards(ids).then((ok) => {
-            if (ok) setSelected([]);
+            if (ok) selectCards([]);
           });
         },
       });
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onPatchCards, onRemoveCards, panelId, viewportRef]);
+  }, [onCommitEdges, onPatchCards, onRemoveCards, panelId, selectCards, viewportRef]);
 
   const canOpenBoardMenu = () => {
     if (selectedRef.current.length >= 2) return true;
@@ -373,7 +269,7 @@ export function Canvas({
           title={t("Select all")}
           onClick={() => {
             close();
-            setSelected(cardsRef.current.map((card: WhiteboardCard) => card.blockId));
+            selectCards(cardsRef.current.map((card: WhiteboardCard) => card.blockId));
           }}
         />
       ) : null}
@@ -395,41 +291,12 @@ export function Canvas({
           data-mouse-scheme={settings.mouseScheme}
           tabIndex={0}
           onMouseDown={onViewportMouseDown}
-          onDragOver={(event) => {
-            if (!isOrcaBlockDrag(event.dataTransfer)) return;
-            event.preventDefault();
-            event.dataTransfer.dropEffect = "copy";
-            setDropActive(true);
-          }}
-          onDragLeave={(event) => {
-            if (isLeavingDragTarget(event.currentTarget, event.relatedTarget)) {
-              setDropActive(false);
-            }
-          }}
-          onDrop={(event) => {
-            event.preventDefault();
-            setDropActive(false);
-            const at = pointerToWorld(event.clientX, event.clientY);
-            const dataTransfer = event.dataTransfer;
-            void completeBoardDrop({
-              dataTransfer,
-              at,
-              existing: cardsRef.current,
-              boardBlockId,
-              addCards: onAddCards,
-            }).catch((error: unknown) => {
-              console.error("[whiteboard] failed to drop blocks", error);
-              orca.notify(
-                "error",
-                error instanceof Error
-                  ? error.message
-                  : t("Failed to add blocks to the board"),
-              );
-            });
-          }}
+          onDragOver={onDragOver}
+          onDragLeave={onDragLeave}
+          onDrop={onDrop}
           onContextMenu={(event) => {
             const target = event.target as HTMLElement | null;
-            if (target?.closest(".owb-card")) return;
+            if (target?.closest(".owb-card, .owb-edge-hit, .owb-edge-editor")) return;
             if (!canOpenBoardMenu()) {
               event.preventDefault();
               return;
@@ -439,6 +306,22 @@ export function Canvas({
         >
           <div ref={gridRef} className="owb-grid" />
           <div ref={canvasRef} className="owb-canvas">
+            <EdgeLayer
+              panelId={panelId}
+              cards={cards}
+              edges={edges}
+              refEdges={refEdges}
+              viewScale={view.scale}
+              selectedId={selectedEdge}
+              canvasRef={canvasRef}
+              pointerToWorld={pointerToWorld}
+              focusViewport={() =>
+                viewportRef.current?.focus({ preventScroll: true })
+              }
+              apiRef={edgeApiRef}
+              onSelect={selectEdge}
+              onCommit={onCommitEdges}
+            />
             {weekdayGuide != null ? (
               <div
                 className="owb-cal-weekdays"
@@ -463,16 +346,32 @@ export function Canvas({
                   selected.length === 0 ||
                   (selected.length === 1 && selectedSet.has(card.blockId))
                 }
-                onSelectOnly={(blockId) => setSelected([blockId])}
+                onSelectOnly={(blockId) => selectCards([blockId])}
                 selectedCount={selected.length}
                 pointerToWorld={pointerToWorld}
                 onStartEdit={startEdit}
                 onEndEdit={endEdit}
-                onCardMouseDown={onCardMouseDown}
+                onCardMouseDown={(event, card) => {
+                  setSelectedEdge(null);
+                  onCardMouseDown(event, card);
+                }}
                 onPatchCard={(blockId, patch) =>
                   onPatchCards([{ blockId, patch }])
                 }
                 onArrange={applyArrange}
+                onMoveFrame={onMoveFrame}
+                onAnchorMouseDown={(
+                  card: WhiteboardCard,
+                  side: Side,
+                  event: React.MouseEvent<HTMLDivElement>,
+                ) => {
+                  edgeApiRef.current?.startDraw(
+                    card,
+                    side,
+                    event.clientX,
+                    event.clientY,
+                  );
+                }}
               />
             ))}
           </div>

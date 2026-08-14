@@ -9,6 +9,7 @@ import {
   WHITEBOARD_TYPE,
 } from "./whiteboard/data";
 import { flushAllCardWrites } from "./whiteboard/cardPersist";
+import { flushAllEdgeWrites } from "./whiteboard/edgePersist";
 import {
   bindWhiteboardPlugin,
   whiteboardSettingsSchema,
@@ -84,6 +85,7 @@ export async function load(_name: string) {
 
 export async function unload() {
   await flushAllCardWrites();
+  await flushAllEdgeWrites();
   orca.panels.unregisterPanel(PANEL_TYPE);
   orca.renderers.unregisterBlock(WHITEBOARD_TYPE);
   orca.converters.unregisterBlock("plain", WHITEBOARD_TYPE);

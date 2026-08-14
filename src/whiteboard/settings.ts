@@ -8,11 +8,13 @@ export type MouseScheme = "standard" | "rightDrag";
 export type WhiteboardSettings = {
   mouseScheme: MouseScheme;
   showAlignGuides: boolean;
+  showReferenceEdges: boolean;
 };
 
 const DEFAULTS: WhiteboardSettings = {
   mouseScheme: "standard",
   showAlignGuides: false,
+  showReferenceEdges: true,
 };
 
 let pluginName = "";
@@ -51,6 +53,14 @@ export function whiteboardSettingsSchema(): PluginSettingsSchema {
       type: "boolean",
       defaultValue: DEFAULTS.showAlignGuides,
     },
+    showReferenceEdges: {
+      label: t("Show reference connections"),
+      description: t(
+        "Draw faint dashed lines when a card's notes already reference another card on this board.",
+      ),
+      type: "boolean",
+      defaultValue: DEFAULTS.showReferenceEdges,
+    },
   };
 }
 
@@ -60,6 +70,7 @@ export function readWhiteboardSettings(
   return {
     mouseScheme: raw?.mouseScheme === "rightDrag" ? "rightDrag" : "standard",
     showAlignGuides: raw?.showAlignGuides === true,
+    showReferenceEdges: raw?.showReferenceEdges !== false,
   };
 }
 

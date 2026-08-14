@@ -80,6 +80,15 @@ const zhCN = {
   "Tidy up to grid": "整理成网格",
   "Removed ${count} cards from the board. Journals themselves were not deleted.":
     "已从白板移除 ${count} 张卡片。只是从白板拿掉，日记本身没有被删除。",
+  "Show reference connections": "显示引用连线",
+  "Draw faint dashed lines when a card's notes already reference another card on this board.":
+    "当一张卡片的笔记里已经引用了板上另一张卡片时，自动画淡虚线。",
+  "Arrow to end": "箭头指向终点",
+  "Arrows on both ends": "两端都有箭头",
+  "No arrows": "无箭头",
+  Delete: "删除",
+  "Failed to save connections": "保存连线失败",
+  "Whiteboard connections were not saved": "连线没有写进白板块，请看控制台日志",
 };
 
 export default zhCN;

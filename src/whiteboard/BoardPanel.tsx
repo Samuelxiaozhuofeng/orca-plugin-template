@@ -8,9 +8,11 @@ import {
   defaultGridColumns,
   placeJournalCards,
   readCards,
+  readEdges,
   viewportOrigin,
   type CanvasOrigin,
 } from "./data";
+import { useEdgePersist } from "./edgePersist";
 import { PlaceDialog, type PlaceDialogValue } from "./PlaceDialog";
 import {
   DEFAULT_VIEW,
@@ -35,6 +37,12 @@ export default function BoardPanel({ panelId, blockId }: Props) {
   const { cards, patchCards, commitCards, appendCards } = useCardPersist(
     blockId ?? null,
     serverCards,
+  );
+  const serverEdges = readEdges(block, cards);
+  const { edges, commitEdges } = useEdgePersist(
+    blockId ?? null,
+    serverEdges,
+    cards.map((card) => card.blockId),
   );
   const [view, setView] = useState<CanvasView>(DEFAULT_VIEW);
   const [busy, setBusy] = useState(false);
@@ -73,6 +81,12 @@ export default function BoardPanel({ panelId, blockId }: Props) {
       const next = cards.filter((card) => !drop.has(card.blockId));
       const saved = await commitCards(next);
       if (!saved) return false;
+      const leftover = edges.filter(
+        (edge) => !drop.has(edge.from) && !drop.has(edge.to),
+      );
+      if (leftover.length !== edges.length) {
+        await commitEdges(leftover);
+      }
       orca.notify(
         "info",
         t(
@@ -82,7 +96,7 @@ export default function BoardPanel({ panelId, blockId }: Props) {
       );
       return true;
     },
-    [cards, commitCards],
+    [cards, commitCards, commitEdges, edges],
   );
 
   const confirmPlace = useCallback(
@@ -148,6 +162,8 @@ export default function BoardPanel({ panelId, blockId }: Props) {
         onPatchCards={patchCards}
         onRemoveCards={onRemoveCards}
         onAddCards={appendCards}
+        edges={edges}
+        onCommitEdges={commitEdges}
         onViewportWidth={setViewportWidth}
       />
       <div className="owb-toolbar">

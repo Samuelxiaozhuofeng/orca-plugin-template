@@ -131,6 +131,7 @@ export function startMoveCards(opts: {
   pointerToWorld: (clientX: number, clientY: number) => { x: number; y: number };
   view: () => CanvasView;
   onEnd: (moves: ReadonlyArray<{ blockId: DbId; x: number; y: number }>) => void;
+  onFrame?: (boxes: Map<DbId, CardRect>) => void;
 }): void {
   const start = opts.pointerToWorld(opts.startX, opts.startY);
   let raf = 0;
@@ -168,6 +169,18 @@ export function startMoveCards(opts: {
     }
     if (alt || !opts.showGuides()) clearGuides(opts.guidesEl);
     else paintGuides(opts.guidesEl, snap.guides, opts.view());
+    if (opts.onFrame != null) {
+      const boxes = new Map<DbId, CardRect>();
+      for (const card of opts.moving) {
+        boxes.set(card.blockId, {
+          x: card.x + lastDx,
+          y: card.y + lastDy,
+          w: card.w,
+          h: card.h,
+        });
+      }
+      opts.onFrame(boxes);
+    }
   };
 
   const onMove = (event: MouseEvent) => {
@@ -299,8 +312,10 @@ export function startResizeCard(opts: {
   startY: number;
   origin: CardRect;
   el: HTMLElement;
+  blockId?: DbId;
   pointerToWorld: (clientX: number, clientY: number) => { x: number; y: number };
   onEnd: (box: CardRect) => void;
+  onFrame?: (boxes: Map<DbId, CardRect>) => void;
 }): void {
   const start = opts.pointerToWorld(opts.startX, opts.startY);
   let raf = 0;
@@ -318,6 +333,9 @@ export function startResizeCard(opts: {
       shift,
     );
     applyCardBox(opts.el, last);
+    if (opts.blockId != null) {
+      opts.onFrame?.(new Map([[opts.blockId, last]]));
+    }
   };
 
   const onMove = (event: MouseEvent) => {

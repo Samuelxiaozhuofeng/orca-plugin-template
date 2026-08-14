@@ -50,6 +50,18 @@ export {
 } from "./cards";
 
 export {
+  edgesEqual,
+  normalizeEdge,
+  parseEdges,
+  readEdges,
+  sanitizeEdges,
+  writeEdges,
+  type EdgeArrow,
+  type Side,
+  type WhiteboardEdge,
+} from "./edges";
+
+export {
   fetchJournalBlocks,
   journalDateKey,
   journalHasContent,
