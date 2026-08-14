@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "vite",
     "build": "NODE_ENV=production tsc && vite build",
+    "postbuild": "node scripts/deploy-dist.mjs",
     "preview": "vite preview"
   },
   "peerDependencies": {
