@@ -80,7 +80,6 @@ export const CARD_EDITOR_CSS = `
   padding: 0 !important;
 }
 
-.owb-card.is-editing .orca-block-handle,
 .owb-card.is-editing .orca-block-drag-handle {
   display: none !important;
 }

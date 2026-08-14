@@ -54,11 +54,15 @@ export function startExtractBulletDrag(
   sourceCardId: DbId,
   blockId: DbId,
 ): void {
+  event.stopPropagation();
+  if (event.nativeEvent) {
+    event.nativeEvent.stopImmediatePropagation();
+  }
   const dataTransfer = event.dataTransfer;
   if (dataTransfer == null) {
     event.preventDefault();
     return;
   }
-  event.stopPropagation();
   writeExtractDragData(dataTransfer, sourceCardId, blockId);
 }
+

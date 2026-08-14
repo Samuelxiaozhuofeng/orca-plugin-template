@@ -137,7 +137,16 @@ export function Canvas({
     onRedo,
   });
 
-  const { dropActive, onDragOver, onDragLeave, onDrop } = useBoardDrop({
+  const {
+    dropActive,
+    onDragOver,
+    onDragLeave,
+    onDrop,
+    onDragEnterCapture,
+    onDragOverCapture,
+    onDragLeaveCapture,
+    onDropCapture,
+  } = useBoardDrop({
     boardBlockId,
     cardsRef,
     edgesRef,
@@ -219,6 +228,10 @@ export function Canvas({
           onDragOver={onDragOver}
           onDragLeave={onDragLeave}
           onDrop={onDrop}
+          onDragEnterCapture={onDragEnterCapture}
+          onDragOverCapture={onDragOverCapture}
+          onDragLeaveCapture={onDragLeaveCapture}
+          onDropCapture={onDropCapture}
           onContextMenu={(event) => {
             const target = event.target as HTMLElement | null;
             if (target?.closest(".owb-card, .owb-edge-hit, .owb-edge-editor")) return;

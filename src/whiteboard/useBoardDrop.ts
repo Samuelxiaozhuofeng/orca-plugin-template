@@ -12,6 +12,20 @@ import type { WhiteboardEdge } from "./edges";
 
 const { useCallback, useState } = window.React;
 
+/**
+ * Blocks rendered inside a card live outside any Orca block editor, so the
+ * host's own droppable handlers (BlockShell `useDroppable`) crash when a drag
+ * passes over them: they read `BlockEditorContext.container.current`, and that
+ * context is empty here. Orca only skips them for its own whiteboard repr
+ * (contentClassName check), which we cannot set, so the board swallows drag
+ * events aimed at card content before they reach the host handlers.
+ */
+function isCardTreeTarget(target: EventTarget | null): boolean {
+  return (
+    target instanceof Element && target.closest(".owb-card-block-tree") != null
+  );
+}
+
 export function useBoardDrop(opts: {
   boardBlockId: DbId;
   cardsRef: { current: WhiteboardCard[] };
@@ -24,6 +38,10 @@ export function useBoardDrop(opts: {
   onDragOver: (event: React.DragEvent<HTMLDivElement>) => void;
   onDragLeave: (event: React.DragEvent<HTMLDivElement>) => void;
   onDrop: (event: React.DragEvent<HTMLDivElement>) => void;
+  onDragEnterCapture: (event: React.DragEvent<HTMLDivElement>) => void;
+  onDragOverCapture: (event: React.DragEvent<HTMLDivElement>) => void;
+  onDragLeaveCapture: (event: React.DragEvent<HTMLDivElement>) => void;
+  onDropCapture: (event: React.DragEvent<HTMLDivElement>) => void;
 } {
   const [dropActive, setDropActive] = useState(false);
   const {
@@ -91,5 +109,48 @@ export function useBoardDrop(opts: {
     ],
   );
 
-  return { dropActive, onDragOver, onDragLeave, onDrop };
+  const onDragEnterCapture = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      if (isCardTreeTarget(event.target)) event.stopPropagation();
+    },
+    [],
+  );
+
+  const onDragOverCapture = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      if (!isCardTreeTarget(event.target)) return;
+      event.stopPropagation();
+      onDragOver(event);
+    },
+    [onDragOver],
+  );
+
+  const onDragLeaveCapture = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      if (!isCardTreeTarget(event.target)) return;
+      event.stopPropagation();
+      onDragLeave(event);
+    },
+    [onDragLeave],
+  );
+
+  const onDropCapture = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      if (!isCardTreeTarget(event.target)) return;
+      event.stopPropagation();
+      onDrop(event);
+    },
+    [onDrop],
+  );
+
+  return {
+    dropActive,
+    onDragOver,
+    onDragLeave,
+    onDrop,
+    onDragEnterCapture,
+    onDragOverCapture,
+    onDragLeaveCapture,
+    onDropCapture,
+  };
 }

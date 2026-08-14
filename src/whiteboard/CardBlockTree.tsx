@@ -82,6 +82,14 @@ export function CardBlockTree({
               onDragStart={(event) => {
                 startExtractBulletDrag(event, blockId, node.id);
               }}
+              onDrag={(event) => {
+                event.stopPropagation();
+                if (event.nativeEvent) event.nativeEvent.stopImmediatePropagation();
+              }}
+              onDragEnd={(event) => {
+                event.stopPropagation();
+                if (event.nativeEvent) event.nativeEvent.stopImmediatePropagation();
+              }}
               onDoubleClick={(event) => event.stopPropagation()}
             />
           ) : (

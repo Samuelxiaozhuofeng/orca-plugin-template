@@ -246,27 +246,33 @@ export const CARD_CSS = `
 }
 
 .owb-extract-bullet {
-  flex: 0 0 10px;
-  box-sizing: border-box;
-  width: 10px;
-  height: 10px;
-  margin-top: 0.45em;
-  border: 1.5px solid var(--orca-color-text-3);
+  flex: 0 0 7px;
+  width: 7px;
+  height: 7px;
+  min-width: 7px;
+  min-height: 7px;
+  margin-top: 0.55em;
+  margin-right: 2px;
+  border: none;
   border-radius: 50%;
-  background: transparent;
+  background: var(--orca-color-text-2, #666);
+  opacity: 0.8;
   cursor: grab;
   user-select: none;
+  display: inline-block;
+  transition: transform 0.15s ease, background 0.15s ease;
 }
 
 .owb-extract-bullet.is-root {
+  opacity: 0.4;
   cursor: default;
   pointer-events: none;
-  opacity: 0.55;
 }
 
 .owb-extract-bullet:not(.is-root):hover {
-  border-color: var(--orca-color-text-2);
-  background: color-mix(in oklab, var(--orca-color-text-2) 18%, transparent);
+  background: var(--orca-color-primary-5, #2F80ED);
+  opacity: 1;
+  transform: scale(1.25);
 }
 
 .owb-extract-bullet:active {
