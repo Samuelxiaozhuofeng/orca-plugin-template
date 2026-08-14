@@ -51,54 +51,84 @@ type Props = {
 
 type CardBox = { x: number; y: number; w: number; h: number };
 
+/** First visible editable line inside the card editor (hidden chrome skipped). */
+function firstEditableLine(root: HTMLElement): HTMLElement | null {
+  const candidates = root.querySelectorAll<HTMLElement>(
+    '[contenteditable="true"], input, textarea',
+  );
+  for (const node of Array.from(candidates)) {
+    const rect = node.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) return node;
+  }
+  return null;
+}
+
+function caretToStart(target: HTMLElement): void {
+  if (target.getAttribute("contenteditable") !== "true") return;
+  const sel = window.getSelection();
+  if (sel == null) return;
+  const range = document.createRange();
+  range.selectNodeContents(target);
+  range.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
 function CardEditor({ blockId }: { blockId: DbId }) {
   const { panelRenderers } = useSnapshot(orca.state);
   const BlockPanel = panelRenderers.block;
   const editorRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+    let timer = 0;
     let attempts = 0;
+
     const focusEditor = () => {
+      if (cancelled) return;
       attempts++;
       const el = editorRef.current;
-      if (!el) return;
+      if (el == null) return;
 
-      const focusable = (
-        el.querySelector('[contenteditable="true"]') ||
-        el.querySelector('.orca-block-text') ||
-        el.querySelector('.orca-block-content') ||
-        el.querySelector('input, textarea')
-      ) as HTMLElement | null;
-
-      if (focusable) {
-        focusable.focus({ preventScroll: true });
-        
-        // Dispatch mouse events to trigger active text editing mode instantly
-        try {
-          const opts = { bubbles: true, cancelable: true, view: window };
-          focusable.dispatchEvent(new MouseEvent("mousedown", opts));
-          focusable.dispatchEvent(new MouseEvent("mouseup", opts));
-          focusable.dispatchEvent(new MouseEvent("click", opts));
-        } catch {
-          // ignore event dispatch errors if any
-        }
-
-        if (focusable.getAttribute("contenteditable") === "true") {
-          const sel = window.getSelection();
-          if (sel) {
-            const range = document.createRange();
-            range.selectNodeContents(focusable);
-            range.collapse(false);
-            sel.removeAllRanges();
-            sel.addRange(range);
-          }
-        }
-      } else if (attempts < 12) {
-        setTimeout(focusEditor, 25);
+      const target = firstEditableLine(el);
+      if (target == null) {
+        if (attempts < 20) timer = window.setTimeout(focusEditor, 25);
+        return;
       }
+
+      target.focus({ preventScroll: true });
+      // Orca derives its caret from a real pointer hit; aim at the very start
+      // of the first line so editing mode opens there instead of at (0, 0).
+      const rect = target.getBoundingClientRect();
+      const clientX = rect.left + 2;
+      const clientY = rect.top + Math.min(10, rect.height / 2);
+      try {
+        const opts = {
+          bubbles: true,
+          cancelable: true,
+          view: window,
+          clientX,
+          clientY,
+        };
+        target.dispatchEvent(new MouseEvent("mousedown", opts));
+        target.dispatchEvent(new MouseEvent("mouseup", opts));
+        target.dispatchEvent(new MouseEvent("click", opts));
+      } catch {
+        // ignore event dispatch errors if any
+      }
+
+      caretToStart(target);
+      // Orca may re-apply its own caret right after the synthetic click.
+      timer = window.setTimeout(() => {
+        if (!cancelled) caretToStart(target);
+      }, 0);
     };
 
-    setTimeout(focusEditor, 10);
+    timer = window.setTimeout(focusEditor, 10);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, [blockId]);
 
   if (BlockPanel == null) {
@@ -141,6 +171,25 @@ function CardToolbar({
   onPatchCard: Props["onPatchCard"];
 }) {
   const [colorMenuOpen, setColorMenuOpen] = window.React.useState(false);
+  const popoverRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!colorMenuOpen) return;
+    const onDown = (event: MouseEvent) => {
+      const target = event.target as Node | null;
+      if (target && popoverRef.current?.contains(target)) return;
+      setColorMenuOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setColorMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onDown, true);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown, true);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [colorMenuOpen]);
 
   const openSplitView = () => {
     try {
@@ -175,7 +224,7 @@ function CardToolbar({
       >
         <i className="ti ti-arrows-vertical" />
       </button>
-      <div className="owb-card-tb-popover-wrapper">
+      <div className="owb-card-tb-popover-wrapper" ref={popoverRef}>
         <button
           type="button"
           className="owb-card-tb-btn"
@@ -194,7 +243,7 @@ function CardToolbar({
                   (card.color || "default") === preset.id ? " is-active" : ""
                 }`}
                 style={{ backgroundColor: preset.bg }}
-                title={preset.label}
+                title={t(preset.label)}
                 onClick={() => {
                   setColorMenuOpen(false);
                   onPatchCard(card.blockId, {
@@ -382,7 +431,6 @@ export function Card({
             open(event);
           }}
         >
-          {selected ? <div className="owb-card-accent-diamond" /> : null}
           <CardToolbar
             panelId={panelId}
             card={card}

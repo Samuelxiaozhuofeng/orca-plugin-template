@@ -1,5 +1,7 @@
 import { ADD_TO_BOARD_CSS } from "./addToBoardStyles";
+import { CARD_EDITOR_CSS } from "./cardEditorStyles";
 import { CARD_CSS } from "./cardStyles";
+import { CARD_CHROME_CSS } from "./cardToolbarStyles";
 import { EDGE_CSS } from "./edgeStyles";
 import { CARD_WIDTH, GRID_GAP, WEEKDAY_HEADER_H } from "./layout";
 
@@ -460,7 +462,14 @@ const SHELL_CSS = `
 }
 `.trim();
 
-export const WHITEBOARD_CSS = `${SHELL_CSS}\n${CARD_CSS}\n${EDGE_CSS}\n${ADD_TO_BOARD_CSS}`;
+export const WHITEBOARD_CSS = [
+  SHELL_CSS,
+  CARD_CSS,
+  CARD_EDITOR_CSS,
+  CARD_CHROME_CSS,
+  EDGE_CSS,
+  ADD_TO_BOARD_CSS,
+].join("\n");
 
 export function injectWhiteboardStyles(): void {
   orca.themes.injectCSS(WHITEBOARD_CSS, WHITEBOARD_CSS_ROLE);

@@ -83,21 +83,6 @@ export const CARD_CSS = `
   cursor: text;
 }
 
-/* Signature top-right blue diamond accent node (Heptabase / Apple standard) */
-.owb-card-accent-diamond {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 6;
-  width: 9px;
-  height: 9px;
-  background: var(--orca-color-primary-5, #2F80ED);
-  transform: rotate(45deg);
-  border-radius: 1.5px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-  pointer-events: none;
-}
-
 /* Card title & headers */
 .owb-card-header {
   display: flex;
@@ -110,6 +95,14 @@ export const CARD_CSS = `
   user-select: none;
   cursor: grab;
   color: var(--orca-color-text-1);
+  transition: padding-right var(--owb-duration) var(--owb-ease);
+}
+
+/* Keep the floating toolbar from sitting on top of the title text. */
+.owb-card:hover .owb-card-header,
+.owb-card.is-selected .owb-card-header,
+.owb-card.is-editing .owb-card-header {
+  padding-right: 100px;
 }
 
 .owb-card-title-main {
@@ -293,208 +286,4 @@ export const CARD_CSS = `
 .owb-card-handle-nw { top: 0; left: 0; cursor: nwse-resize; }
 .owb-card-handle-se { bottom: 0; right: 0; cursor: nwse-resize; }
 .owb-card-handle-sw { bottom: 0; left: 0; cursor: nesw-resize; }
-
-/* Seamless Block Editor (0-Shift Layout Alignment) */
-.owb-card-editor,
-.owb-card-editor .orca-panel,
-.owb-card-editor .orca-hideable,
-.owb-card-editor .orca-block-editor,
-.owb-card-editor .orca-block-editor-main {
-  height: 100%;
-  min-height: 0;
-  margin: 0 !important;
-  padding: 0 !important;
-}
-
-/* Hide heavy document editor chromes in card edit mode */
-.owb-card-editor .orca-block-editor-title,
-.owb-card-editor .orca-block-editor-header,
-.owb-card-editor .orca-block-editor-cover,
-.owb-card-editor .orca-block-breadcrumb,
-.owb-card-editor .orca-scrolling-breadcrumb,
-.owb-card-editor .orca-block-editor-properties {
-  display: none !important;
-}
-
-/* Suppress outline bullets and drag handles inside cards for clean Heptabase text presentation */
-.owb-card .orca-block-bullet,
-.owb-card .orca-block-bullet-dot,
-.owb-card .orca-block-handle,
-.owb-card .orca-block-drag-handle,
-.owb-card .orca-block-selected-bg,
-.owb-card-editor .orca-block-bullet,
-.owb-card-editor .orca-block-bullet-dot,
-.owb-card-editor .orca-block-handle,
-.owb-card-editor .orca-block-drag-handle,
-.owb-card-editor .orca-block-selected-bg {
-  display: none !important;
-  visibility: hidden !important;
-  opacity: 0 !important;
-  width: 0 !important;
-  height: 0 !important;
-  margin: 0 !important;
-  padding: 0 !important;
-}
-
-/* Ensure clean text block alignment without indentation offset */
-.owb-card .orca-block-children,
-.owb-card-editor .orca-block-children {
-  padding-left: 12px !important;
-}
-
-.owb-card .orca-block,
-.owb-card-editor .orca-block {
-  margin-left: 0 !important;
-  padding-left: 0 !important;
-}
-
-/* Card Color Themes (Apple Color Palette) */
-.owb-card.owb-card-theme-blue {
-  background: color-mix(in oklab, #2F80ED 8%, var(--orca-color-bg-1));
-  border-color: color-mix(in oklab, #2F80ED 25%, transparent);
-}
-.owb-card.owb-card-theme-green {
-  background: color-mix(in oklab, #22C55E 8%, var(--orca-color-bg-1));
-  border-color: color-mix(in oklab, #22C55E 25%, transparent);
-}
-.owb-card.owb-card-theme-yellow {
-  background: color-mix(in oklab, #EAB308 10%, var(--orca-color-bg-1));
-  border-color: color-mix(in oklab, #EAB308 30%, transparent);
-}
-.owb-card.owb-card-theme-coral {
-  background: color-mix(in oklab, #F43F5E 8%, var(--orca-color-bg-1));
-  border-color: color-mix(in oklab, #F43F5E 25%, transparent);
-}
-.owb-card.owb-card-theme-purple {
-  background: color-mix(in oklab, #A855F7 8%, var(--orca-color-bg-1));
-  border-color: color-mix(in oklab, #A855F7 25%, transparent);
-}
-
-/* Floating Card Micro-Toolbar (Translucent Glassmorphism) */
-.owb-card-floating-toolbar {
-  position: absolute;
-  top: 8px;
-  right: 12px;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 2px 4px;
-  border-radius: 8px;
-  background: color-mix(in oklab, var(--orca-color-bg-1) 85%, transparent);
-  -webkit-backdrop-filter: saturate(180%) blur(12px);
-  backdrop-filter: saturate(180%) blur(12px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 0 0 1px var(--orca-color-border-2, rgba(0, 0, 0, 0.08));
-  opacity: 0;
-  transform: translateY(-2px);
-  pointer-events: none;
-  transition: opacity 160ms ease, transform 160ms ease;
-}
-
-.owb-card:hover .owb-card-floating-toolbar,
-.owb-card.is-selected .owb-card-floating-toolbar,
-.owb-card.is-editing .owb-card-floating-toolbar {
-  opacity: 1;
-  transform: translateY(0);
-  pointer-events: auto;
-}
-
-.owb-card-tb-btn {
-  appearance: none;
-  border: none;
-  background: transparent;
-  color: var(--orca-color-text-2);
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border-radius: 5px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  cursor: pointer;
-  transition: background 120ms ease, color 120ms ease;
-}
-
-.owb-card-tb-btn:hover {
-  background: color-mix(in oklab, var(--orca-color-text-3) 15%, transparent);
-  color: var(--orca-color-text-1);
-}
-
-.owb-card-tb-popover-wrapper {
-  position: relative;
-}
-
-.owb-card-color-popover {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  margin-top: 4px;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 6px 8px;
-  border-radius: 8px;
-  background: var(--orca-color-bg-1);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12), 0 0 0 1px var(--orca-color-border);
-  z-index: 20;
-}
-
-.owb-card-color-dot {
-  appearance: none;
-  border: none;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  cursor: pointer;
-  transition: transform 120ms ease, box-shadow 120ms ease;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1);
-}
-
-.owb-card-color-dot:hover {
-  transform: scale(1.2);
-}
-
-.owb-card-color-dot.is-active {
-  box-shadow: 0 0 0 2px var(--orca-color-primary-5, #2F80ED);
-  transform: scale(1.15);
-}
-
-/* Connection Anchor Dots with Magnetic Scale Pulse */
-.owb-card-anchor {
-  position: absolute;
-  z-index: 12;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--orca-color-primary-5, #2F80ED);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
-  opacity: 0;
-  transform: scale(0.6);
-  transition: opacity 150ms ease, transform 150ms ease;
-  cursor: pointer;
-}
-
-.owb-card:hover .owb-card-anchor,
-.owb-card.is-selected .owb-card-anchor {
-  opacity: 0.85;
-  transform: scale(1);
-}
-
-.owb-card-anchor:hover {
-  opacity: 1 !important;
-  transform: scale(1.35) !important;
-  box-shadow: 0 0 0 4px color-mix(in oklab, var(--orca-color-primary-5, #2F80ED) 25%, transparent);
-}
-
-.owb-card-anchor-t { top: -5px; left: 50%; margin-left: -5px; }
-.owb-card-anchor-r { top: 50%; right: -5px; margin-top: -5px; }
-.owb-card-anchor-b { bottom: -5px; left: 50%; margin-left: -5px; }
-.owb-card-anchor-l { top: 50%; left: -5px; margin-top: -5px; }
-
-.owb-card-editor-missing {
-  padding: var(--owb-space-2);
-  color: var(--orca-color-text-3);
-  font-size: 12px;
-}
 `.trim();
