@@ -36,18 +36,18 @@ export function blockCardTitle(
   return t("Untitled");
 }
 
-function JournalTitle({ date }: { date: string }) {
+function JournalBadge({ date }: { date: string }) {
   const dateMeta = cardDateMeta(date);
   return (
-    <span className="owb-card-title-main">
+    <div
+      className={`owb-card-journal-badge${dateMeta.isWeekend ? " is-weekend" : ""}${
+        dateMeta.isToday ? " is-today" : ""
+      }`}
+      title={dateMeta.date}
+    >
       {dateMeta.isToday ? <span className="owb-card-today-dot" /> : null}
-      <span className="owb-card-date">{dateMeta.date}</span>
-      <span
-        className={`owb-card-weekday${dateMeta.isWeekend ? " is-weekend" : ""}`}
-      >
-        {dateMeta.weekday}
-      </span>
-    </span>
+      <span className="owb-card-badge-weekday">{dateMeta.weekday || dateMeta.date}</span>
+    </div>
   );
 }
 
@@ -55,30 +55,23 @@ function BlockTitle({ blockId }: { blockId: DbId }) {
   const { blocks } = useSnapshot(orca.state);
   const title = blockCardTitle(blockId, blocks);
   return (
-    <span className="owb-card-title-main">
-      <i className="ti ti-file-text owb-card-page-icon" />
-      <span className="owb-card-page">{title}</span>
-    </span>
+    <div className="owb-card-header">
+      <span className="owb-card-title-main">
+        <i className="ti ti-file-text owb-card-page-icon" />
+        <span className="owb-card-page">{title}</span>
+      </span>
+    </div>
   );
 }
 
 export function CardTitle({
   card,
-  editing,
 }: {
   card: WhiteboardCard;
   editing: boolean;
 }) {
-  return (
-    <div className="owb-card-title">
-      {card.kind === "journal" && typeof card.date === "string" ? (
-        <JournalTitle date={card.date} />
-      ) : (
-        <BlockTitle blockId={card.blockId} />
-      )}
-      {editing ? (
-        <span className="owb-card-edit-badge">{t("Editing")}</span>
-      ) : null}
-    </div>
-  );
+  if (card.kind === "journal" && typeof card.date === "string") {
+    return <JournalBadge date={card.date} />;
+  }
+  return <BlockTitle blockId={card.blockId} />;
 }

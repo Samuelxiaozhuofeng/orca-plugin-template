@@ -37,7 +37,7 @@ type Props = {
   ) => void;
   onPatchCard: (
     blockId: DbId,
-    patch: { x?: number; y?: number; w?: number; h?: number },
+    patch: { x?: number; y?: number; w?: number; h?: number; color?: string },
   ) => void;
   onArrange: (action: ArrangeAction) => void;
   onSelectOnly: (blockId: DbId) => void;
@@ -54,11 +54,58 @@ type CardBox = { x: number; y: number; w: number; h: number };
 function CardEditor({ blockId }: { blockId: DbId }) {
   const { panelRenderers } = useSnapshot(orca.state);
   const BlockPanel = panelRenderers.block;
+  const editorRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    let attempts = 0;
+    const focusEditor = () => {
+      attempts++;
+      const el = editorRef.current;
+      if (!el) return;
+
+      const focusable = (
+        el.querySelector('[contenteditable="true"]') ||
+        el.querySelector('.orca-block-text') ||
+        el.querySelector('.orca-block-content') ||
+        el.querySelector('input, textarea')
+      ) as HTMLElement | null;
+
+      if (focusable) {
+        focusable.focus({ preventScroll: true });
+        
+        // Dispatch mouse events to trigger active text editing mode instantly
+        try {
+          const opts = { bubbles: true, cancelable: true, view: window };
+          focusable.dispatchEvent(new MouseEvent("mousedown", opts));
+          focusable.dispatchEvent(new MouseEvent("mouseup", opts));
+          focusable.dispatchEvent(new MouseEvent("click", opts));
+        } catch {
+          // ignore event dispatch errors if any
+        }
+
+        if (focusable.getAttribute("contenteditable") === "true") {
+          const sel = window.getSelection();
+          if (sel) {
+            const range = document.createRange();
+            range.selectNodeContents(focusable);
+            range.collapse(false);
+            sel.removeAllRanges();
+            sel.addRange(range);
+          }
+        }
+      } else if (attempts < 12) {
+        setTimeout(focusEditor, 25);
+      }
+    };
+
+    setTimeout(focusEditor, 10);
+  }, [blockId]);
+
   if (BlockPanel == null) {
     return <div className="owb-card-editor-missing">{t("Editor unavailable")}</div>;
   }
   return (
-    <div className="owb-card-editor">
+    <div ref={editorRef} className="owb-card-editor">
       <div className="orca-panel" data-panel-id="_reference">
         <div className="orca-hideable">
           <BlockPanel
@@ -68,6 +115,96 @@ function CardEditor({ blockId }: { blockId: DbId }) {
             active
           />
         </div>
+      </div>
+    </div>
+  );
+}
+
+const COLOR_PRESETS = [
+  { id: "default", label: "Default", bg: "var(--orca-color-bg-1)" },
+  { id: "blue", label: "Blue", bg: "rgba(47, 128, 237, 0.18)" },
+  { id: "green", label: "Green", bg: "rgba(34, 197, 94, 0.18)" },
+  { id: "yellow", label: "Yellow", bg: "rgba(234, 179, 8, 0.22)" },
+  { id: "coral", label: "Coral", bg: "rgba(244, 63, 94, 0.18)" },
+  { id: "purple", label: "Purple", bg: "rgba(168, 85, 247, 0.18)" },
+];
+
+function CardToolbar({
+  panelId,
+  card,
+  fitContentHeight,
+  onPatchCard,
+}: {
+  panelId: string;
+  card: WhiteboardCard;
+  fitContentHeight: () => void;
+  onPatchCard: Props["onPatchCard"];
+}) {
+  const [colorMenuOpen, setColorMenuOpen] = window.React.useState(false);
+
+  const openSplitView = () => {
+    try {
+      orca.nav.addTo(panelId, "right", {
+        view: "block",
+        viewArgs: { blockId: card.blockId },
+        viewState: {},
+      });
+    } catch (err) {
+      console.error("Failed to open split view", err);
+    }
+  };
+
+  return (
+    <div
+      className="owb-card-floating-toolbar"
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      <button
+        type="button"
+        className="owb-card-tb-btn"
+        title={t("Open side-by-side")}
+        onClick={openSplitView}
+      >
+        <i className="ti ti-layout-sidebar-right" />
+      </button>
+      <button
+        type="button"
+        className="owb-card-tb-btn"
+        title={t("Fit content height")}
+        onClick={fitContentHeight}
+      >
+        <i className="ti ti-arrows-vertical" />
+      </button>
+      <div className="owb-card-tb-popover-wrapper">
+        <button
+          type="button"
+          className="owb-card-tb-btn"
+          title={t("Card color")}
+          onClick={() => setColorMenuOpen((v: boolean) => !v)}
+        >
+          <i className="ti ti-palette" />
+        </button>
+        {colorMenuOpen ? (
+          <div className="owb-card-color-popover">
+            {COLOR_PRESETS.map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                className={`owb-card-color-dot${
+                  (card.color || "default") === preset.id ? " is-active" : ""
+                }`}
+                style={{ backgroundColor: preset.bg }}
+                title={preset.label}
+                onClick={() => {
+                  setColorMenuOpen(false);
+                  onPatchCard(card.blockId, {
+                    color: preset.id === "default" ? undefined : preset.id,
+                  });
+                }}
+              />
+            ))}
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -140,6 +277,7 @@ export function Card({
     const target = event.target as HTMLElement | null;
     if (target?.closest(".owb-card-handle") && event.button === 0) return;
     if (target?.closest(".owb-card-anchor")) return;
+    if (target?.closest(".owb-card-floating-toolbar")) return;
     if (editing && target?.closest(".owb-card-body")) return;
     if (isOnCardScrollbar(event.target, event.clientX, event.clientY)) return;
     onCardMouseDown(event, card);
@@ -183,7 +321,7 @@ export function Card({
   const fitContentHeight = () => {
     const el = cardRef.current;
     if (!el) return;
-    const title = el.querySelector(".owb-card-title") as HTMLElement | null;
+    const title = el.querySelector(".owb-card-title, .owb-card-header") as HTMLElement | null;
     const inner = el.querySelector(
       ".orca-block, .orca-block-editor-blocks, .owb-card-excerpt",
     ) as HTMLElement | null;
@@ -192,7 +330,7 @@ export function Card({
       inner?.scrollHeight ?? body?.scrollHeight ?? MIN_CARD_HEIGHT;
     const nextH = Math.max(
       MIN_CARD_HEIGHT,
-      (title?.offsetHeight ?? 0) + contentH + 8,
+      (title?.offsetHeight ?? 0) + contentH + 16,
     );
     if (nextH === card.h) return;
     onPatchCard(card.blockId, { w: card.w, h: nextH });
@@ -202,6 +340,7 @@ export function Card({
     "owb-card",
     editing ? "is-editing" : "",
     selected ? "is-selected" : "",
+    card.color ? `owb-card-theme-${card.color}` : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -243,6 +382,13 @@ export function Card({
             open(event);
           }}
         >
+          {selected ? <div className="owb-card-accent-diamond" /> : null}
+          <CardToolbar
+            panelId={panelId}
+            card={card}
+            fitContentHeight={fitContentHeight}
+            onPatchCard={onPatchCard}
+          />
           <CardTitle card={card} editing={editing} />
           <div
             className="owb-card-body"

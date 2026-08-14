@@ -157,7 +157,7 @@ export function cardPatchesChange(
   cards: readonly WhiteboardCard[],
   entries: ReadonlyArray<{
     blockId: DbId;
-    patch: { x?: number; y?: number; w?: number; h?: number };
+    patch: { x?: number; y?: number; w?: number; h?: number; color?: string };
   }>,
 ): boolean {
   if (entries.length === 0) return false;
@@ -173,6 +173,7 @@ export function cardPatchesChange(
     if (patch.y != null && patch.y !== card.y) return true;
     if (patch.w != null && patch.w !== card.w) return true;
     if (patch.h != null && patch.h !== card.h) return true;
+    if (patch.color !== undefined && patch.color !== card.color) return true;
   }
   return false;
 }

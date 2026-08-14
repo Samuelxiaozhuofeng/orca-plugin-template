@@ -7,7 +7,7 @@ const { useCallback, useEffect, useRef, useState } = window.React;
 const WRITE_DEBOUNCE_MS = 300;
 
 export type CardBoxPatch = Partial<
-  Pick<WhiteboardCard, "x" | "y" | "w" | "h">
+  Pick<WhiteboardCard, "x" | "y" | "w" | "h" | "color">
 >;
 
 type PersistBox = {

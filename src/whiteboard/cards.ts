@@ -13,6 +13,7 @@ export type WhiteboardCard = {
   blockId: DbId;
   kind: "journal" | "block";
   date?: string;
+  color?: string;
   x: number;
   y: number;
   w: number;
@@ -21,6 +22,10 @@ export type WhiteboardCard = {
 
 function dateIfString(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
+}
+
+function colorIfString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
 function inferKind(
@@ -49,12 +54,14 @@ export function normalizeCard(value: unknown): WhiteboardCard | null {
     typeof card.h === "number" && card.h > 0 ? card.h : CARD_HEIGHT,
   );
   const date = dateIfString(card.date);
+  const color = colorIfString(card.color);
   const kind = inferKind(card.kind, date);
   if (kind === "journal") {
     return {
       blockId: card.blockId,
       kind: "journal",
       date,
+      color,
       x: card.x,
       y: card.y,
       w: size.w,
@@ -64,6 +71,7 @@ export function normalizeCard(value: unknown): WhiteboardCard | null {
   return {
     blockId: card.blockId,
     kind: "block",
+    color,
     x: card.x,
     y: card.y,
     w: size.w,
@@ -128,6 +136,7 @@ function cardEqual(left: WhiteboardCard, right: WhiteboardCard): boolean {
     left.blockId === right.blockId &&
     left.kind === right.kind &&
     left.date === right.date &&
+    left.color === right.color &&
     left.x === right.x &&
     left.y === right.y &&
     left.w === right.w &&
