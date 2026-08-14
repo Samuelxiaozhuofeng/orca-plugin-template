@@ -214,8 +214,23 @@ export const CARD_CSS = `
 }
 
 .owb-card-body > .orca-block:first-child,
-.owb-card-body .orca-block:first-child {
+.owb-card-body .orca-block:first-child,
+.owb-card-body .owb-card-block-tree > .owb-card-block-node:first-child > .orca-block {
   margin-top: 0;
+}
+
+/* Read-only cards always expand children; hide the host fold caret
+   so clicking the card cannot write the note fold flag. */
+.owb-card:not(.is-editing) .orca-block-folding-handle {
+  display: none !important;
+}
+
+.owb-card-block-tree {
+  min-width: 0;
+}
+
+.owb-card-block-node + .owb-card-block-node {
+  margin-top: 2px;
 }
 
 .owb-card-body > .orca-block:last-child,

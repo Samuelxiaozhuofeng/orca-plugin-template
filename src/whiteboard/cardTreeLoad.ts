@@ -48,6 +48,7 @@ export function collectMissingCardTreeIds(
         missing.push(id);
         return;
       }
+      // Outline fold is `_repr.fold` and does not remove children ids.
       for (const child of block.children ?? []) {
         walk(child, depth + 1);
       }

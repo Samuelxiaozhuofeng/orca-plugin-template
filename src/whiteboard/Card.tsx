@@ -20,6 +20,7 @@ import type { Side } from "./edges";
 import type { ArrangeAction } from "./selection";
 import { isHostOverlayTarget } from "./hostOverlay";
 import { useCardBlockView } from "./blockWatch";
+import { CardBlockTree } from "./CardBlockTree";
 
 const ANCHOR_SIDES: Side[] = ["t", "r", "b", "l"];
 
@@ -352,12 +353,10 @@ export function Card({
             ) : degraded ? (
               <div className="owb-card-excerpt">{excerpt}</div>
             ) : (
-              <orca.components.Block
+              <CardBlockTree
                 key={treeRev}
                 panelId={panelId}
                 blockId={card.blockId}
-                blockLevel={0}
-                indentLevel={0}
               />
             )}
           </div>
