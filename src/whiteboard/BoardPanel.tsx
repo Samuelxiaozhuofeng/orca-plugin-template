@@ -32,7 +32,7 @@ export default function BoardPanel({ panelId, blockId }: Props) {
   const { blocks } = useSnapshot(orca.state);
   const block = blockId == null ? undefined : blocks[blockId];
   const serverCards = readCards(block);
-  const { cards, patchCards, commitCards } = useCardPersist(
+  const { cards, patchCards, commitCards, appendCards } = useCardPersist(
     blockId ?? null,
     serverCards,
   );
@@ -139,15 +139,15 @@ export default function BoardPanel({ panelId, blockId }: Props) {
     <div className="owb-panel">
       <Canvas
         panelId={panelId}
+        boardBlockId={blockId}
         cards={cards}
         view={view}
-        busy={busy}
         zoomLabelRef={zoomLabelRef}
         weekdayGuide={weekdayGuide}
         onViewChange={setView}
         onPatchCards={patchCards}
         onRemoveCards={onRemoveCards}
-        onPlaceWeek={() => setPlaceOpen(true)}
+        onAddCards={appendCards}
         onViewportWidth={setViewportWidth}
       />
       <div className="owb-toolbar">

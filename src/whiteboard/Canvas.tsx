@@ -5,19 +5,29 @@ import {
   handleWhiteboardKey,
   isWhiteboardShortcutTarget,
 } from "./canvasKeys";
-import { startMoveCards } from "./cardGestures";
+import {
+  startMoveCards,
+  startRightButtonSession,
+  swallowNextContextMenu,
+} from "./cardGestures";
 import {
   WEEKDAY_LABELS_MON,
   type CanvasOrigin,
   type WhiteboardCard,
 } from "./data";
-import { JournalCard } from "./JournalCard";
+import { Card } from "./Card";
+import {
+  completeBoardDrop,
+  isLeavingDragTarget,
+  isOrcaBlockDrag,
+} from "./dropBlocks";
 import { startMarquee } from "./marquee";
 import {
   arrangeCards,
   toggleId,
   type ArrangeAction,
 } from "./selection";
+import { useWhiteboardSettings } from "./settings";
 import { useCanvasView } from "./useCanvasView";
 import {
   CARD_LOD_SCALE,
@@ -36,41 +46,45 @@ const { useCallback, useEffect, useMemo, useRef, useState } = window.React;
 
 type Props = {
   panelId: string;
+  boardBlockId: DbId;
   cards: WhiteboardCard[];
   view: CanvasView;
-  busy: boolean;
   zoomLabelRef: { current: HTMLElement | null };
   onViewChange: (view: CanvasView) => void;
   onPatchCards: (entries: CardPatchEntry[]) => void;
   onRemoveCards: (ids: DbId[]) => Promise<boolean>;
-  onPlaceWeek: () => void;
+  onAddCards: (cards: WhiteboardCard[]) => Promise<boolean>;
   onViewportWidth: (width: number) => void;
   weekdayGuide?: CanvasOrigin | null;
 };
 
 export function Canvas({
   panelId,
+  boardBlockId,
   cards,
   view,
-  busy,
   zoomLabelRef,
   onViewChange,
   onPatchCards,
   onRemoveCards,
-  onPlaceWeek,
+  onAddCards,
   onViewportWidth,
   weekdayGuide,
 }: Props) {
   const [editingId, setEditingId] = useState<DbId | null>(null);
   const [selected, setSelected] = useState<DbId[]>([]);
+  const [dropActive, setDropActive] = useState(false);
   const editingRef = useRef<DbId | null>(null);
   const selectedRef = useRef<DbId[]>([]);
   const cardsRef = useRef(cards);
   const marqueeRef = useRef<HTMLDivElement | null>(null);
   const guidesRef = useRef<HTMLDivElement | null>(null);
+  const settings = useWhiteboardSettings();
+  const settingsRef = useRef(settings);
   editingRef.current = editingId;
   selectedRef.current = selected;
   cardsRef.current = cards;
+  settingsRef.current = settings;
 
   const {
     viewportRef,
@@ -137,6 +151,77 @@ export function Canvas({
     viewportRef.current?.focus({ preventScroll: true });
   };
 
+  const beginMoveSelection = (startX: number, startY: number) => {
+    const canvas = canvasRef.current;
+    if (canvas == null) return;
+    const movingIds = new Set(selectedRef.current);
+    const moving = cardsRef.current.filter((item: WhiteboardCard) =>
+      movingIds.has(item.blockId),
+    );
+    if (moving.length === 0) return;
+    const others = cardsRef.current.filter(
+      (item: WhiteboardCard) => !movingIds.has(item.blockId),
+    );
+    startMoveCards({
+      startX,
+      startY,
+      canvas,
+      guidesEl: guidesRef.current,
+      showGuides: () => settingsRef.current.showAlignGuides,
+      moving,
+      others,
+      pointerToWorld,
+      view: () => liveViewRef.current,
+      onEnd: (moves) => {
+        if (moves.length === 0) return;
+        onPatchCards(
+          moves.map((item) => ({
+            blockId: item.blockId,
+            patch: { x: item.x, y: item.y },
+          })),
+        );
+      },
+    });
+  };
+
+  const selectCardOnPointer = (
+    card: WhiteboardCard,
+    event: React.MouseEvent,
+  ): boolean => {
+    const additive = event.shiftKey || event.metaKey || event.ctrlKey;
+    let next = selectedRef.current;
+    if (additive) {
+      next = toggleId(next, card.blockId);
+      selectedRef.current = next;
+      setSelected(next);
+    } else if (!next.includes(card.blockId)) {
+      next = [card.blockId];
+      selectedRef.current = next;
+      setSelected(next);
+    }
+    return next.includes(card.blockId);
+  };
+
+  const fireAppContextMenu = (
+    clientX: number,
+    clientY: number,
+    target: EventTarget | null,
+  ) => {
+    const el =
+      target instanceof Element ? target : viewportRef.current;
+    if (el == null) return;
+    el.dispatchEvent(
+      new MouseEvent("contextmenu", {
+        bubbles: true,
+        cancelable: true,
+        view: window,
+        clientX,
+        clientY,
+        button: 2,
+      }),
+    );
+  };
+
   const onViewportMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement | null;
     if (target?.closest(".owb-card")) return;
@@ -146,7 +231,23 @@ export function Canvas({
     const spacePan = spaceHeldRef.current;
     if (event.button === 1 || spacePan || (event.button === 0 && event.altKey && blank)) {
       event.preventDefault();
+      if (event.button === 2) swallowNextContextMenu();
       startPan(event.clientX, event.clientY);
+      return;
+    }
+    if (
+      event.button === 2 &&
+      blank &&
+      settingsRef.current.mouseScheme === "rightDrag"
+    ) {
+      event.preventDefault();
+      startRightButtonSession({
+        startX: event.clientX,
+        startY: event.clientY,
+        onDrag: () => startPan(event.clientX, event.clientY),
+        onIdleRelease: () =>
+          fireAppContextMenu(event.clientX, event.clientY, event.target),
+      });
       return;
     }
     if (event.button !== 0 || !blank) return;
@@ -181,7 +282,23 @@ export function Canvas({
   ) => {
     if (event.button === 1 || spaceHeldRef.current) {
       event.preventDefault();
+      if (event.button === 2) swallowNextContextMenu();
       startPan(event.clientX, event.clientY);
+      return;
+    }
+    if (event.button === 2 && settingsRef.current.mouseScheme === "rightDrag") {
+      event.preventDefault();
+      event.stopPropagation();
+      focusViewport();
+      const canMove =
+        editingRef.current !== card.blockId && selectCardOnPointer(card, event);
+      if (canMove) beginMoveSelection(event.clientX, event.clientY);
+      startRightButtonSession({
+        startX: event.clientX,
+        startY: event.clientY,
+        onIdleRelease: () =>
+          fireAppContextMenu(event.clientX, event.clientY, event.target),
+      });
       return;
     }
     if (event.button !== 0) return;
@@ -189,45 +306,9 @@ export function Canvas({
     event.stopPropagation();
     focusViewport();
 
-    const additive = event.shiftKey || event.metaKey || event.ctrlKey;
-    let next = selectedRef.current;
-    if (additive) {
-      next = toggleId(next, card.blockId);
-      setSelected(next);
-    } else if (!next.includes(card.blockId)) {
-      next = [card.blockId];
-      setSelected(next);
-    }
-    if (!next.includes(card.blockId)) return;
-
-    const canvas = canvasRef.current;
-    if (canvas == null) return;
-    const movingIds = new Set(next);
-    const moving = cardsRef.current.filter((item: WhiteboardCard) =>
-      movingIds.has(item.blockId),
-    );
-    const others = cardsRef.current.filter(
-      (item: WhiteboardCard) => !movingIds.has(item.blockId),
-    );
-    startMoveCards({
-      startX: event.clientX,
-      startY: event.clientY,
-      canvas,
-      guidesEl: guidesRef.current,
-      moving,
-      others,
-      pointerToWorld,
-      view: () => liveViewRef.current,
-      onEnd: (moves) => {
-        if (moves.length === 0) return;
-        onPatchCards(
-          moves.map((item) => ({
-            blockId: item.blockId,
-            patch: { x: item.x, y: item.y },
-          })),
-        );
-      },
-    });
+    if (!selectCardOnPointer(card, event)) return;
+    if (settingsRef.current.mouseScheme === "rightDrag") return;
+    beginMoveSelection(event.clientX, event.clientY);
   };
 
   useEffect(() => {
@@ -278,20 +359,29 @@ export function Canvas({
     return () => window.removeEventListener("keydown", onKey);
   }, [onPatchCards, onRemoveCards, panelId, viewportRef]);
 
+  const canOpenBoardMenu = () => {
+    if (selectedRef.current.length >= 2) return true;
+    return (
+      selectedRef.current.length === 0 && cardsRef.current.length > 0
+    );
+  };
+
   const boardMenu = (close: () => void) => (
     <orca.components.Menu>
-      <orca.components.MenuText
-        title={t("Place journals…")}
-        disabled={busy}
-        onClick={() => {
-          close();
-          onPlaceWeek();
-        }}
-      />
+      {selected.length === 0 && cards.length > 0 ? (
+        <orca.components.MenuText
+          title={t("Select all")}
+          onClick={() => {
+            close();
+            setSelected(cardsRef.current.map((card: WhiteboardCard) => card.blockId));
+          }}
+        />
+      ) : null}
       <ArrangeMenuItems
         close={close}
         selectedCount={selected.length}
         onArrange={applyArrange}
+        leadingSeparator={false}
       />
     </orca.components.Menu>
   );
@@ -301,12 +391,49 @@ export function Canvas({
       {(open) => (
         <div
           ref={viewportRef}
-          className="owb-viewport"
+          className={dropActive ? "owb-viewport is-drop-target" : "owb-viewport"}
+          data-mouse-scheme={settings.mouseScheme}
           tabIndex={0}
           onMouseDown={onViewportMouseDown}
+          onDragOver={(event) => {
+            if (!isOrcaBlockDrag(event.dataTransfer)) return;
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "copy";
+            setDropActive(true);
+          }}
+          onDragLeave={(event) => {
+            if (isLeavingDragTarget(event.currentTarget, event.relatedTarget)) {
+              setDropActive(false);
+            }
+          }}
+          onDrop={(event) => {
+            event.preventDefault();
+            setDropActive(false);
+            const at = pointerToWorld(event.clientX, event.clientY);
+            const dataTransfer = event.dataTransfer;
+            void completeBoardDrop({
+              dataTransfer,
+              at,
+              existing: cardsRef.current,
+              boardBlockId,
+              addCards: onAddCards,
+            }).catch((error: unknown) => {
+              console.error("[whiteboard] failed to drop blocks", error);
+              orca.notify(
+                "error",
+                error instanceof Error
+                  ? error.message
+                  : t("Failed to add blocks to the board"),
+              );
+            });
+          }}
           onContextMenu={(event) => {
             const target = event.target as HTMLElement | null;
             if (target?.closest(".owb-card")) return;
+            if (!canOpenBoardMenu()) {
+              event.preventDefault();
+              return;
+            }
             open(event);
           }}
         >
@@ -325,8 +452,8 @@ export function Canvas({
               </div>
             ) : null}
             {shownCards.map((card: WhiteboardCard) => (
-              <JournalCard
-                key={`${card.date}-${card.blockId}`}
+              <Card
+                key={card.blockId}
                 panelId={panelId}
                 card={card}
                 degraded={degraded && editingId !== card.blockId}
@@ -358,7 +485,9 @@ export function Canvas({
                 {t("This board is empty")}
               </div>
               <div className="owb-canvas-empty-sub">
-                {t("Right-click or use the toolbar to place journals.")}
+                {t(
+                  "Use the toolbar to place journals, or drag blocks here from a note.",
+                )}
               </div>
             </div>
           )}

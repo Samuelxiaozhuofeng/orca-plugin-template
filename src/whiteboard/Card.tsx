@@ -9,11 +9,8 @@ import {
   startResizeCard,
   type ResizeHandle,
 } from "./cardGestures";
-import {
-  cardDateMeta,
-  MIN_CARD_HEIGHT,
-  type WhiteboardCard,
-} from "./data";
+import { CardTitle } from "./CardTitle";
+import { MIN_CARD_HEIGHT, type WhiteboardCard } from "./data";
 import type { ArrangeAction } from "./selection";
 import { cachedBlockPlainText, cardExcerpt } from "./viewTransform";
 
@@ -45,7 +42,7 @@ type Props = {
 
 type CardBox = { x: number; y: number; w: number; h: number };
 
-function JournalEditor({ blockId }: { blockId: DbId }) {
+function CardEditor({ blockId }: { blockId: DbId }) {
   const { panelRenderers } = useSnapshot(orca.state);
   const BlockPanel = panelRenderers.block;
   if (BlockPanel == null) {
@@ -67,7 +64,7 @@ function JournalEditor({ blockId }: { blockId: DbId }) {
   );
 }
 
-export function JournalCard({
+export function Card({
   panelId,
   card,
   degraded,
@@ -96,12 +93,12 @@ export function JournalCard({
   }
 
   const { blocks } = useSnapshot(orca.state);
-  const journal = blocks[card.blockId];
+  const hosted = blocks[card.blockId];
   const isEmptyJournal =
-    journal != null &&
-    !(typeof journal.text === "string" && journal.text.trim().length > 0) &&
-    (journal.children?.length ?? 0) === 0;
-  const dateMeta = cardDateMeta(card.date);
+    card.kind === "journal" &&
+    hosted != null &&
+    !(typeof hosted.text === "string" && hosted.text.trim().length > 0) &&
+    (hosted.children?.length ?? 0) === 0;
   const excerpt = cardExcerpt(cachedBlockPlainText(card.blockId, blocks));
 
   useLayoutEffect(() => {
@@ -130,7 +127,7 @@ export function JournalCard({
 
   const onRootMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement | null;
-    if (target?.closest(".owb-card-handle")) return;
+    if (target?.closest(".owb-card-handle") && event.button === 0) return;
     if (editing && target?.closest(".owb-card-body")) return;
     if (isOnCardScrollbar(event.target, event.clientX, event.clientY)) return;
     onCardMouseDown(event, card);
@@ -224,25 +221,15 @@ export function JournalCard({
           style={{ left: box.x, top: box.y, width: box.w, height: box.h }}
           onMouseDown={onRootMouseDown}
           onContextMenu={(event) => {
-            if (editing) return;
+            if (editing) {
+              event.preventDefault();
+              return;
+            }
             if (!selected) onSelectOnly(card.blockId);
             open(event);
           }}
         >
-          <div className="owb-card-title">
-            <span className="owb-card-title-main">
-              {dateMeta.isToday ? <span className="owb-card-today-dot" /> : null}
-              <span className="owb-card-date">{dateMeta.date}</span>
-              <span
-                className={`owb-card-weekday${dateMeta.isWeekend ? " is-weekend" : ""}`}
-              >
-                {dateMeta.weekday}
-              </span>
-            </span>
-            {editing ? (
-              <span className="owb-card-edit-badge">{t("Editing")}</span>
-            ) : null}
-          </div>
+          <CardTitle card={card} editing={editing} />
           <div
             className="owb-card-body"
             title={editing ? undefined : t("Double-click to edit")}
@@ -251,7 +238,7 @@ export function JournalCard({
             }}
           >
             {editing ? (
-              <JournalEditor blockId={card.blockId} />
+              <CardEditor blockId={card.blockId} />
             ) : isEmptyJournal ? (
               <div className="owb-card-empty">{t("No notes this day")}</div>
             ) : degraded ? (
@@ -270,7 +257,6 @@ export function JournalCard({
                 <div
                   key={handle}
                   className={`owb-card-handle owb-card-handle-${handle}`}
-                  title={t("Drag to resize")}
                   onMouseDown={(event) => onResizeMouseDown(event, handle)}
                 />
               ))

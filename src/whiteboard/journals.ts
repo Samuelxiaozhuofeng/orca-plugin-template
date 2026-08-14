@@ -72,7 +72,7 @@ export function journalDateKey(block: Block | undefined): string | null {
   return `${y}-${m}-${d}`;
 }
 
-/** Same empty rule as JournalCard: no trimmed text and no children. */
+/** Same empty rule as Card: no trimmed text and no children. */
 export function journalHasContent(block: Block): boolean {
   const text = typeof block.text === "string" ? block.text.trim() : "";
   if (text.length > 0) return true;
@@ -133,7 +133,15 @@ export async function placeJournalCards(
   }
 
   const fetched = await fetchJournalBlocks(range);
-  const byDate = new Map(request.existing.map((card) => [card.date, card]));
+  const existingIds = new Set(
+    request.existing.map((card) => card.blockId),
+  );
+  const byDate = new Map<string, WhiteboardCard>();
+  for (const card of request.existing) {
+    if (card.kind === "journal" && typeof card.date === "string") {
+      byDate.set(card.date, card);
+    }
+  }
   const seen = new Set<string>();
   let skippedExisting = 0;
   let skippedEmpty = 0;
@@ -145,7 +153,7 @@ export async function placeJournalCards(
       continue;
     }
     seen.add(dateKey);
-    if (byDate.has(dateKey)) {
+    if (byDate.has(dateKey) || existingIds.has(block.id)) {
       skippedExisting += 1;
       continue;
     }
@@ -167,6 +175,7 @@ export async function placeJournalCards(
         : layoutGrid(index, request.columns, request.origin);
     const card: WhiteboardCard = {
       blockId: item.block.id,
+      kind: "journal",
       date: item.date,
       x: pos.x,
       y: pos.y,

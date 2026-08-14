@@ -53,11 +53,79 @@ function cardEl(canvas: HTMLElement, blockId: DbId): HTMLElement | null {
   return canvas.querySelector(`[data-block-id="${blockId}"]`);
 }
 
+export const RIGHT_BUTTON_THRESHOLD_PX = 3;
+
+export function swallowNextContextMenu(): void {
+  const onMenu = (event: Event) => {
+    event.preventDefault();
+    event.stopPropagation();
+  };
+  window.addEventListener("contextmenu", onMenu, true);
+  const done = () => {
+    window.removeEventListener("mouseup", done);
+    window.setTimeout(() => {
+      window.removeEventListener("contextmenu", onMenu, true);
+    }, 0);
+  };
+  window.addEventListener("mouseup", done);
+}
+
+export function startRightButtonSession(opts: {
+  startX: number;
+  startY: number;
+  onDrag?: () => void;
+  onIdleRelease: () => void;
+}): void {
+  let dragged = false;
+  let finished = false;
+  let allowSynthetic = false;
+
+  const onMenu = (event: Event) => {
+    if (allowSynthetic) return;
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  const onMove = (event: MouseEvent) => {
+    if (dragged) return;
+    const dx = event.clientX - opts.startX;
+    const dy = event.clientY - opts.startY;
+    if (
+      dx * dx + dy * dy <
+      RIGHT_BUTTON_THRESHOLD_PX * RIGHT_BUTTON_THRESHOLD_PX
+    ) {
+      return;
+    }
+    dragged = true;
+    opts.onDrag?.();
+  };
+
+  const onUp = () => {
+    if (finished) return;
+    finished = true;
+    window.removeEventListener("mousemove", onMove);
+    window.removeEventListener("mouseup", onUp);
+    if (!dragged) {
+      allowSynthetic = true;
+      opts.onIdleRelease();
+      allowSynthetic = false;
+    }
+    window.setTimeout(() => {
+      window.removeEventListener("contextmenu", onMenu, true);
+    }, 0);
+  };
+
+  window.addEventListener("contextmenu", onMenu, true);
+  window.addEventListener("mousemove", onMove);
+  window.addEventListener("mouseup", onUp);
+}
+
 export function startMoveCards(opts: {
   startX: number;
   startY: number;
   canvas: HTMLElement;
   guidesEl: HTMLElement | null;
+  showGuides: () => boolean;
   moving: ReadonlyArray<{ blockId: DbId } & CardRect>;
   others: readonly CardRect[];
   pointerToWorld: (clientX: number, clientY: number) => { x: number; y: number };
@@ -98,7 +166,7 @@ export function startMoveCards(opts: {
         h: card.h,
       });
     }
-    if (alt) clearGuides(opts.guidesEl);
+    if (alt || !opts.showGuides()) clearGuides(opts.guidesEl);
     else paintGuides(opts.guidesEl, snap.guides, opts.view());
   };
 

@@ -11,19 +11,34 @@ export const PROP_TYPE_TEXT = 1;
 
 export type WhiteboardCard = {
   blockId: DbId;
-  date: string;
+  kind: "journal" | "block";
+  date?: string;
   x: number;
   y: number;
   w: number;
   h: number;
 };
 
-function normalizeCard(value: unknown): WhiteboardCard | null {
+function dateIfString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+function inferKind(
+  rawKind: unknown,
+  date: string | undefined,
+): "journal" | "block" {
+  if (rawKind === "journal") {
+    return date != null ? "journal" : "block";
+  }
+  if (rawKind === "block") return "block";
+  return date != null && date.length > 0 ? "journal" : "block";
+}
+
+export function normalizeCard(value: unknown): WhiteboardCard | null {
   if (value == null || typeof value !== "object") return null;
   const card = value as Record<string, unknown>;
   if (
     typeof card.blockId !== "number" ||
-    typeof card.date !== "string" ||
     typeof card.x !== "number" ||
     typeof card.y !== "number"
   ) {
@@ -33,9 +48,22 @@ function normalizeCard(value: unknown): WhiteboardCard | null {
     typeof card.w === "number" && card.w > 0 ? card.w : CARD_WIDTH,
     typeof card.h === "number" && card.h > 0 ? card.h : CARD_HEIGHT,
   );
+  const date = dateIfString(card.date);
+  const kind = inferKind(card.kind, date);
+  if (kind === "journal") {
+    return {
+      blockId: card.blockId,
+      kind: "journal",
+      date,
+      x: card.x,
+      y: card.y,
+      w: size.w,
+      h: size.h,
+    };
+  }
   return {
     blockId: card.blockId,
-    date: card.date,
+    kind: "block",
     x: card.x,
     y: card.y,
     w: size.w,
@@ -43,7 +71,7 @@ function normalizeCard(value: unknown): WhiteboardCard | null {
   };
 }
 
-function parseCardsValue(value: unknown): WhiteboardCard[] {
+export function parseCards(value: unknown): WhiteboardCard[] {
   let parsed: unknown = value;
   if (typeof value === "string") {
     const trimmed = value.trim();
@@ -68,7 +96,7 @@ export function readCards(
   if (block == null) return [];
   const prop = block.properties?.find((item) => item.name === CARDS_PROP);
   if (prop == null) return [];
-  return parseCardsValue(prop.value);
+  return parseCards(prop.value);
 }
 
 function applyReturnedBlocks(result: unknown): void {
@@ -87,15 +115,43 @@ function applyReturnedBlocks(result: unknown): void {
   }
 }
 
-function cardsEqual(left: WhiteboardCard[], right: WhiteboardCard[]): boolean {
-  return JSON.stringify(left) === JSON.stringify(right);
+function storedCard(card: WhiteboardCard): WhiteboardCard {
+  const normalized = normalizeCard(card);
+  if (normalized == null) {
+    throw new Error(t("Whiteboard cards were not saved"));
+  }
+  return normalized;
+}
+
+function cardEqual(left: WhiteboardCard, right: WhiteboardCard): boolean {
+  return (
+    left.blockId === right.blockId &&
+    left.kind === right.kind &&
+    left.date === right.date &&
+    left.x === right.x &&
+    left.y === right.y &&
+    left.w === right.w &&
+    left.h === right.h
+  );
+}
+
+export function cardsEqual(
+  left: WhiteboardCard[],
+  right: WhiteboardCard[],
+): boolean {
+  if (left.length !== right.length) return false;
+  for (let i = 0; i < left.length; i++) {
+    if (!cardEqual(left[i], right[i])) return false;
+  }
+  return true;
 }
 
 export async function writeCards(
   blockId: DbId,
   cards: WhiteboardCard[],
 ): Promise<void> {
-  const payload = JSON.stringify(cards);
+  const stored = cards.map(storedCard);
+  const payload = JSON.stringify(stored);
   // Must not use invokeEditorCommand here: that API no-ops when the active
   // panel has no viewState.editor (the whiteboard panel never has one).
   const result = await orca.invokeBackend(
@@ -119,10 +175,10 @@ export async function writeCards(
   }
 
   const readBack = readCards(fresh ?? orca.state.blocks[blockId]);
-  if (!cardsEqual(readBack, cards)) {
+  if (!cardsEqual(readBack, stored)) {
     console.error("[whiteboard] cards write verify failed", {
       blockId,
-      expected: cards,
+      expected: stored,
       readBack,
       backendResult: result,
       freshProperties: fresh?.properties,

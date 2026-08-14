@@ -1,6 +1,6 @@
 import type { DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n";
-import { writeCards, type WhiteboardCard } from "./data";
+import { cardsEqual, writeCards, type WhiteboardCard } from "./data";
 
 const { useCallback, useEffect, useRef, useState } = window.React;
 
@@ -22,7 +22,7 @@ type PersistBox = {
 };
 
 function sameCards(left: WhiteboardCard[], right: WhiteboardCard[]): boolean {
-  return JSON.stringify(left) === JSON.stringify(right);
+  return cardsEqual(left, right);
 }
 
 function notifyWriteError(error: unknown): void {
@@ -49,6 +49,7 @@ export function useCardPersist(
     entries: ReadonlyArray<{ blockId: DbId; patch: CardBoxPatch }>,
   ) => void;
   commitCards: (next: WhiteboardCard[]) => Promise<boolean>;
+  appendCards: (incoming: WhiteboardCard[]) => Promise<boolean>;
   flush: () => Promise<void>;
 } {
   const [cards, setCards] = useState<WhiteboardCard[]>(serverCards);
@@ -172,6 +173,21 @@ export function useCardPersist(
     [flushNow, show],
   );
 
+  const appendCards = useCallback(
+    async (incoming: WhiteboardCard[]): Promise<boolean> => {
+      if (incoming.length === 0) return true;
+      const occupied = new Set(
+        boxRef.current.local.map((card: WhiteboardCard) => card.blockId),
+      );
+      const fresh = incoming.filter(
+        (card: WhiteboardCard) => !occupied.has(card.blockId),
+      );
+      if (fresh.length === 0) return true;
+      return commitCards([...boxRef.current.local, ...fresh]);
+    },
+    [commitCards],
+  );
+
   useEffect(() => {
     const id = blockId;
     const initial = serverCardsRef.current;
@@ -220,5 +236,12 @@ export function useCardPersist(
     }
   }, [serverCards, show]);
 
-  return { cards, patchCard, patchCards, commitCards, flush: flushNow };
+  return {
+    cards,
+    patchCard,
+    patchCards,
+    commitCards,
+    appendCards,
+    flush: flushNow,
+  };
 }

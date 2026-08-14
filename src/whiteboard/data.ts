@@ -40,7 +40,14 @@ export {
   type RangePreset,
 } from "./layout";
 
-export { readCards, writeCards, type WhiteboardCard } from "./cards";
+export {
+  cardsEqual,
+  normalizeCard,
+  parseCards,
+  readCards,
+  writeCards,
+  type WhiteboardCard,
+} from "./cards";
 
 export {
   fetchJournalBlocks,

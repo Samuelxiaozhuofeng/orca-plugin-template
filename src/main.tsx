@@ -10,6 +10,10 @@ import {
 } from "./whiteboard/data";
 import { flushAllCardWrites } from "./whiteboard/cardPersist";
 import {
+  bindWhiteboardPlugin,
+  whiteboardSettingsSchema,
+} from "./whiteboard/settings";
+import {
   injectWhiteboardStyles,
   removeWhiteboardStyles,
 } from "./whiteboard/styles";
@@ -25,8 +29,10 @@ function commandId(name: string): string {
 
 export async function load(_name: string) {
   pluginName = _name;
+  bindWhiteboardPlugin(_name);
 
   setupL10N(orca.state.locale, { "zh-CN": zhCN });
+  await orca.plugins.setSettingsSchema(pluginName, whiteboardSettingsSchema());
   injectWhiteboardStyles();
 
   orca.panels.registerPanel(PANEL_TYPE, BoardPanel);

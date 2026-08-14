@@ -147,6 +147,10 @@ const SHELL_CSS = `
   background: var(--orca-color-bg-2);
 }
 
+.owb-viewport.is-drop-target {
+  box-shadow: inset 0 0 0 2px var(--orca-color-primary-5);
+}
+
 .owb-viewport:focus {
   outline: none;
 }

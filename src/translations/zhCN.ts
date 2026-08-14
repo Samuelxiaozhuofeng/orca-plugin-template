@@ -41,8 +41,27 @@ const zhCN = {
   "Added ${count} journal cards": "已放入 ${count} 张日记卡片",
   "${count} cards": "${count} 张卡片",
   "This board is empty": "这块白板还是空的",
-  "Right-click or use the toolbar to place journals.":
-    "在空白处右键，或点工具栏的「放入日记…」",
+  "Use the toolbar to place journals, or drag blocks here from a note.":
+    "点工具栏的「放入日记…」，或从笔记里把块拖进来。",
+  "Added ${added} cards": "已放入 ${added} 张",
+  "skipped ${existing} already on the board": "跳过 ${existing} 张已在白板上",
+  "skipped ${self} that would nest this board":
+    "跳过 ${self} 张（不能把白板放进自己）",
+  "Nothing to add to the board": "没有可放入白板的内容",
+  ", ": "，",
+  "Failed to add blocks to the board": "无法把块放到白板上",
+  Untitled: "未命名",
+  "Select all": "全选",
+  "Mouse controls": "鼠标操作方式",
+  "How left and right mouse buttons move cards and pan the canvas.":
+    "选择用左键还是右键来移动卡片和平移画布。",
+  "Standard: left-drag cards, space/middle-drag to pan":
+    "标准：左键拖动卡片，空格/中键平移画布",
+  "Right-drag: right-drag cards to move, right-drag blank to pan":
+    "右键拖动：右键拖卡片移动，右键拖空白平移画布",
+  "Show alignment guides": "显示对齐参考线",
+  "Draw alignment lines while dragging. Snapping stays on either way.":
+    "拖动卡片时画出对齐线。关掉后吸附仍然有效。",
   "No notes this day": "这天还没有写日记",
   "Double-click to edit": "双击进入编辑",
   Editing: "编辑中",

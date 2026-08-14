@@ -5,12 +5,14 @@ type Props = {
   close: () => void;
   selectedCount: number;
   onArrange: (action: ArrangeAction) => void;
+  leadingSeparator?: boolean;
 };
 
 export function ArrangeMenuItems({
   close,
   selectedCount,
   onArrange,
+  leadingSeparator = true,
 }: Props) {
   if (selectedCount < 2) return null;
 
@@ -28,7 +30,7 @@ export function ArrangeMenuItems({
 
   return (
     <>
-      <orca.components.MenuSeparator />
+      {leadingSeparator ? <orca.components.MenuSeparator /> : null}
       <orca.components.MenuTitle title={t("Arrange")} />
       {item("alignLeft", t("Align left"))}
       {item("alignCenterX", t("Align horizontal centers"))}

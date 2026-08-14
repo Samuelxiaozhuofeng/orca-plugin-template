@@ -1,4 +1,9 @@
 export const CARD_CSS = `
+.owb-viewport[data-mouse-scheme="rightDrag"] .owb-card:not(.is-editing):not(.is-dragging),
+.owb-viewport[data-mouse-scheme="rightDrag"] .owb-card:not(.is-editing):not(.is-dragging) .owb-card-title {
+  cursor: default;
+}
+
 .owb-card {
   position: absolute;
   display: flex;
@@ -35,6 +40,7 @@ export const CARD_CSS = `
 
 .owb-card.is-dragging {
   z-index: 4;
+  cursor: grabbing;
   transform: scale(1.02);
   transition: none;
   box-shadow:
@@ -99,6 +105,19 @@ export const CARD_CSS = `
   align-items: center;
   gap: var(--owb-space-2);
   min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.owb-card-page-icon {
+  flex: 0 0 auto;
+  color: var(--orca-color-text-2);
+}
+
+.owb-card-page {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .owb-card-today-dot {
@@ -206,61 +225,45 @@ export const CARD_CSS = `
   position: absolute;
   z-index: 5;
   box-sizing: border-box;
-  background: var(--orca-color-bg-1);
-  box-shadow: 0 0 0 1px var(--orca-color-primary-5);
-  border-radius: 2px;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--owb-duration) var(--owb-ease);
-}
-
-.owb-card:hover .owb-card-handle,
-.owb-card.is-selected .owb-card-handle,
-.owb-card.is-resizing .owb-card-handle {
-  opacity: 0.85;
+  background: transparent;
+  border: none;
+  box-shadow: none;
   pointer-events: auto;
-}
-
-.owb-card .owb-card-handle:hover,
-.owb-card.is-resizing .owb-card-handle {
-  opacity: 1;
 }
 
 .owb-card-handle-n,
 .owb-card-handle-s {
-  left: 50%;
-  width: 16px;
+  left: 12px;
+  right: 12px;
   height: 8px;
-  margin-left: -8px;
   cursor: ns-resize;
 }
 
 .owb-card-handle-e,
 .owb-card-handle-w {
-  top: 50%;
+  top: 12px;
+  bottom: 12px;
   width: 8px;
-  height: 16px;
-  margin-top: -8px;
   cursor: ew-resize;
 }
 
-.owb-card-handle-n { top: 2px; }
-.owb-card-handle-s { bottom: 2px; }
-.owb-card-handle-e { right: 2px; }
-.owb-card-handle-w { left: 2px; }
+.owb-card-handle-n { top: 0; }
+.owb-card-handle-s { bottom: 0; }
+.owb-card-handle-e { right: 0; }
+.owb-card-handle-w { left: 0; }
 
 .owb-card-handle-ne,
 .owb-card-handle-nw,
 .owb-card-handle-se,
 .owb-card-handle-sw {
-  width: 8px;
-  height: 8px;
+  width: 12px;
+  height: 12px;
 }
 
-.owb-card-handle-ne { top: 2px; right: 2px; cursor: nesw-resize; }
-.owb-card-handle-nw { top: 2px; left: 2px; cursor: nwse-resize; }
-.owb-card-handle-se { bottom: 2px; right: 2px; cursor: nwse-resize; }
-.owb-card-handle-sw { bottom: 2px; left: 2px; cursor: nesw-resize; }
+.owb-card-handle-ne { top: 0; right: 0; cursor: nesw-resize; }
+.owb-card-handle-nw { top: 0; left: 0; cursor: nwse-resize; }
+.owb-card-handle-se { bottom: 0; right: 0; cursor: nwse-resize; }
+.owb-card-handle-sw { bottom: 0; left: 0; cursor: nesw-resize; }
 
 .owb-card-editor,
 .owb-card-editor .orca-panel,
