@@ -1,6 +1,6 @@
 import type { DbId } from "../orca.d.ts";
 import type { WhiteboardCard } from "./cards";
-import type { WhiteboardEdge } from "./edges";
+import { bendsEqual, type WhiteboardEdge } from "./edges";
 
 export const HISTORY_LIMIT = 50;
 
@@ -29,7 +29,16 @@ let blankUndoTold = false;
 export function cloneSnapshot(snapshot: BoardSnapshot): BoardSnapshot {
   return {
     cards: snapshot.cards.map((card) => ({ ...card })),
-    edges: snapshot.edges.map((edge) => ({ ...edge })),
+    edges: snapshot.edges.map((edge) => {
+      if (edge.bend == null) return { ...edge };
+      return {
+        ...edge,
+        bend: {
+          from: { ...edge.bend.from },
+          to: { ...edge.bend.to },
+        },
+      };
+    }),
   };
 }
 
@@ -189,7 +198,8 @@ export function edgesMatchIgnoringLinked(
       item.label !== other.label ||
       item.arrow !== other.arrow ||
       item.fromSide !== other.fromSide ||
-      item.toSide !== other.toSide
+      item.toSide !== other.toSide ||
+      !bendsEqual(item.bend, other.bend)
     ) {
       return false;
     }

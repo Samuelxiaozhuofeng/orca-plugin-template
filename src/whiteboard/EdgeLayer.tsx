@@ -1,6 +1,6 @@
 import type { WhiteboardCard } from "./data";
-import { curveForBoxes } from "./edgeGeometry";
-import type { DrawDropEmpty } from "./edgeGestures";
+import { curveForBoxes, type EdgeCurve } from "./edgeGeometry";
+import type { DrawDropEmpty, EdgeEls } from "./edgeGestures";
 import { EdgeLabelLayer, EdgeMenuPopup } from "./EdgeOverlay";
 import {
   type EdgeArrow,
@@ -58,6 +58,107 @@ function ArrowMark(props: {
   );
 }
 
+function stopHandleDown(event: React.MouseEvent): boolean {
+  if (event.button !== 0) return false;
+  event.preventDefault();
+  event.stopPropagation();
+  return true;
+}
+
+function SelectedHandles(props: {
+  edgeId: string;
+  curve: EdgeCurve;
+  els: Map<string, EdgeEls>;
+  handleR: number;
+  midR: number;
+  ctrlR: number;
+  onEndpointDown: (which: "from" | "to", event: React.MouseEvent) => void;
+  onBendDown: (which: "mid" | "from" | "to", event: React.MouseEvent) => void;
+  onMidDoubleClick: (event: React.MouseEvent) => void;
+}) {
+  const { edgeId, curve, els, handleR, midR, ctrlR } = props;
+  return (
+    <>
+      <line
+        ref={bindEl(els, edgeId, "tangentFrom")}
+        className="owb-edge-tangent"
+        x1={curve.p0.x}
+        y1={curve.p0.y}
+        x2={curve.p1.x}
+        y2={curve.p1.y}
+      />
+      <line
+        ref={bindEl(els, edgeId, "tangentTo")}
+        className="owb-edge-tangent"
+        x1={curve.p3.x}
+        y1={curve.p3.y}
+        x2={curve.p2.x}
+        y2={curve.p2.y}
+      />
+      <circle
+        ref={bindEl(els, edgeId, "handleCtrlFrom")}
+        className="owb-edge-handle owb-edge-handle-ctrl"
+        cx={curve.p1.x}
+        cy={curve.p1.y}
+        r={ctrlR}
+        onMouseDown={(event: React.MouseEvent) => {
+          if (!stopHandleDown(event)) return;
+          props.onBendDown("from", event);
+        }}
+      />
+      <circle
+        ref={bindEl(els, edgeId, "handleCtrlTo")}
+        className="owb-edge-handle owb-edge-handle-ctrl"
+        cx={curve.p2.x}
+        cy={curve.p2.y}
+        r={ctrlR}
+        onMouseDown={(event: React.MouseEvent) => {
+          if (!stopHandleDown(event)) return;
+          props.onBendDown("to", event);
+        }}
+      />
+      <circle
+        ref={bindEl(els, edgeId, "handleMid")}
+        className="owb-edge-handle owb-edge-handle-mid"
+        cx={curve.label.x}
+        cy={curve.label.y}
+        r={midR}
+        onMouseDown={(event: React.MouseEvent) => {
+          if (!stopHandleDown(event)) return;
+          props.onBendDown("mid", event);
+        }}
+        onDoubleClick={(event: React.MouseEvent) => {
+          event.preventDefault();
+          event.stopPropagation();
+          props.onMidDoubleClick(event);
+        }}
+      />
+      <circle
+        ref={bindEl(els, edgeId, "handleFrom")}
+        className="owb-edge-handle owb-edge-handle-end"
+        cx={curve.p0.x}
+        cy={curve.p0.y}
+        r={handleR}
+        onMouseDown={(event: React.MouseEvent) => {
+          if (!stopHandleDown(event)) return;
+          props.onEndpointDown("from", event);
+        }}
+      />
+      <circle
+        ref={bindEl(els, edgeId, "handleTo")}
+        className="owb-edge-handle owb-edge-handle-end"
+        cx={curve.p3.x}
+        cy={curve.p3.y}
+        r={handleR}
+        onMouseDown={(event: React.MouseEvent) => {
+          if (!stopHandleDown(event)) return;
+          props.onEndpointDown("to", event);
+        }}
+      />
+    </>
+  );
+}
+
 export function EdgeLayer({
   panelId,
   cards,
@@ -78,7 +179,17 @@ export function EdgeLayer({
     { edgeId: string; x: number; y: number } | null
   >(null);
   const skipBlurRef = useRef(false);
-  const { ghostRef, elsRef, edgesRef, commitRef, boxMap } = useEdgeLayerApi({
+  const {
+    ghostRef,
+    snapRef,
+    elsRef,
+    edgesRef,
+    commitRef,
+    boxMap,
+    beginEndpointDrag,
+    beginBendDrag,
+    resetBend,
+  } = useEdgeLayerApi({
     cards,
     edges,
     refEdges,
@@ -93,13 +204,16 @@ export function EdgeLayer({
   const ns = markerNs(panelId);
   const scale = viewScale === 0 ? 1 : viewScale;
   const handleR = 4 / scale;
+  const midR = 7 / scale;
+  const ctrlR = 4.5 / scale;
+  const snapR = 10 / scale;
 
   const boxes = boxMap();
   const curveOf = (edge: AnyEdge) => {
     const from = boxes.get(edge.from);
     const to = boxes.get(edge.to);
     if (from == null || to == null) return null;
-    return curveForBoxes(from, to, edge.fromSide, edge.toSide);
+    return curveForBoxes(from, to, edge.fromSide, edge.toSide, edge.bend);
   };
 
   const markersFor = (kind: "plain" | "ref" | "sel", arrow: EdgeArrow) => {
@@ -233,22 +347,35 @@ export function EdgeLayer({
                     }}
                   />
                   {selected ? (
-                    <>
-                      <circle
-                        ref={bindEl(elsRef.current, edge.id, "handleFrom")}
-                        className="owb-edge-handle"
-                        cx={curve.p0.x}
-                        cy={curve.p0.y}
-                        r={handleR}
-                      />
-                      <circle
-                        ref={bindEl(elsRef.current, edge.id, "handleTo")}
-                        className="owb-edge-handle"
-                        cx={curve.p3.x}
-                        cy={curve.p3.y}
-                        r={handleR}
-                      />
-                    </>
+                    <SelectedHandles
+                      edgeId={edge.id}
+                      curve={curve}
+                      els={elsRef.current}
+                      handleR={handleR}
+                      midR={midR}
+                      ctrlR={ctrlR}
+                      onEndpointDown={(which, event) => {
+                        focusViewport();
+                        beginEndpointDrag(
+                          edge.id,
+                          which,
+                          event.clientX,
+                          event.clientY,
+                        );
+                      }}
+                      onBendDown={(which, event) => {
+                        focusViewport();
+                        beginBendDrag(
+                          edge.id,
+                          which,
+                          event.clientX,
+                          event.clientY,
+                        );
+                      }}
+                      onMidDoubleClick={() => {
+                        resetBend(edge.id);
+                      }}
+                    />
                   ) : null}
                 </g>
               );
@@ -258,6 +385,14 @@ export function EdgeLayer({
               className="owb-edge-ghost"
               visibility="hidden"
               d=""
+            />
+            <circle
+              ref={snapRef}
+              className="owb-edge-snap"
+              visibility="hidden"
+              cx="0"
+              cy="0"
+              r={snapR}
             />
           </svg>
           <EdgeLabelLayer

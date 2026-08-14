@@ -77,6 +77,37 @@ export const EDGE_CSS = `
   pointer-events: none;
 }
 
+.owb-edge.is-selected .owb-edge-handle {
+  pointer-events: auto;
+  cursor: grab;
+}
+
+.owb-edge.is-selected .owb-edge-handle:active {
+  cursor: grabbing;
+}
+
+.owb-edge-handle-mid {
+  fill: var(--orca-color-primary-5, #00a896);
+}
+
+.owb-edge-tangent {
+  fill: none;
+  stroke: var(--orca-color-primary-5, #00a896);
+  stroke-width: 1.25;
+  stroke-dasharray: 4 3;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.owb-edge-snap {
+  fill: var(--orca-color-primary-5, #00a896);
+  fill-opacity: 0.18;
+  stroke: var(--orca-color-primary-5, #00a896);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
 .owb-edge-labels {
   position: absolute;
   inset: 0;
@@ -172,7 +203,12 @@ export const EDGE_CSS = `
   box-shadow: 4px 4px 0px 0px var(--orca-color-primary-5, #00a896);
 }
 
-.owb-canvas.is-drawing-edge {
+.owb-canvas.is-drawing-edge,
+.owb-canvas.is-rebinding-edge {
   cursor: crosshair;
+}
+
+.owb-canvas.is-editing-edge {
+  cursor: grabbing;
 }
 `.trim();

@@ -2,12 +2,19 @@ import type { DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n";
 import { assertBoardWritable, writeProperties } from "./boardWrite";
 import type { JsonParseResult } from "./cards";
+import { BEND_LIMIT, bendsEqual, parseBend } from "./edgeBend";
+
+export { BEND_LIMIT, bendsEqual };
 
 export const EDGES_PROP = "edges";
 export const PROP_TYPE_TEXT = 1;
 
 export type EdgeArrow = "end" | "both" | "none";
 export type Side = "t" | "r" | "b" | "l";
+
+/** Unit: controlLength(dist(p0, p3)). Default curve is { along: 1, across: 0 }. */
+export type EdgeBendPoint = { along: number; across: number };
+export type EdgeBend = { from: EdgeBendPoint; to: EdgeBendPoint };
 
 export type WhiteboardEdge = {
   id: string;
@@ -17,6 +24,7 @@ export type WhiteboardEdge = {
   arrow: EdgeArrow;
   fromSide?: Side;
   toSide?: Side;
+  bend?: EdgeBend;
   /** True after this line was written into the notes as a real reference. */
   linked?: true;
 };
@@ -83,6 +91,8 @@ export function normalizeEdge(value: unknown): WhiteboardEdge | null {
   if (fromSide != null) edge.fromSide = fromSide;
   const toSide = asSide(raw.toSide);
   if (toSide != null) edge.toSide = toSide;
+  const bend = parseBend(raw.bend);
+  if (bend != null) edge.bend = bend;
   if (raw.linked === true) edge.linked = true;
   return edge;
 }
@@ -170,7 +180,8 @@ function edgeEqual(left: WhiteboardEdge, right: WhiteboardEdge): boolean {
     left.arrow === right.arrow &&
     left.fromSide === right.fromSide &&
     left.toSide === right.toSide &&
-    left.linked === right.linked
+    left.linked === right.linked &&
+    bendsEqual(left.bend, right.bend)
   );
 }
 

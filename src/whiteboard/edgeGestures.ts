@@ -4,8 +4,9 @@ import {
   curveForBoxes,
   hitCardAt,
   type CardBox,
+  type Point,
 } from "./edgeGeometry";
-import { pairKey, type Side } from "./edges";
+import { pairKey, type EdgeBend, type Side } from "./edges";
 
 export type BoxedCard = { blockId: DbId } & CardBox;
 
@@ -15,7 +16,26 @@ export type EdgeEls = {
   label: HTMLElement | null;
   handleFrom: SVGElement | null;
   handleTo: SVGElement | null;
+  handleMid: SVGElement | null;
+  handleCtrlFrom: SVGElement | null;
+  handleCtrlTo: SVGElement | null;
+  tangentFrom: SVGElement | null;
+  tangentTo: SVGElement | null;
 };
+
+function setCircle(el: SVGElement | null, p: Point): void {
+  if (el == null) return;
+  el.setAttribute("cx", String(p.x));
+  el.setAttribute("cy", String(p.y));
+}
+
+function setLine(el: SVGElement | null, a: Point, b: Point): void {
+  if (el == null) return;
+  el.setAttribute("x1", String(a.x));
+  el.setAttribute("y1", String(a.y));
+  el.setAttribute("x2", String(b.x));
+  el.setAttribute("y2", String(b.y));
+}
 
 export function setGhostPath(el: SVGPathElement | null, d: string): void {
   if (el == null) return;
@@ -35,14 +55,13 @@ export function paintCurveDom(els: EdgeEls, curve: ReturnType<typeof curveForBox
     els.label.style.left = `${curve.label.x}px`;
     els.label.style.top = `${curve.label.y}px`;
   }
-  if (els.handleFrom != null) {
-    els.handleFrom.setAttribute("cx", String(curve.p0.x));
-    els.handleFrom.setAttribute("cy", String(curve.p0.y));
-  }
-  if (els.handleTo != null) {
-    els.handleTo.setAttribute("cx", String(curve.p3.x));
-    els.handleTo.setAttribute("cy", String(curve.p3.y));
-  }
+  setCircle(els.handleFrom, curve.p0);
+  setCircle(els.handleTo, curve.p3);
+  setCircle(els.handleMid, curve.label);
+  setCircle(els.handleCtrlFrom, curve.p1);
+  setCircle(els.handleCtrlTo, curve.p2);
+  setLine(els.tangentFrom, curve.p0, curve.p1);
+  setLine(els.tangentTo, curve.p3, curve.p2);
 }
 
 export function paintEdgesForBoxes(
@@ -52,6 +71,7 @@ export function paintEdgesForBoxes(
     to: DbId;
     fromSide?: Side;
     toSide?: Side;
+    bend?: EdgeBend;
   }>,
   boxes: Map<DbId, CardBox>,
   getEls: (id: string) => EdgeEls | undefined,
@@ -62,7 +82,10 @@ export function paintEdgesForBoxes(
     if (from == null || to == null) continue;
     const els = getEls(edge.id);
     if (els == null) continue;
-    paintCurveDom(els, curveForBoxes(from, to, edge.fromSide, edge.toSide));
+    paintCurveDom(
+      els,
+      curveForBoxes(from, to, edge.fromSide, edge.toSide, edge.bend),
+    );
   }
 }
 
@@ -72,7 +95,7 @@ function clearTargets(canvas: HTMLElement): void {
     .forEach((el) => el.classList.remove("is-edge-target"));
 }
 
-function markTarget(canvas: HTMLElement, id: DbId | null): void {
+export function setEdgeTarget(canvas: HTMLElement, id: DbId | null): void {
   clearTargets(canvas);
   if (id == null) return;
   canvas
@@ -95,7 +118,7 @@ type TrackedGesture = {
 
 const edgeGestureBuckets = new WeakMap<object, Set<TrackedGesture>>();
 
-function trackEdgeGesture(root: object, onAbort: () => void): TrackedGesture {
+export function trackEdgeGesture(root: object, onAbort: () => void): TrackedGesture {
   let open = true;
   let bucket = edgeGestureBuckets.get(root);
   if (bucket == null) {
@@ -174,7 +197,7 @@ export function startDrawEdge(opts: {
       !occupied.has(pairKey(opts.fromId, rawHit))
         ? rawHit
         : null;
-    markTarget(opts.canvas, hit);
+    setEdgeTarget(opts.canvas, hit);
     const dest =
       hit != null
         ? cards.find((card) => card.blockId === hit)

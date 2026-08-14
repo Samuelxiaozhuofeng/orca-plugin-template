@@ -1,5 +1,5 @@
 import type { DbId } from "../orca.d.ts";
-import type { Side } from "./edges";
+import type { EdgeBend, Side } from "./edges";
 
 export type CardBox = { x: number; y: number; w: number; h: number };
 export type Point = { x: number; y: number };
@@ -55,6 +55,26 @@ export function sideNormal(side: Side): Point {
   return { x: -1, y: 0 };
 }
 
+/** Clockwise 90° of a unit normal — the "across" axis of a bend. */
+export function perpClockwise(n: Point): Point {
+  return { x: n.y, y: -n.x };
+}
+
+export function offsetFromBend(
+  origin: Point,
+  side: Side,
+  along: number,
+  across: number,
+  ctrl: number,
+): Point {
+  const n = sideNormal(side);
+  const p = perpClockwise(n);
+  return {
+    x: origin.x + (along * n.x + across * p.x) * ctrl,
+    y: origin.y + (along * n.y + across * p.y) * ctrl,
+  };
+}
+
 export function sideMidpoint(box: CardBox, side: Side): Point {
   if (side === "t") return { x: box.x + box.w / 2, y: box.y };
   if (side === "r") return { x: box.x + box.w, y: box.y + box.h / 2 };
@@ -108,15 +128,26 @@ export function curveForBoxes(
   to: CardBox,
   fromSide?: Side,
   toSide?: Side,
+  bend?: EdgeBend,
 ): EdgeCurve {
   const sides = resolveSides(from, to, fromSide, toSide);
   const p0 = anchorPoint(from, sides.fromSide);
   const p3 = anchorPoint(to, sides.toSide);
   const ctrl = controlLength(pointDist(p0, p3));
-  const n0 = sideNormal(sides.fromSide);
-  const n3 = sideNormal(sides.toSide);
-  const p1 = { x: p0.x + n0.x * ctrl, y: p0.y + n0.y * ctrl };
-  const p2 = { x: p3.x + n3.x * ctrl, y: p3.y + n3.y * ctrl };
+  const p1 = offsetFromBend(
+    p0,
+    sides.fromSide,
+    bend?.from.along ?? 1,
+    bend?.from.across ?? 0,
+    ctrl,
+  );
+  const p2 = offsetFromBend(
+    p3,
+    sides.toSide,
+    bend?.to.along ?? 1,
+    bend?.to.across ?? 0,
+    ctrl,
+  );
   return {
     p0,
     p1,
