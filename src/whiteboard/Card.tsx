@@ -30,6 +30,7 @@ type Props = {
   panelId: string;
   card: WhiteboardCard;
   degraded: boolean;
+  treeRev?: number;
   editing: boolean;
   selected: boolean;
   showResize: boolean;
@@ -145,6 +146,7 @@ export function Card({
   panelId,
   card,
   degraded,
+  treeRev = 0,
   editing,
   selected,
   showResize,
@@ -172,7 +174,7 @@ export function Card({
     liveRef.current = { x: card.x, y: card.y, w: card.w, h: card.h };
   }
 
-  const hosted = useCardBlockView(card.blockId);
+  const hosted = useCardBlockView(card.blockId, treeRev);
   const isEmptyJournal =
     card.kind === "journal" &&
     hosted.exists &&
@@ -351,6 +353,7 @@ export function Card({
               <div className="owb-card-excerpt">{excerpt}</div>
             ) : (
               <orca.components.Block
+                key={treeRev}
                 panelId={panelId}
                 blockId={card.blockId}
                 blockLevel={0}

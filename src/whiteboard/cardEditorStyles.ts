@@ -58,7 +58,11 @@ export const CARD_EDITOR_CSS = `
 .owb-card-editor .orca-block-editor-cover,
 .owb-card-editor .orca-block-breadcrumb,
 .owb-card-editor .orca-scrolling-breadcrumb,
-.owb-card-editor .orca-block-editor-properties {
+.owb-card-editor .orca-block-editor-properties,
+.owb-card-editor .orca-block-editor-query-tabs-container,
+.owb-card-editor .orca-block-editor-query-views,
+.owb-card-editor .orca-query-editor,
+.owb-card-editor .orca-block-editor-sidetools {
   display: none !important;
 }
 

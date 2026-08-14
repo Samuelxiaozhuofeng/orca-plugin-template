@@ -168,7 +168,7 @@ export function cardBlockViewEqual(
   );
 }
 
-export function useCardBlockView(blockId: DbId): CardBlockView {
+export function useCardBlockView(blockId: DbId, epoch = 0): CardBlockView {
   return useWatchedValue(
     () => readCardBlockView(blockId),
     () =>
@@ -178,7 +178,7 @@ export function useCardBlockView(blockId: DbId): CardBlockView {
         Number.POSITIVE_INFINITY,
         Number.POSITIVE_INFINITY,
       ),
-    [blockId],
+    [blockId, epoch],
     cardBlockViewEqual,
   );
 }

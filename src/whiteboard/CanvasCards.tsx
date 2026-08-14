@@ -10,6 +10,7 @@ import type { Side } from "./edges";
 import type { ArrangeAction } from "./selection";
 import type { CardPatchEntry } from "./useCanvasPointer";
 import type { EdgeLayerApi } from "./EdgeLayer";
+import { cardTreeLoadIds, useVisibleCardTrees } from "./cardTreeLoad";
 
 type Props = {
   panelId: string;
@@ -53,6 +54,10 @@ export function CanvasCards({
   onMoveFrame,
   edgeApiRef,
 }: Props) {
+  const treeRevByRoot = useVisibleCardTrees(
+    cardTreeLoadIds(shownCards, degraded, editingId),
+  );
+
   return (
     <>
       {weekdayGuide != null ? (
@@ -73,6 +78,7 @@ export function CanvasCards({
           panelId={panelId}
           card={card}
           degraded={degraded && editingId !== card.blockId}
+          treeRev={treeRevByRoot[card.blockId] ?? 0}
           editing={editingId === card.blockId}
           selected={selectedSet.has(card.blockId)}
           showResize={
