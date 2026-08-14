@@ -75,7 +75,20 @@ export async function ensureBlocksCached(ids: DbId[]): Promise<void> {
   cacheBlocks(fetched);
 }
 
-function cardFromBlock(
+export function originBelowCards(
+  cards: readonly WhiteboardCard[],
+): { x: number; y: number } {
+  if (cards.length === 0) return { x: 0, y: 0 };
+  let minX = Infinity;
+  let maxBottom = -Infinity;
+  for (const card of cards) {
+    if (card.x < minX) minX = card.x;
+    if (card.y + card.h > maxBottom) maxBottom = card.y + card.h;
+  }
+  return { x: minX, y: maxBottom + GRID_GAP };
+}
+
+export function cardFromBlock(
   blockId: DbId,
   x: number,
   y: number,
@@ -165,7 +178,7 @@ export async function placeDroppedBlocks(opts: {
 
 /** Only mentions the counts that actually happened, so the common
  * "dropped one new block" case reads as a single short sentence. */
-function dropMessage(result: DropBlocksResult): string {
+export function dropMessage(result: DropBlocksResult): string {
   const parts: string[] = [];
   if (result.added > 0) {
     parts.push(t("Added ${added} cards", { added: String(result.added) }));

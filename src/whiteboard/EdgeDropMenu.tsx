@@ -1,5 +1,10 @@
 import type { DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n";
+import {
+  discardLastRecord,
+  holdHistory,
+  recordBefore,
+} from "./boardHistory";
 import type { WhiteboardCard } from "./data";
 import { placeDroppedBlocks } from "./dropBlocks";
 import type { DrawDropEmpty } from "./edgeGestures";
@@ -85,6 +90,8 @@ export function EdgeDropMenu({
   const createAndConnect = async () => {
     if (busyRef.current) return;
     busyRef.current = true;
+    recordBefore(boardBlockId, { cards, edges });
+    const release = holdHistory();
     try {
       const card = await addBlankCardToBoard({
         boardBlockId,
@@ -92,7 +99,10 @@ export function EdgeDropMenu({
         y: drop.world.y,
         addCards: onAddCards,
       });
-      if (card == null) return;
+      if (card == null) {
+        discardLastRecord(boardBlockId);
+        return;
+      }
       await connectTo(card.blockId);
     } catch (error) {
       console.error("[whiteboard] drop-create card failed", error);
@@ -100,7 +110,9 @@ export function EdgeDropMenu({
         "error",
         error instanceof Error ? error.message : t("Failed to create a new card"),
       );
+      discardLastRecord(boardBlockId);
     } finally {
+      release();
       busyRef.current = false;
     }
   };
@@ -120,19 +132,29 @@ export function EdgeDropMenu({
         await connectTo(blockId);
         return;
       }
-      const result = await placeDroppedBlocks({
-        ids: [blockId],
-        at: drop.world,
-        existing: cards,
-        boardBlockId,
-      });
-      if (result.incoming.length === 0) {
-        orca.notify("info", t("Nothing to add to the board"));
-        return;
+      recordBefore(boardBlockId, { cards, edges });
+      const release = holdHistory();
+      try {
+        const result = await placeDroppedBlocks({
+          ids: [blockId],
+          at: drop.world,
+          existing: cards,
+          boardBlockId,
+        });
+        if (result.incoming.length === 0) {
+          discardLastRecord(boardBlockId);
+          orca.notify("info", t("Nothing to add to the board"));
+          return;
+        }
+        const saved = await onAddCards(result.incoming);
+        if (!saved) {
+          discardLastRecord(boardBlockId);
+          return;
+        }
+        await connectTo(blockId);
+      } finally {
+        release();
       }
-      const saved = await onAddCards(result.incoming);
-      if (!saved) return;
-      await connectTo(blockId);
     } catch (error) {
       console.error("[whiteboard] drop-connect existing failed", error);
       orca.notify(
@@ -141,6 +163,7 @@ export function EdgeDropMenu({
           ? error.message
           : t("Failed to add blocks to the board"),
       );
+      discardLastRecord(boardBlockId);
     } finally {
       busyRef.current = false;
     }

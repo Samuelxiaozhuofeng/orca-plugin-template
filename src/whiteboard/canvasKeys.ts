@@ -39,6 +39,8 @@ export type WhiteboardKeyActions = {
   selectAll: () => void;
   escape: () => void;
   remove: () => void;
+  undo: () => void;
+  redo: () => void;
 };
 
 const ARROWS: Record<string, [number, number]> = {
@@ -61,10 +63,24 @@ export function handleWhiteboardKey(
     actions.remove();
     return true;
   }
-  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "a") {
-    event.preventDefault();
-    actions.selectAll();
-    return true;
+  if (event.metaKey || event.ctrlKey) {
+    const key = event.key.toLowerCase();
+    if (key === "a") {
+      event.preventDefault();
+      actions.selectAll();
+      return true;
+    }
+    if (key === "z") {
+      event.preventDefault();
+      if (event.shiftKey) actions.redo();
+      else actions.undo();
+      return true;
+    }
+    if (key === "y") {
+      event.preventDefault();
+      actions.redo();
+      return true;
+    }
   }
   const step = ARROWS[event.key];
   if (step == null) return false;

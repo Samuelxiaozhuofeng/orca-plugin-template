@@ -109,6 +109,18 @@ const zhCN = {
   "Cannot connect a card to itself": "不能把一张卡片连到自己",
   "Cannot place this board on itself": "不能把这块白板接到自己身上",
   "Search blocks": "搜索块",
+  Undo: "撤销",
+  Redo: "重做",
+  "Add to whiteboard…": "加到白板…",
+  "Search whiteboards": "搜索白板",
+  "Loading whiteboards…": "正在列出白板…",
+  "Failed to list whiteboards": "无法列出白板",
+  "No whiteboards yet. Use the slash command to create one in a note.":
+    "还没有白板。在笔记里输入 / 新建白板。",
+  "No matching whiteboards": "没有匹配的白板",
+  "Open whiteboard": "打开这块白板",
+  "Undo removed the card from the board. The note is still under this whiteboard in the outline.":
+    "卡片已从白板上拿掉，笔记还在这块白板下面，没有被删除。",
 };
 
 export default zhCN;

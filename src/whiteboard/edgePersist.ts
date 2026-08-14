@@ -41,7 +41,10 @@ export function useEdgePersist(
   cardIds: readonly DbId[],
 ): {
   edges: WhiteboardEdge[];
-  commitEdges: (next: WhiteboardEdge[]) => Promise<boolean>;
+  commitEdges: (
+    next: WhiteboardEdge[],
+    cardIds?: ReadonlySet<DbId>,
+  ) => Promise<boolean>;
 } {
   const [edges, setEdges] = useState<WhiteboardEdge[]>(serverEdges);
   const boxRef = useRef<PersistBox>({
@@ -118,11 +121,16 @@ export function useEdgePersist(
   }, [show]);
 
   const commitEdges = useCallback(
-    async (next: WhiteboardEdge[]): Promise<boolean> => {
-      const cleaned = sanitizeEdges(next, new Set(cardIdsRef.current));
+    async (
+      next: WhiteboardEdge[],
+      cardIds?: ReadonlySet<DbId>,
+    ): Promise<boolean> => {
+      const ids = cardIds ?? new Set(cardIdsRef.current);
+      const cleaned = sanitizeEdges(next, ids);
       show(cleaned);
       boxRef.current.pending = cleaned;
       boxRef.current.dirty = true;
+      if (cardIds != null) cardIdsRef.current = [...cardIds];
       return flushNow();
     },
     [flushNow, show],

@@ -49,7 +49,12 @@ type Props = {
   onPatchCards: (entries: CardPatchEntry[]) => void;
   onRemoveCards: (ids: DbId[]) => Promise<boolean>;
   onAddCards: (cards: WhiteboardCard[]) => Promise<boolean>;
-  onCommitEdges: (next: WhiteboardEdge[]) => Promise<boolean>;
+  onCommitEdges: (
+    next: WhiteboardEdge[],
+    cardIds?: ReadonlySet<DbId>,
+  ) => Promise<boolean>;
+  onUndo: () => void;
+  onRedo: () => void;
   edges: WhiteboardEdge[];
   onViewportWidth: (width: number) => void;
   weekdayGuide?: CanvasOrigin | null;
@@ -66,6 +71,8 @@ export function Canvas({
   onRemoveCards,
   onAddCards,
   onCommitEdges,
+  onUndo,
+  onRedo,
   edges,
   onViewportWidth,
   weekdayGuide,
@@ -283,11 +290,22 @@ export function Canvas({
             if (ok) selectCards([]);
           });
         },
+        undo: onUndo,
+        redo: onRedo,
       });
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onCommitEdges, onPatchCards, onRemoveCards, panelId, selectCards, viewportRef]);
+  }, [
+    onCommitEdges,
+    onPatchCards,
+    onRedo,
+    onRemoveCards,
+    onUndo,
+    panelId,
+    selectCards,
+    viewportRef,
+  ]);
 
   const canOpenBoardMenu = () => {
     if (selectedRef.current.length >= 2) return true;

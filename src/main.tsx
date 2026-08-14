@@ -1,5 +1,10 @@
 import { setupL10N, t } from "./libs/l10n";
 import zhCN from "./translations/zhCN";
+import {
+  AddToBoardMenuItem,
+  addToBoardCommandId,
+  mountAddToBoardHost,
+} from "./whiteboard/addToBoard";
 import BoardBlock from "./whiteboard/BoardBlock";
 import BoardPanel from "./whiteboard/BoardPanel";
 import {
@@ -20,6 +25,7 @@ import {
 } from "./whiteboard/styles";
 
 let pluginName: string;
+let unmountAddToBoard: (() => void) | null = null;
 
 const INSERT_COMMAND = "insertWhiteboard";
 const INSERT_SLASH = "insertWhiteboardSlash";
@@ -80,6 +86,17 @@ export async function load(_name: string) {
     command: commandId(INSERT_COMMAND),
   });
 
+  orca.blockMenuCommands.registerBlockMenuCommand(
+    addToBoardCommandId(pluginName),
+    {
+      worksOnMultipleBlocks: true,
+      render: (blockIds, _rootBlockId, close) => (
+        <AddToBoardMenuItem blockIds={blockIds} close={close} />
+      ),
+    },
+  );
+  unmountAddToBoard = mountAddToBoardHost();
+
   console.log(`${pluginName} loaded.`);
 }
 
@@ -92,6 +109,11 @@ export async function unload() {
   if (pluginName) {
     orca.commands.unregisterEditorCommand(commandId(INSERT_COMMAND));
     orca.slashCommands.unregisterSlashCommand(commandId(INSERT_SLASH));
+    orca.blockMenuCommands.unregisterBlockMenuCommand(
+      addToBoardCommandId(pluginName),
+    );
   }
+  unmountAddToBoard?.();
+  unmountAddToBoard = null;
   removeWhiteboardStyles();
 }
