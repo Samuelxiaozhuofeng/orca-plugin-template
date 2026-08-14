@@ -10,6 +10,11 @@ import {
   type ResizeHandle,
 } from "./cardGestures";
 import { CardTitle } from "./CardTitle";
+import {
+  CardToolbar,
+  openCardInSidePanel,
+  openCardInThisPanel,
+} from "./CardToolbar";
 import { MIN_CARD_HEIGHT, type WhiteboardCard } from "./data";
 import type { Side } from "./edges";
 import type { ArrangeAction } from "./selection";
@@ -145,115 +150,6 @@ function CardEditor({ blockId }: { blockId: DbId }) {
             active
           />
         </div>
-      </div>
-    </div>
-  );
-}
-
-const COLOR_PRESETS = [
-  { id: "default", label: "Default", bg: "var(--orca-color-bg-1)" },
-  { id: "blue", label: "Blue", bg: "rgba(47, 128, 237, 0.18)" },
-  { id: "green", label: "Green", bg: "rgba(34, 197, 94, 0.18)" },
-  { id: "yellow", label: "Yellow", bg: "rgba(234, 179, 8, 0.22)" },
-  { id: "coral", label: "Coral", bg: "rgba(244, 63, 94, 0.18)" },
-  { id: "purple", label: "Purple", bg: "rgba(168, 85, 247, 0.18)" },
-];
-
-function CardToolbar({
-  panelId,
-  card,
-  fitContentHeight,
-  onPatchCard,
-}: {
-  panelId: string;
-  card: WhiteboardCard;
-  fitContentHeight: () => void;
-  onPatchCard: Props["onPatchCard"];
-}) {
-  const [colorMenuOpen, setColorMenuOpen] = window.React.useState(false);
-  const popoverRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!colorMenuOpen) return;
-    const onDown = (event: MouseEvent) => {
-      const target = event.target as Node | null;
-      if (target && popoverRef.current?.contains(target)) return;
-      setColorMenuOpen(false);
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setColorMenuOpen(false);
-    };
-    document.addEventListener("mousedown", onDown, true);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown, true);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [colorMenuOpen]);
-
-  const openSplitView = () => {
-    try {
-      orca.nav.addTo(panelId, "right", {
-        view: "block",
-        viewArgs: { blockId: card.blockId },
-        viewState: {},
-      });
-    } catch (err) {
-      console.error("Failed to open split view", err);
-    }
-  };
-
-  return (
-    <div
-      className="owb-card-floating-toolbar"
-      onMouseDown={(e) => e.stopPropagation()}
-    >
-      <button
-        type="button"
-        className="owb-card-tb-btn"
-        title={t("Open side-by-side")}
-        onClick={openSplitView}
-      >
-        <i className="ti ti-layout-sidebar-right" />
-      </button>
-      <button
-        type="button"
-        className="owb-card-tb-btn"
-        title={t("Fit content height")}
-        onClick={fitContentHeight}
-      >
-        <i className="ti ti-arrows-vertical" />
-      </button>
-      <div className="owb-card-tb-popover-wrapper" ref={popoverRef}>
-        <button
-          type="button"
-          className="owb-card-tb-btn"
-          title={t("Card color")}
-          onClick={() => setColorMenuOpen((v: boolean) => !v)}
-        >
-          <i className="ti ti-palette" />
-        </button>
-        {colorMenuOpen ? (
-          <div className="owb-card-color-popover">
-            {COLOR_PRESETS.map((preset) => (
-              <button
-                key={preset.id}
-                type="button"
-                className={`owb-card-color-dot${
-                  (card.color || "default") === preset.id ? " is-active" : ""
-                }`}
-                style={{ backgroundColor: preset.bg }}
-                title={t(preset.label)}
-                onClick={() => {
-                  setColorMenuOpen(false);
-                  onPatchCard(card.blockId, {
-                    color: preset.id === "default" ? undefined : preset.id,
-                  });
-                }}
-              />
-            ))}
-          </div>
-        ) : null}
       </div>
     </div>
   );
@@ -401,6 +297,21 @@ export function Card({
       menu={(close) => (
         <orca.components.Menu>
           <orca.components.MenuText
+            title={t("Open in side panel")}
+            onClick={() => {
+              close();
+              openCardInSidePanel(card.blockId);
+            }}
+          />
+          <orca.components.MenuText
+            title={t("Open in this panel")}
+            onClick={() => {
+              close();
+              openCardInThisPanel(card.blockId, panelId);
+            }}
+          />
+          <orca.components.MenuSeparator />
+          <orca.components.MenuText
             title={t("Fit content height")}
             onClick={() => {
               close();
@@ -432,7 +343,6 @@ export function Card({
           }}
         >
           <CardToolbar
-            panelId={panelId}
             card={card}
             fitContentHeight={fitContentHeight}
             onPatchCard={onPatchCard}

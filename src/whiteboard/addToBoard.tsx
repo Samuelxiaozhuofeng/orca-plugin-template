@@ -1,26 +1,35 @@
 import type { DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n";
-import { fetchBlock } from "./newCard";
+import { BoardPicker, type BoardPickerRow } from "./BoardPicker";
+import {
+  fetchWhiteboardBlocks,
+  findBoardsContainingBlock,
+  findOpenBoardPanelId,
+  getOpenBoard,
+  listBoards,
+  type BoardLocateHit,
+} from "./boards";
+import { requestCardFocus } from "./cardFocus";
+import { openBoard, PANEL_TYPE, readCards, writeCards } from "./data";
 import {
   dropMessage,
   originBelowCards,
   placeDroppedBlocks,
   type DropBlocksResult,
 } from "./dropBlocks";
-import { openBoard, readCards, writeCards } from "./data";
-import {
-  fetchWhiteboardBlocks,
-  getOpenBoard,
-  listBoards,
-  type BoardListItem,
-} from "./boards";
+import { fetchBlock } from "./newCard";
 
 const { useEffect, useMemo, useState } = window.React;
 
 const ADD_COMMAND = "addToWhiteboard";
+const LOCATE_COMMAND = "locateOnWhiteboard";
 
 export function addToBoardCommandId(pluginName: string): string {
   return `${pluginName}.${ADD_COMMAND}`;
+}
+
+export function locateOnBoardCommandId(pluginName: string): string {
+  return `${pluginName}.${LOCATE_COMMAND}`;
 }
 
 export function AddToBoardMenuItem(props: {
@@ -39,18 +48,79 @@ export function AddToBoardMenuItem(props: {
   );
 }
 
-type Request = { ids: DbId[] };
+export function LocateOnBoardMenuItem(props: {
+  blockId: DbId;
+  close: () => void;
+}): React.ReactNode {
+  return (
+    <orca.components.MenuText
+      title={t("Locate on whiteboard")}
+      preIcon="ti ti-focus-2"
+      onClick={() => {
+        props.close();
+        void locateBlockOnWhiteboard(props.blockId);
+      }}
+    />
+  );
+}
 
-let hostListener: ((req: Request) => void) | null = null;
-const queued: Request[] = [];
+type HostRequest =
+  | { kind: "add"; ids: DbId[] }
+  | { kind: "locate"; hits: BoardLocateHit[] };
 
-export function openAddToBoard(ids: DbId[]): void {
-  const req = { ids: [...ids] };
+let hostListener: ((req: HostRequest) => void) | null = null;
+const queued: HostRequest[] = [];
+
+function dispatchHost(req: HostRequest): void {
   if (hostListener != null) {
     hostListener(req);
     return;
   }
   queued.push(req);
+}
+
+export function openAddToBoard(ids: DbId[]): void {
+  dispatchHost({ kind: "add", ids: [...ids] });
+}
+
+function openLocatePicker(hits: BoardLocateHit[]): void {
+  dispatchHost({ kind: "locate", hits });
+}
+
+export function jumpToBoardCard(boardId: DbId, cardBlockId: DbId): void {
+  requestCardFocus(boardId, cardBlockId);
+  const openId = findOpenBoardPanelId(orca.state.panels, boardId);
+  if (openId != null) {
+    orca.nav.switchFocusTo(openId);
+    return;
+  }
+  orca.nav.openInLastPanel(PANEL_TYPE, { blockId: boardId });
+}
+
+export async function locateBlockOnWhiteboard(blockId: DbId): Promise<void> {
+  try {
+    const hits = await findBoardsContainingBlock(blockId);
+    if (hits.length === 0) {
+      orca.notify("info", t("This block is not on any whiteboard yet"), {
+        title: t("Add to whiteboard…"),
+        action: () => openAddToBoard([blockId]),
+      });
+      return;
+    }
+    if (hits.length === 1) {
+      jumpToBoardCard(hits[0].boardId, hits[0].cardBlockId);
+      return;
+    }
+    openLocatePicker(hits);
+  } catch (err: unknown) {
+    console.error("[whiteboard] locate on whiteboard failed", err);
+    orca.notify(
+      "error",
+      err instanceof Error
+        ? err.message
+        : t("Failed to find this block on whiteboards"),
+    );
+  }
 }
 
 async function addBlocksToBoard(
@@ -83,8 +153,7 @@ function AddToBoardDialog(props: {
   ids: DbId[];
   onClose: () => void;
 }): React.ReactNode {
-  const [query, setQuery] = useState("");
-  const [boards, setBoards] = useState<BoardListItem[] | null>(null);
+  const [boards, setBoards] = useState<BoardPickerRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<DbId | null>(null);
 
@@ -94,7 +163,14 @@ function AddToBoardDialog(props: {
     setError(null);
     void fetchWhiteboardBlocks()
       .then((blocks) => {
-        if (!cancelled) setBoards(listBoards(blocks));
+        if (cancelled) return;
+        setBoards(
+          listBoards(blocks).map((board) => ({
+            id: board.id,
+            name: board.name,
+            meta: t("${count} cards", { count: String(board.cardCount) }),
+          })),
+        );
       })
       .catch((err: unknown) => {
         console.error("[whiteboard] failed to list whiteboards", err);
@@ -108,15 +184,6 @@ function AddToBoardDialog(props: {
       cancelled = true;
     };
   }, []);
-
-  const filtered = useMemo(() => {
-    if (boards == null) return [];
-    const needle = query.trim().toLowerCase();
-    if (needle === "") return boards;
-    return boards.filter((board: BoardListItem) =>
-      board.name.toLowerCase().includes(needle),
-    );
-  }, [boards, query]);
 
   const pick = async (boardId: DbId) => {
     if (busyId != null) return;
@@ -144,56 +211,53 @@ function AddToBoardDialog(props: {
   };
 
   return (
-    <orca.components.ModalOverlay visible canClose onClose={props.onClose}>
-      <div className="owb-dialog" role="dialog">
-        <div className="owb-dialog-title">{t("Add to whiteboard…")}</div>
-        <input
-          className="owb-board-search"
-          type="search"
-          value={query}
-          autoFocus
-          placeholder={t("Search whiteboards")}
-          onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-            setQuery(event.target.value)
-          }
-        />
-        {error != null ? (
-          <div className="owb-dialog-warn">{error}</div>
-        ) : boards == null ? (
-          <div className="owb-dialog-hint">{t("Loading whiteboards…")}</div>
-        ) : boards.length === 0 ? (
-          <div className="owb-dialog-hint">
-            {t(
-              "No whiteboards yet. Use the slash command to create one in a note.",
-            )}
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="owb-dialog-hint">{t("No matching whiteboards")}</div>
-        ) : (
-          <div className="owb-board-list">
-            {filtered.map((board: BoardListItem) => (
-              <button
-                key={board.id}
-                type="button"
-                className="owb-board-item"
-                disabled={busyId != null}
-                onClick={() => void pick(board.id)}
-              >
-                <span className="owb-board-item-name">{board.name}</span>
-                <span className="owb-board-item-count">
-                  {t("${count} cards", { count: String(board.cardCount) })}
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    </orca.components.ModalOverlay>
+    <BoardPicker
+      title={t("Add to whiteboard…")}
+      emptyHint={t(
+        "No whiteboards yet. Use the slash command to create one in a note.",
+      )}
+      error={error}
+      items={error != null ? [] : boards}
+      busyId={busyId}
+      onClose={props.onClose}
+      onPick={(boardId) => void pick(boardId)}
+    />
+  );
+}
+
+function LocateBoardDialog(props: {
+  hits: BoardLocateHit[];
+  onClose: () => void;
+}): React.ReactNode {
+  const items = useMemo(
+    () =>
+      props.hits.map((hit) => ({
+        id: hit.boardId,
+        name: hit.name,
+        meta: hit.viaAncestor ? t("Inside a card") : t("On this board"),
+      })),
+    [props.hits],
+  );
+
+  return (
+    <BoardPicker
+      title={t("Locate on whiteboard")}
+      emptyHint={t("This block is not on any whiteboard yet")}
+      error={null}
+      items={items}
+      onClose={props.onClose}
+      onPick={(boardId) => {
+        const hit = props.hits.find((item) => item.boardId === boardId);
+        props.onClose();
+        if (hit == null) return;
+        jumpToBoardCard(hit.boardId, hit.cardBlockId);
+      }}
+    />
   );
 }
 
 function AddToBoardHost(): React.ReactNode {
-  const [req, setReq] = useState<Request | null>(null);
+  const [req, setReq] = useState<HostRequest | null>(null);
 
   useEffect(() => {
     hostListener = (next) => setReq(next);
@@ -204,9 +268,10 @@ function AddToBoardHost(): React.ReactNode {
   }, []);
 
   if (req == null) return null;
-  return (
-    <AddToBoardDialog ids={req.ids} onClose={() => setReq(null)} />
-  );
+  if (req.kind === "locate") {
+    return <LocateBoardDialog hits={req.hits} onClose={() => setReq(null)} />;
+  }
+  return <AddToBoardDialog ids={req.ids} onClose={() => setReq(null)} />;
 }
 
 export function mountAddToBoardHost(): () => void {

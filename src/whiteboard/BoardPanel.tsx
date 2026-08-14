@@ -2,6 +2,11 @@ import type { Block, DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n";
 import { registerOpenBoard } from "./boards";
 import {
+  CARD_FOCUS_WAIT_MS,
+  takePendingCardFocus,
+  type CanvasFocusApi,
+} from "./cardFocus";
+import {
   canRedo,
   canUndo,
   cardPatchesChange,
@@ -72,7 +77,9 @@ export default function BoardPanel({ panelId, blockId }: Props) {
   const [placeOpen, setPlaceOpen] = useState(false);
   const [weekdayGuide, setWeekdayGuide] = useState<CanvasOrigin | null>(null);
   const [historyTick, setHistoryTick] = useState(0);
+  const [pendingFocus, setPendingFocus] = useState<DbId | null>(null);
   const zoomLabelRef = useRef<HTMLButtonElement | null>(null);
+  const focusApiRef = useRef<CanvasFocusApi | null>(null);
   const cardsRef = useRef(cards);
   const edgesRef = useRef(edges);
   cardsRef.current = cards;
@@ -137,8 +144,49 @@ export default function BoardPanel({ panelId, blockId }: Props) {
     return registerOpenBoard(blockId, {
       getCards: () => cardsRef.current,
       appendCards: onAddCards,
+      focusCard: (cardBlockId: DbId) => {
+        if (
+          !cardsRef.current.some(
+            (card: WhiteboardCard) => card.blockId === cardBlockId,
+          )
+        ) {
+          return false;
+        }
+        return focusApiRef.current?.focusCard(cardBlockId) ?? false;
+      },
     });
   }, [blockId, onAddCards]);
+
+  useEffect(() => {
+    if (blockId == null) {
+      setPendingFocus(null);
+      return;
+    }
+    setPendingFocus(takePendingCardFocus(blockId));
+  }, [blockId]);
+
+  useEffect(() => {
+    if (pendingFocus == null) return;
+    if (
+      !cards.some((card: WhiteboardCard) => card.blockId === pendingFocus)
+    ) {
+      return;
+    }
+    const ok = focusApiRef.current?.focusCard(pendingFocus) ?? false;
+    setPendingFocus(null);
+    if (!ok) {
+      orca.notify("info", t("This card is no longer on the board"));
+    }
+  }, [cards, pendingFocus]);
+
+  useEffect(() => {
+    if (pendingFocus == null) return;
+    const timer = window.setTimeout(() => {
+      orca.notify("info", t("This card is no longer on the board"));
+      setPendingFocus(null);
+    }, CARD_FOCUS_WAIT_MS);
+    return () => window.clearTimeout(timer);
+  }, [pendingFocus]);
 
   useEffect(() => {
     return () => {
@@ -341,6 +389,7 @@ export default function BoardPanel({ panelId, blockId }: Props) {
         onUndo={onUndo}
         onRedo={onRedo}
         onViewportWidth={setViewportWidth}
+        focusApiRef={focusApiRef}
       />
       <div className="owb-toolbar">
         <div className="owb-toolbar-title">{boardName(block)}</div>

@@ -286,4 +286,34 @@ export const CARD_CSS = `
 .owb-card-handle-nw { top: 0; left: 0; cursor: nwse-resize; }
 .owb-card-handle-se { bottom: 0; right: 0; cursor: nwse-resize; }
 .owb-card-handle-sw { bottom: 0; left: 0; cursor: nesw-resize; }
+
+@keyframes owb-card-focus-flash {
+  0%, 50%, 100% {
+    box-shadow:
+      0 4px 16px rgba(0, 0, 0, 0.08),
+      0 0 0 2.5px var(--orca-color-primary-5, #2F80ED),
+      0 0 0 6px color-mix(in oklab, var(--orca-color-primary-5, #2F80ED) 16%, transparent);
+  }
+  25%, 75% {
+    box-shadow:
+      0 4px 16px rgba(0, 0, 0, 0.08),
+      0 0 0 3px var(--orca-color-primary-5, #2F80ED),
+      0 0 0 12px color-mix(in oklab, var(--orca-color-primary-5, #2F80ED) 28%, transparent);
+  }
+}
+
+.owb-card.is-focus-flash {
+  z-index: 6;
+  animation: owb-card-focus-flash 1200ms ease-in-out;
+}
+
+.owb-canvas.is-view-animating {
+  transition: transform 240ms ease-out;
+}
+
+.owb-grid.is-view-animating {
+  transition:
+    background-position 240ms ease-out,
+    background-size 240ms ease-out;
+}
 `.trim();

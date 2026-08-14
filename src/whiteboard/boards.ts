@@ -1,11 +1,19 @@
-import type { Block, DbId } from "../orca.d.ts";
+import type {
+  Block,
+  ColumnPanel,
+  DbId,
+  RowPanel,
+  ViewPanel,
+} from "../orca.d.ts";
 import { t } from "../libs/l10n";
 import {
   boardName,
+  PANEL_TYPE,
   readCards,
   WHITEBOARD_TYPE,
   type WhiteboardCard,
 } from "./data";
+import { fetchBlock } from "./newCard";
 
 export type BoardListItem = {
   id: DbId;
@@ -13,10 +21,20 @@ export type BoardListItem = {
   cardCount: number;
 };
 
-type OpenBoard = {
+export type BoardLocateHit = {
+  boardId: DbId;
+  name: string;
+  cardBlockId: DbId;
+  viaAncestor: boolean;
+};
+
+export type OpenBoard = {
   getCards: () => WhiteboardCard[];
   appendCards: (incoming: WhiteboardCard[]) => Promise<boolean>;
+  focusCard: (cardBlockId: DbId) => boolean;
 };
+
+const PARENT_WALK_LIMIT = 20;
 
 const openBoards = new Map<DbId, OpenBoard>();
 
@@ -94,4 +112,82 @@ export function listBoards(blocks: readonly Block[]): BoardListItem[] {
       cardCount: readCards(block).length,
     }))
     .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+}
+
+export function findOpenBoardPanelId(
+  root: RowPanel,
+  boardId: DbId,
+): string | null {
+  const stack: Array<RowPanel | ColumnPanel | ViewPanel> = [root];
+  while (stack.length > 0) {
+    const node = stack.pop();
+    if (node == null) continue;
+    if ("view" in node) {
+      if (
+        node.view === PANEL_TYPE &&
+        asBlockId(node.viewArgs?.blockId) === boardId
+      ) {
+        return node.id;
+      }
+      continue;
+    }
+    for (const child of node.children) stack.push(child);
+  }
+  return null;
+}
+
+export async function findBoardsContainingBlock(
+  blockId: DbId,
+): Promise<BoardLocateHit[]> {
+  const boards = await fetchWhiteboardBlocks();
+  const ancestors = await ancestorIds(blockId);
+  const hits: BoardLocateHit[] = [];
+  for (const board of boards) {
+    const cards = readCards(board);
+    let selfId: DbId | null = null;
+    for (const card of cards) {
+      if (card.blockId === blockId) {
+        selfId = card.blockId;
+        break;
+      }
+    }
+    let ancestorId: DbId | null = null;
+    if (selfId == null) {
+      const cardIds = new Set(cards.map((card) => card.blockId));
+      for (const ancestor of ancestors) {
+        if (cardIds.has(ancestor)) {
+          ancestorId = ancestor;
+          break;
+        }
+      }
+    }
+    const cardBlockId = selfId ?? ancestorId;
+    if (cardBlockId == null) continue;
+    hits.push({
+      boardId: board.id,
+      name: boardName(board),
+      cardBlockId,
+      viaAncestor: selfId == null,
+    });
+  }
+  return hits;
+}
+
+async function loadBlock(id: DbId): Promise<Block> {
+  return orca.state.blocks[id] ?? fetchBlock(id);
+}
+
+async function ancestorIds(startId: DbId): Promise<DbId[]> {
+  const seen = new Set<DbId>([startId]);
+  const ids: DbId[] = [];
+  let current = await loadBlock(startId);
+  let parentId = current.parent;
+  for (let i = 0; i < PARENT_WALK_LIMIT && parentId != null; i++) {
+    if (seen.has(parentId)) break;
+    seen.add(parentId);
+    ids.push(parentId);
+    current = await loadBlock(parentId);
+    parentId = current.parent;
+  }
+  return ids;
 }

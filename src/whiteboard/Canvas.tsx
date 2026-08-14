@@ -10,6 +10,7 @@ import {
   type CanvasOrigin,
   type WhiteboardCard,
 } from "./data";
+import { useCanvasFocusApi, type CanvasFocusApi } from "./cardFocus";
 import { Card } from "./Card";
 import { EdgeDropMenu } from "./EdgeDropMenu";
 import { EdgeLayer, type EdgeLayerApi } from "./EdgeLayer";
@@ -58,6 +59,7 @@ type Props = {
   edges: WhiteboardEdge[];
   onViewportWidth: (width: number) => void;
   weekdayGuide?: CanvasOrigin | null;
+  focusApiRef: { current: CanvasFocusApi | null };
 };
 
 export function Canvas({
@@ -76,6 +78,7 @@ export function Canvas({
   edges,
   onViewportWidth,
   weekdayGuide,
+  focusApiRef,
 }: Props) {
   const [editingId, setEditingId] = useState<DbId | null>(null);
   const [selected, setSelected] = useState<DbId[]>([]);
@@ -136,6 +139,17 @@ export function Canvas({
     cardsRef,
     pointerToWorld,
     onAddCards,
+  });
+
+  useCanvasFocusApi(focusApiRef, {
+    cardsRef,
+    liveViewRef,
+    canvasRef,
+    gridRef,
+    viewportRef,
+    viewportSize,
+    onViewChange,
+    selectCards,
   });
 
   const { onViewportMouseDown, onCardMouseDown } = useCanvasPointer({

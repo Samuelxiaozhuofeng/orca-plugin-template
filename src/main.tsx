@@ -3,8 +3,11 @@ import zhCN from "./translations/zhCN";
 import {
   AddToBoardMenuItem,
   addToBoardCommandId,
+  LocateOnBoardMenuItem,
+  locateOnBoardCommandId,
   mountAddToBoardHost,
 } from "./whiteboard/addToBoard";
+import { clearAllPendingCardFocus } from "./whiteboard/cardFocus";
 import BoardBlock from "./whiteboard/BoardBlock";
 import BoardPanel from "./whiteboard/BoardPanel";
 import {
@@ -95,6 +98,15 @@ export async function load(_name: string) {
       ),
     },
   );
+  orca.blockMenuCommands.registerBlockMenuCommand(
+    locateOnBoardCommandId(pluginName),
+    {
+      worksOnMultipleBlocks: false,
+      render: (blockId, _rootBlockId, close) => (
+        <LocateOnBoardMenuItem blockId={blockId} close={close} />
+      ),
+    },
+  );
   unmountAddToBoard = mountAddToBoardHost();
 
   console.log(`${pluginName} loaded.`);
@@ -112,8 +124,12 @@ export async function unload() {
     orca.blockMenuCommands.unregisterBlockMenuCommand(
       addToBoardCommandId(pluginName),
     );
+    orca.blockMenuCommands.unregisterBlockMenuCommand(
+      locateOnBoardCommandId(pluginName),
+    );
   }
   unmountAddToBoard?.();
   unmountAddToBoard = null;
+  clearAllPendingCardFocus();
   removeWhiteboardStyles();
 }
