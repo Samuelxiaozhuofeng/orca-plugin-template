@@ -19,7 +19,7 @@ import { MIN_CARD_HEIGHT, type WhiteboardCard } from "./data";
 import type { Side } from "./edges";
 import type { ArrangeAction } from "./selection";
 import { isHostOverlayTarget } from "./hostOverlay";
-import { cachedBlockPlainText, cardExcerpt } from "./viewTransform";
+import { useCardBlockView } from "./blockWatch";
 
 const ANCHOR_SIDES: Side[] = ["t", "r", "b", "l"];
 
@@ -172,14 +172,13 @@ export function Card({
     liveRef.current = { x: card.x, y: card.y, w: card.w, h: card.h };
   }
 
-  const { blocks } = useSnapshot(orca.state);
-  const hosted = blocks[card.blockId];
+  const hosted = useCardBlockView(card.blockId);
   const isEmptyJournal =
     card.kind === "journal" &&
-    hosted != null &&
+    hosted.exists &&
     !(typeof hosted.text === "string" && hosted.text.trim().length > 0) &&
-    (hosted.children?.length ?? 0) === 0;
-  const excerpt = cardExcerpt(cachedBlockPlainText(card.blockId, blocks));
+    hosted.childCount === 0;
+  const excerpt = hosted.excerpt;
 
   useLayoutEffect(() => {
     const el = cardRef.current;

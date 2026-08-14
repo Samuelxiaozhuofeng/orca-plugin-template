@@ -161,11 +161,38 @@ export function visibleCards<T extends WhiteboardCard>(
   );
 }
 
+export const BLOCK_TREE_MAX_NODES = 2000;
+export const BLOCK_TREE_MAX_DEPTH = 30;
+
+export type BlockTextLookup = {
+  [id: number]: { text?: string; children?: DbId[] } | undefined;
+};
+
+/** Depth-first ids of each root and its descendants. Shared by text + watchers. */
+export function collectBlockTreeIds(
+  roots: readonly DbId[],
+  blocks: BlockTextLookup,
+  maxNodes = BLOCK_TREE_MAX_NODES,
+  maxDepth = BLOCK_TREE_MAX_DEPTH,
+): DbId[] {
+  const out: DbId[] = [];
+  const seen = new Set<DbId>();
+  const walk = (id: DbId, depth: number) => {
+    if (out.length >= maxNodes || depth > maxDepth) return;
+    if (seen.has(id)) return;
+    seen.add(id);
+    out.push(id);
+    const children = blocks[id]?.children;
+    if (children == null) return;
+    for (const child of children) walk(child, depth + 1);
+  };
+  for (const root of roots) walk(root, 0);
+  return out;
+}
+
 export function cachedBlockPlainText(
   blockId: DbId,
-  blocks: {
-    [id: number]: { text?: string; children?: DbId[] } | undefined;
-  },
+  blocks: BlockTextLookup,
 ): string {
   const seen = new Set<DbId>();
   const walk = (id: DbId): string => {

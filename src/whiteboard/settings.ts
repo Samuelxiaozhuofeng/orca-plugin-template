@@ -5,11 +5,15 @@ const { useSnapshot } = window.Valtio;
 
 export type MouseScheme = "standard" | "rightDrag";
 
+export const DEFAULT_BOARD_TAG = "whiteboard";
+
 export type WhiteboardSettings = {
   mouseScheme: MouseScheme;
   showAlignGuides: boolean;
   showReferenceEdges: boolean;
   markOutlineBlocks: boolean;
+  autoTagNewBoards: boolean;
+  boardTag: string;
 };
 
 const DEFAULTS: WhiteboardSettings = {
@@ -17,6 +21,8 @@ const DEFAULTS: WhiteboardSettings = {
   showAlignGuides: false,
   showReferenceEdges: true,
   markOutlineBlocks: true,
+  autoTagNewBoards: true,
+  boardTag: DEFAULT_BOARD_TAG,
 };
 
 let pluginName = "";
@@ -71,6 +77,20 @@ export function whiteboardSettingsSchema(): PluginSettingsSchema {
       type: "boolean",
       defaultValue: DEFAULTS.markOutlineBlocks,
     },
+    autoTagNewBoards: {
+      label: t("Tag new whiteboards"),
+      description: t(
+        "Automatically add this tag so new whiteboards appear in Orca's tag sidebar.",
+      ),
+      type: "boolean",
+      defaultValue: DEFAULTS.autoTagNewBoards,
+    },
+    boardTag: {
+      label: t("Whiteboard tag"),
+      description: t("Tag name without #. Default is whiteboard."),
+      type: "string",
+      defaultValue: DEFAULTS.boardTag,
+    },
   };
 }
 
@@ -82,7 +102,16 @@ export function readWhiteboardSettings(
     showAlignGuides: raw?.showAlignGuides === true,
     showReferenceEdges: raw?.showReferenceEdges !== false,
     markOutlineBlocks: raw?.markOutlineBlocks !== false,
+    autoTagNewBoards: raw?.autoTagNewBoards !== false,
+    boardTag: typeof raw?.boardTag === "string" ? raw.boardTag : DEFAULTS.boardTag,
   };
+}
+
+export function currentWhiteboardSettings(): WhiteboardSettings {
+  if (!pluginName) return DEFAULTS;
+  return readWhiteboardSettings(
+    orca.state.plugins[pluginName]?.settings as Record<string, unknown> | undefined,
+  );
 }
 
 export function useWhiteboardSettings(): WhiteboardSettings {

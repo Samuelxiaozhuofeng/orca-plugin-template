@@ -25,6 +25,7 @@ import {
 } from "./whiteboard/openBoardDialog";
 import { flushAllCardWrites } from "./whiteboard/cardPersist";
 import { flushAllEdgeWrites } from "./whiteboard/edgePersist";
+import { tagNewWhiteboard } from "./whiteboard/boardTag";
 import {
   bindWhiteboardPlugin,
   whiteboardSettingsSchema,
@@ -89,6 +90,9 @@ export async function load(_name: string) {
         orca.notify("error", t("Failed to create whiteboard"));
         return null;
       }
+      // Tag before opening the board: the whiteboard panel has no editor,
+      // so insertTag would no-op after the panel switch.
+      await tagNewWhiteboard(newId, cursor);
       openBoard(newId, panelId, false);
       return null;
     },

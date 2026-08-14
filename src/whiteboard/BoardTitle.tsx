@@ -13,8 +13,13 @@ function isComposingKey(event: React.KeyboardEvent): boolean {
 }
 
 async function writeBoardTitle(blockId: DbId, name: string): Promise<void> {
-  const content: ContentFragment[] = [{ t: "t", v: name }];
   const block = orca.state.blocks[blockId] as Block | undefined;
+  // Keep non-text fragments (tag refs such as #whiteboard) so renaming a
+  // board does not strip them out of the block.
+  const kept = (block?.content ?? []).filter(
+    (fragment: ContentFragment) => fragment.t !== "t",
+  );
+  const content: ContentFragment[] = [{ t: "t", v: name }, ...kept];
   const text = await orca.converters.blockConvert(
     "plain",
     { content },

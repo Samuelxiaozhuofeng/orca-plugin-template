@@ -1,9 +1,10 @@
 import type { Block, DbId } from "../orca.d.ts";
+import { useWatchedValue } from "./blockWatch";
 import type { WhiteboardCard } from "./cards";
 import { pairKey, type WhiteboardEdge } from "./edges";
+import { collectBlockTreeIds } from "./viewTransform";
 
 const { useMemo } = window.React;
-const { useSnapshot } = window.Valtio;
 
 export const REF_TYPE_INLINE = 1;
 export const REF_WALK_MAX_BLOCKS = 2000;
@@ -65,23 +66,62 @@ export function collectReferenceEdges(
   return out;
 }
 
+function liveBlocks(): { [id: number]: Block | undefined } {
+  return orca.state.blocks as { [id: number]: Block | undefined };
+}
+
+/** Fingerprint of children + inline refs in the card forest. Text is ignored. */
+export function referenceRelationKey(
+  cards: readonly WhiteboardCard[],
+  blocks: { [id: number]: Block | undefined },
+): string {
+  const owner = buildOwnerMap(cards, blocks);
+  const ids = [...owner.keys()].sort((a, b) => a - b);
+  const parts: string[] = [];
+  for (const id of ids) {
+    const block = blocks[id];
+    const children = block?.children?.join(",") ?? "";
+    const refs = (block?.refs ?? [])
+      .filter((ref) => ref.type === REF_TYPE_INLINE)
+      .map((ref) => String(ref.to))
+      .join(",");
+    parts.push(`${id}>${owner.get(id)}:${children}:${refs}`);
+  }
+  return parts.join("|");
+}
+
 export function useReferenceEdges(
   cards: readonly WhiteboardCard[],
   drawn: readonly WhiteboardEdge[],
   enabled: boolean,
 ): ReferenceEdge[] {
-  const { blocks } = useSnapshot(orca.state);
   const cardKey = cards.map((card) => card.blockId).join(",");
   const drawnKey = drawn
     .map((edge) => pairKey(edge.from, edge.to))
     .sort()
     .join("|");
+  const relationKey = useWatchedValue(
+    () => {
+      if (!enabled || cards.length === 0) return "";
+      return referenceRelationKey(cards, liveBlocks());
+    },
+    () => {
+      if (!enabled || cards.length === 0) return [];
+      return collectBlockTreeIds(
+        cards.map((card) => card.blockId),
+        liveBlocks(),
+        REF_WALK_MAX_BLOCKS,
+        REF_WALK_MAX_DEPTH,
+      );
+    },
+    [enabled, cardKey],
+  );
 
   return useMemo(() => {
     if (!enabled || cards.length === 0) return [];
     const pairs = new Set(
       drawn.map((edge) => pairKey(edge.from, edge.to)),
     );
-    return collectReferenceEdges(cards, blocks, pairs);
-  }, [enabled, cardKey, drawnKey, blocks]);
+    return collectReferenceEdges(cards, liveBlocks(), pairs);
+  }, [enabled, cardKey, drawnKey, relationKey]);
 }

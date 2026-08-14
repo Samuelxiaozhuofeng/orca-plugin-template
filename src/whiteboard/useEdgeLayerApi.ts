@@ -1,0 +1,211 @@
+import type { DbId } from "../orca.d.ts";
+import type { WhiteboardCard } from "./data";
+import type { CardBox } from "./edgeGeometry";
+import {
+  paintEdgesForBoxes,
+  startDrawEdge,
+  type DrawDropEmpty,
+  type EdgeEls,
+} from "./edgeGestures";
+import {
+  nextEdgeId,
+  pairKey,
+  type Side,
+  type WhiteboardEdge,
+} from "./edges";
+import type { ReferenceEdge } from "./edgeRefs";
+
+const { useLayoutEffect, useRef } = window.React;
+
+export type EdgeLayerApi = {
+  startDraw: (card: WhiteboardCard, side: Side, clientX: number, clientY: number) => void;
+  onFrame: (boxes: Map<DbId, CardBox>) => void;
+  clearGhost: () => void;
+};
+
+export type AnyEdge = {
+  id: string;
+  from: DbId;
+  to: DbId;
+  fromSide?: Side;
+  toSide?: Side;
+};
+
+export function markerNs(panelId: string): string {
+  return `owb${panelId.replace(/[^a-zA-Z0-9_-]/g, "")}`;
+}
+
+export function bindEl(store: Map<string, EdgeEls>, id: string, key: keyof EdgeEls) {
+  return (el: SVGElement | HTMLElement | null) => {
+    const rec = store.get(id) ?? {
+      visible: null,
+      hit: null,
+      label: null,
+      handleFrom: null,
+      handleTo: null,
+    };
+    rec[key] = el as never;
+    store.set(id, rec);
+  };
+}
+
+export function useEdgeLayerApi(opts: {
+  cards: WhiteboardCard[];
+  edges: WhiteboardEdge[];
+  refEdges: ReferenceEdge[];
+  canvasRef: { current: HTMLDivElement | null };
+  pointerToWorld: (clientX: number, clientY: number) => { x: number; y: number };
+  apiRef: { current: EdgeLayerApi | null };
+  onSelect: (id: string | null) => void;
+  onCommit: (next: WhiteboardEdge[]) => Promise<boolean>;
+  onDropEmpty: (drop: DrawDropEmpty) => void;
+}) {
+  const {
+    cards,
+    edges,
+    refEdges,
+    canvasRef,
+    pointerToWorld,
+    apiRef,
+    onSelect,
+    onCommit,
+    onDropEmpty,
+  } = opts;
+  const ghostRef = useRef<SVGPathElement | null>(null);
+  const elsRef = useRef(new Map<string, EdgeEls>());
+  const liveRef = useRef(new Map<DbId, CardBox>());
+  const cardsRef = useRef<WhiteboardCard[]>(cards);
+  const edgesRef = useRef<WhiteboardEdge[]>(edges);
+  const refsRef = useRef<ReferenceEdge[]>(refEdges);
+  const commitRef = useRef(onCommit);
+  const selectRef = useRef(onSelect);
+  const dismissDrawRef = useRef<(() => void) | null>(null);
+  const dropEmptyRef = useRef(onDropEmpty);
+  dropEmptyRef.current = onDropEmpty;
+  cardsRef.current = cards;
+  edgesRef.current = edges;
+  refsRef.current = refEdges;
+  commitRef.current = onCommit;
+  selectRef.current = onSelect;
+
+  const boxMap = () => {
+    const map = new Map<DbId, CardBox>();
+    for (const card of cardsRef.current) {
+      map.set(card.blockId, liveRef.current.get(card.blockId) ?? card);
+    }
+    return map;
+  };
+
+  const allPainted = (): AnyEdge[] => [...edgesRef.current, ...refsRef.current];
+
+  const paintAll = () => {
+    paintEdgesForBoxes(allPainted(), boxMap(), (id) => elsRef.current.get(id));
+  };
+
+  useLayoutEffect(() => {
+    for (const card of cards) {
+      const live = liveRef.current.get(card.blockId);
+      if (live == null) continue;
+      if (
+        live.x === card.x &&
+        live.y === card.y &&
+        live.w === card.w &&
+        live.h === card.h
+      ) {
+        liveRef.current.delete(card.blockId);
+      }
+    }
+  }, [cards]);
+
+  useLayoutEffect(() => {
+    paintAll();
+  });
+
+  useLayoutEffect(() => {
+    const startDraw = (
+      card: WhiteboardCard,
+      side: Side,
+      clientX: number,
+      clientY: number,
+    ) => {
+      const canvas = canvasRef.current;
+      const ghost = ghostRef.current;
+      if (canvas == null || ghost == null) return;
+      dismissDrawRef.current?.();
+      const fromBox = liveRef.current.get(card.blockId) ?? card;
+      selectRef.current(null);
+      const session = startDrawEdge({
+        fromId: card.blockId,
+        fromSide: side,
+        fromBox,
+        cards: () =>
+          cardsRef.current.map((item: WhiteboardCard) => ({
+            blockId: item.blockId,
+            ...(liveRef.current.get(item.blockId) ?? item),
+          })),
+        canvas,
+        ghost,
+        pointerToWorld,
+        occupiedPairs: () =>
+          new Set(
+            edgesRef.current.map((edge: WhiteboardEdge) =>
+              pairKey(edge.from, edge.to),
+            ),
+          ),
+        onComplete: (toId, fromSide) => {
+          dismissDrawRef.current = null;
+          const current = edgesRef.current;
+          void commitRef.current([
+            ...current,
+            {
+              id: nextEdgeId(card.blockId, toId, current),
+              from: card.blockId,
+              to: toId,
+              arrow: "end",
+              fromSide,
+            },
+          ]);
+        },
+        onCancel: () => {
+          dismissDrawRef.current = null;
+        },
+        onDropEmpty: (drop) => {
+          dropEmptyRef.current(drop);
+        },
+      });
+      dismissDrawRef.current = session.dismiss;
+    };
+
+    const onFrame = (boxes: Map<DbId, CardBox>) => {
+      for (const [id, box] of boxes) liveRef.current.set(id, box);
+      const touched = new Set(boxes.keys());
+      paintEdgesForBoxes(
+        allPainted().filter(
+          (edge) => touched.has(edge.from) || touched.has(edge.to),
+        ),
+        boxMap(),
+        (id) => elsRef.current.get(id),
+      );
+    };
+
+    apiRef.current = {
+      startDraw,
+      onFrame,
+      clearGhost: () => {
+        dismissDrawRef.current?.();
+        dismissDrawRef.current = null;
+      },
+    };
+    return () => {
+      apiRef.current = null;
+    };
+  }, [apiRef, canvasRef, pointerToWorld]);
+
+  return {
+    ghostRef,
+    elsRef,
+    edgesRef,
+    commitRef,
+    boxMap,
+  };
+}

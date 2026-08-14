@@ -75,6 +75,12 @@ const zhCN = {
   "Mark outline blocks already on a whiteboard": "在大纲里标记已上白板的块",
   "Show a small mark next to outline rows that already have a card on a whiteboard.":
     "已做成白板卡片的大纲行右侧会显示小标记。",
+  "Tag new whiteboards": "新建白板时自动打标签",
+  "Automatically add this tag so new whiteboards appear in Orca's tag sidebar.":
+    "自动打上这个标签，新白板就会出现在 Orca 自带的标签侧栏里。",
+  "Whiteboard tag": "白板标签",
+  "Tag name without #. Default is whiteboard.":
+    "标签名，不用写 #。默认是 whiteboard。",
   "This block is not on any whiteboard yet": "这个块还不在任何白板上",
   "This card is no longer on the board": "这张卡片已经不在白板上了",
   "On this board": "在这块白板上",
