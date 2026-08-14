@@ -15,6 +15,8 @@ export type WhiteboardEdge = {
   arrow: EdgeArrow;
   fromSide?: Side;
   toSide?: Side;
+  /** True after this line was written into the notes as a real reference. */
+  linked?: true;
 };
 
 const ARROWS = new Set<EdgeArrow>(["end", "both", "none"]);
@@ -79,6 +81,7 @@ export function normalizeEdge(value: unknown): WhiteboardEdge | null {
   if (fromSide != null) edge.fromSide = fromSide;
   const toSide = asSide(raw.toSide);
   if (toSide != null) edge.toSide = toSide;
+  if (raw.linked === true) edge.linked = true;
   return edge;
 }
 
@@ -162,7 +165,8 @@ function edgeEqual(left: WhiteboardEdge, right: WhiteboardEdge): boolean {
     left.label === right.label &&
     left.arrow === right.arrow &&
     left.fromSide === right.fromSide &&
-    left.toSide === right.toSide
+    left.toSide === right.toSide &&
+    left.linked === right.linked
   );
 }
 

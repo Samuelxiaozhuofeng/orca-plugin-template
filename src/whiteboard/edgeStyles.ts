@@ -43,9 +43,15 @@ export const EDGE_CSS = `
   stroke-width: 2.5;
 }
 
+.owb-edge.is-linked:not(.is-selected) .owb-edge-visible {
+  stroke: var(--orca-color-primary-5);
+  stroke-width: 2;
+}
+
 .owb-edge.is-selected .owb-edge-visible {
   stroke: var(--orca-color-primary-5);
-  stroke-width: 3;
+  stroke-width: 2;
+  filter: drop-shadow(0 0 2.5px var(--orca-color-primary-5));
 }
 
 .owb-edge.is-ref .owb-edge-visible {
@@ -81,7 +87,8 @@ export const EDGE_CSS = `
 }
 
 .owb-edge-label,
-.owb-edge-editor {
+.owb-edge-editor,
+.owb-edge-link-badge {
   position: absolute;
   transform: translate(-50%, -50%);
   box-sizing: border-box;
@@ -96,6 +103,23 @@ export const EDGE_CSS = `
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.owb-edge-label,
+.owb-edge-link-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.owb-edge-link-badge {
+  padding: 2px 5px;
+}
+
+.owb-edge-link-icon {
+  font-size: 12px;
+  line-height: 1;
+  color: var(--orca-color-primary-5);
 }
 
 .owb-edge-editor {

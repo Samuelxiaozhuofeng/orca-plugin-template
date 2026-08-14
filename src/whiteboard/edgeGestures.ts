@@ -80,6 +80,14 @@ function markTarget(canvas: HTMLElement, id: DbId | null): void {
     ?.classList.add("is-edge-target");
 }
 
+export type DrawDropEmpty = {
+  clientX: number;
+  clientY: number;
+  world: { x: number; y: number };
+  fromId: DbId;
+  fromSide: Side;
+};
+
 export function startDrawEdge(opts: {
   fromId: DbId;
   fromSide: Side;
@@ -91,20 +99,26 @@ export function startDrawEdge(opts: {
   occupiedPairs: () => ReadonlySet<string>;
   onComplete: (toId: DbId, fromSide: Side) => void;
   onCancel: () => void;
-}): void {
-  let finished = false;
+  onDropEmpty: (drop: DrawDropEmpty) => void;
+}): { dismiss: () => void } {
+  let live = true;
   opts.canvas.classList.add("is-drawing-edge");
   setGhostPath(opts.ghost, "");
 
-  const finish = () => {
-    if (finished) return;
-    finished = true;
+  const detach = () => {
     window.removeEventListener("mousemove", onMove);
     window.removeEventListener("mouseup", onUp);
     window.removeEventListener("keydown", onKey, true);
-    clearTargets(opts.canvas);
-    setGhostPath(opts.ghost, "");
-    opts.canvas.classList.remove("is-drawing-edge");
+  };
+
+  const cleanup = (clearGhost: boolean) => {
+    if (live) {
+      live = false;
+      detach();
+      clearTargets(opts.canvas);
+      opts.canvas.classList.remove("is-drawing-edge");
+    }
+    if (clearGhost) setGhostPath(opts.ghost, "");
   };
 
   const paint = (clientX: number, clientY: number) => {
@@ -143,11 +157,26 @@ export function startDrawEdge(opts: {
       !occupied.has(pairKey(opts.fromId, rawHit))
         ? rawHit
         : null;
-    finish();
     if (hit == null) {
-      opts.onCancel();
+      // Released over a card we cannot connect to (itself, or an already
+      // connected pair): just cancel. Offering "new card here" would drop
+      // the new card on top of the card under the cursor.
+      if (rawHit != null) {
+        cleanup(true);
+        opts.onCancel();
+        return;
+      }
+      cleanup(false);
+      opts.onDropEmpty({
+        clientX: event.clientX,
+        clientY: event.clientY,
+        world,
+        fromId: opts.fromId,
+        fromSide: opts.fromSide,
+      });
       return;
     }
+    cleanup(true);
     opts.onComplete(hit, opts.fromSide);
   };
 
@@ -155,11 +184,12 @@ export function startDrawEdge(opts: {
     if (event.key !== "Escape") return;
     event.preventDefault();
     event.stopPropagation();
-    finish();
+    cleanup(true);
     opts.onCancel();
   };
 
   window.addEventListener("mousemove", onMove);
   window.addEventListener("mouseup", onUp);
   window.addEventListener("keydown", onKey, true);
+  return { dismiss: () => cleanup(true) };
 }

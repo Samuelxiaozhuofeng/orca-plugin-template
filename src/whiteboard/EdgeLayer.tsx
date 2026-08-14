@@ -1,12 +1,13 @@
 import type { DbId } from "../orca.d.ts";
-import { t } from "../libs/l10n";
 import type { WhiteboardCard } from "./data";
 import { curveForBoxes, type CardBox } from "./edgeGeometry";
 import {
   paintEdgesForBoxes,
   startDrawEdge,
+  type DrawDropEmpty,
   type EdgeEls,
 } from "./edgeGestures";
+import { EdgeMenuItems } from "./EdgeMenuItems";
 import {
   nextEdgeId,
   pairKey,
@@ -21,6 +22,7 @@ const { useLayoutEffect, useRef, useState } = window.React;
 export type EdgeLayerApi = {
   startDraw: (card: WhiteboardCard, side: Side, clientX: number, clientY: number) => void;
   onFrame: (boxes: Map<DbId, CardBox>) => void;
+  clearGhost: () => void;
 };
 
 type Props = {
@@ -36,6 +38,7 @@ type Props = {
   apiRef: { current: EdgeLayerApi | null };
   onSelect: (id: string | null) => void;
   onCommit: (next: WhiteboardEdge[]) => Promise<boolean>;
+  onDropEmpty: (drop: DrawDropEmpty) => void;
 };
 
 type AnyEdge = {
@@ -100,8 +103,13 @@ export function EdgeLayer({
   apiRef,
   onSelect,
   onCommit,
+  onDropEmpty,
 }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [menuAt, setMenuAt] = useState<
+    { edgeId: string; x: number; y: number } | null
+  >(null);
+  const bodyRef = useRef(document.body);
   const ghostRef = useRef<SVGPathElement | null>(null);
   const elsRef = useRef(new Map<string, EdgeEls>());
   const liveRef = useRef(new Map<DbId, CardBox>());
@@ -110,8 +118,10 @@ export function EdgeLayer({
   const refsRef = useRef<ReferenceEdge[]>(refEdges);
   const commitRef = useRef(onCommit);
   const selectRef = useRef(onSelect);
-  const menuEdgeRef = useRef<string | null>(null);
   const skipBlurRef = useRef(false);
+  const dismissDrawRef = useRef<(() => void) | null>(null);
+  const dropEmptyRef = useRef(onDropEmpty);
+  dropEmptyRef.current = onDropEmpty;
   cardsRef.current = cards;
   edgesRef.current = edges;
   refsRef.current = refEdges;
@@ -165,9 +175,10 @@ export function EdgeLayer({
       const canvas = canvasRef.current;
       const ghost = ghostRef.current;
       if (canvas == null || ghost == null) return;
+      dismissDrawRef.current?.();
       const fromBox = liveRef.current.get(card.blockId) ?? card;
       selectRef.current(null);
-      startDrawEdge({
+      const session = startDrawEdge({
         fromId: card.blockId,
         fromSide: side,
         fromBox,
@@ -186,6 +197,7 @@ export function EdgeLayer({
             ),
           ),
         onComplete: (toId, fromSide) => {
+          dismissDrawRef.current = null;
           const current = edgesRef.current;
           void commitRef.current([
             ...current,
@@ -198,8 +210,14 @@ export function EdgeLayer({
             },
           ]);
         },
-        onCancel: () => {},
+        onCancel: () => {
+          dismissDrawRef.current = null;
+        },
+        onDropEmpty: (drop) => {
+          dropEmptyRef.current(drop);
+        },
       });
+      dismissDrawRef.current = session.dismiss;
     };
 
     const onFrame = (boxes: Map<DbId, CardBox>) => {
@@ -214,7 +232,14 @@ export function EdgeLayer({
       );
     };
 
-    apiRef.current = { startDraw, onFrame };
+    apiRef.current = {
+      startDraw,
+      onFrame,
+      clearGhost: () => {
+        dismissDrawRef.current?.();
+        dismissDrawRef.current = null;
+      },
+    };
     return () => {
       apiRef.current = null;
     };
@@ -261,47 +286,12 @@ export function EdgeLayer({
     );
   };
 
-  const edgeMenu = (close: () => void) => {
-    const id = menuEdgeRef.current ?? selectedId;
-    const edge = edges.find((item) => item.id === id);
-    if (edge == null) return null;
-    const setArrow = (arrow: EdgeArrow) => {
-      close();
-      if (edge.arrow === arrow) return;
-      void onCommit(
-        edges.map((item) => (item.id === edge.id ? { ...item, arrow } : item)),
-      );
-    };
-    return (
-      <orca.components.Menu>
-        <orca.components.MenuText
-          title={t("Arrow to end")}
-          preIcon={edge.arrow === "end" ? "ti ti-check" : undefined}
-          onClick={() => setArrow("end")}
-        />
-        <orca.components.MenuText
-          title={t("Arrows on both ends")}
-          preIcon={edge.arrow === "both" ? "ti ti-check" : undefined}
-          onClick={() => setArrow("both")}
-        />
-        <orca.components.MenuText
-          title={t("No arrows")}
-          preIcon={edge.arrow === "none" ? "ti ti-check" : undefined}
-          onClick={() => setArrow("none")}
-        />
-        <orca.components.MenuSeparator />
-        <orca.components.MenuText
-          title={t("Delete")}
-          dangerous
-          onClick={() => {
-            close();
-            void onCommit(edges.filter((item) => item.id !== edge.id));
-            onSelect(null);
-          }}
-        />
-      </orca.components.Menu>
-    );
-  };
+  // Anchored at the cursor rather than at the <path>: the context-menu
+  // component positions against HTML box metrics, which SVG elements do
+  // not have, so anchoring to the line itself never opens.
+  const menuEdge =
+    menuAt == null ? null : edges.find((item) => item.id === menuAt.edgeId);
+  const closeMenu = () => setMenuAt(null);
 
   const editing = editingId == null
     ? null
@@ -309,9 +299,30 @@ export function EdgeLayer({
   const editingCurve = editing == null ? null : curveOf(editing);
 
   return (
-    <orca.components.ContextMenu menu={edgeMenu}>
-      {(open) => (
-        <div className="owb-edge-layer">
+    <>
+      {menuEdge != null ? (
+        <orca.components.Popup
+          visible
+          rect={new DOMRect(menuAt!.x, menuAt!.y, 1, 1)}
+          container={bodyRef}
+          allowBeyondContainer
+          escapeToClose
+          defaultPlacement="bottom"
+          alignment="left"
+          onClose={closeMenu}
+        >
+          <orca.components.Menu>
+            <EdgeMenuItems
+              edge={menuEdge}
+              edges={edges}
+              close={closeMenu}
+              onCommit={onCommit}
+              onSelect={onSelect}
+            />
+          </orca.components.Menu>
+        </orca.components.Popup>
+      ) : null}
+      <div className="owb-edge-layer">
           <svg className="owb-edges" aria-hidden>
             <defs>
               <ArrowMark id={`${ns}-e-plain`} fill="var(--orca-color-text-2)" scale={scale} />
@@ -339,11 +350,18 @@ export function EdgeLayer({
               const curve = curveOf(edge);
               if (curve == null) return null;
               const selected = selectedId === edge.id;
-              const tone = selected ? "sel" : "plain";
+              const tone = selected || edge.linked ? "sel" : "plain";
+              const className = [
+                "owb-edge",
+                selected ? "is-selected" : "",
+                edge.linked ? "is-linked" : "",
+              ]
+                .filter(Boolean)
+                .join(" ");
               return (
                 <g
                   key={edge.id}
-                  className={selected ? "owb-edge is-selected" : "owb-edge"}
+                  className={className}
                   data-edge-id={edge.id}
                 >
                   <path
@@ -371,9 +389,12 @@ export function EdgeLayer({
                     onContextMenu={(event: React.MouseEvent) => {
                       event.preventDefault();
                       event.stopPropagation();
-                      menuEdgeRef.current = edge.id;
                       onSelect(edge.id);
-                      open(event);
+                      setMenuAt({
+                        edgeId: edge.id,
+                        x: event.clientX,
+                        y: event.clientY,
+                      });
                     }}
                   />
                   {selected ? (
@@ -406,16 +427,22 @@ export function EdgeLayer({
           </svg>
           <div className="owb-edge-labels">
             {edges.map((edge) => {
-              if (edge.label == null || edge.id === editingId) return null;
+              if (edge.id === editingId) return null;
+              if (edge.label == null && !edge.linked) return null;
               const curve = curveOf(edge);
               if (curve == null) return null;
               return (
                 <div
                   key={edge.id}
                   ref={bindEl(elsRef.current, edge.id, "label")}
-                  className="owb-edge-label"
+                  className={
+                    edge.label != null ? "owb-edge-label" : "owb-edge-link-badge"
+                  }
                   style={{ left: curve.label.x, top: curve.label.y }}
                 >
+                  {edge.linked ? (
+                    <i className="ti ti-link owb-edge-link-icon" />
+                  ) : null}
                   {edge.label}
                 </div>
               );
@@ -459,9 +486,8 @@ export function EdgeLayer({
                 }}
               />
             ) : null}
-          </div>
         </div>
-      )}
-    </orca.components.ContextMenu>
+      </div>
+    </>
   );
 }

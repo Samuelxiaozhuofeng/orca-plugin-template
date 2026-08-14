@@ -89,6 +89,26 @@ const zhCN = {
   Delete: "删除",
   "Failed to save connections": "保存连线失败",
   "Whiteboard connections were not saved": "连线没有写进白板块，请看控制台日志",
+  "Create card and connect": "新建一张卡片并连上",
+  "Connect to an existing block": "接到已有的块",
+  "Create a note reference": "在笔记里建立引用",
+  "Adds a child under the source note. Deleting this line later will not remove that child.":
+    "会在源笔记下新增一条引用。之后删掉这条线，不会删掉那条笔记。",
+  "Added a reference under the source note. Deleting this line will not remove that note.":
+    "已在源笔记下新增一条引用。删掉这条线不会撤销那条笔记。",
+  "Failed to create a new card": "无法新建卡片",
+  "Failed to load this block": "无法读取这个块",
+  "Created the note but could not save it as a card. The new note is under this board in the outline.":
+    "笔记已经建好，但没能当成卡片写进白板。新笔记在这块白板下面，不会丢。",
+  "Failed to create a note reference": "无法在笔记里建立引用",
+  "Created the note reference but could not mark this line. The reference is already in the source note.":
+    "笔记里的引用已经建好，但这条线没能标成已连接。引用还在源笔记里。",
+  "Created the reference but could not write it into the new note.":
+    "引用关系已经建好，但没能写进新笔记的正文。",
+  "These cards are already connected": "这两张卡片已经连过了",
+  "Cannot connect a card to itself": "不能把一张卡片连到自己",
+  "Cannot place this board on itself": "不能把这块白板接到自己身上",
+  "Search blocks": "搜索块",
 };
 
 export default zhCN;

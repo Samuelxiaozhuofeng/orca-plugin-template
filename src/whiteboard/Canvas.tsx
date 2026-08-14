@@ -11,9 +11,12 @@ import {
   type WhiteboardCard,
 } from "./data";
 import { Card } from "./Card";
+import { EdgeDropMenu } from "./EdgeDropMenu";
 import { EdgeLayer, type EdgeLayerApi } from "./EdgeLayer";
 import type { CardBox } from "./edgeGeometry";
+import type { DrawDropEmpty } from "./edgeGestures";
 import { useReferenceEdges } from "./edgeRefs";
+import { addBlankCardToBoard } from "./newCard";
 import type { Side, WhiteboardEdge } from "./edges";
 import {
   arrangeCards,
@@ -70,6 +73,7 @@ export function Canvas({
   const [editingId, setEditingId] = useState<DbId | null>(null);
   const [selected, setSelected] = useState<DbId[]>([]);
   const [selectedEdge, setSelectedEdge] = useState<string | null>(null);
+  const [edgeDrop, setEdgeDrop] = useState<DrawDropEmpty | null>(null);
   const editingRef = useRef<DbId | null>(null);
   const selectedRef = useRef<DbId[]>([]);
   const selectedEdgeRef = useRef<string | null>(null);
@@ -198,6 +202,36 @@ export function Canvas({
 
   const endEdit = useCallback(() => setEditingId(null), []);
 
+  const closeEdgeDrop = useCallback(() => {
+    setEdgeDrop(null);
+    edgeApiRef.current?.clearGhost();
+  }, []);
+
+  const createBlankAt = useCallback(
+    async (at: { x: number; y: number }, edit: boolean) => {
+      try {
+        const card = await addBlankCardToBoard({
+          boardBlockId,
+          x: at.x,
+          y: at.y,
+          addCards: onAddCards,
+        });
+        if (card == null) return;
+        selectCards([card.blockId]);
+        if (edit) startEdit(card.blockId);
+      } catch (error) {
+        console.error("[whiteboard] create blank card failed", error);
+        orca.notify(
+          "error",
+          error instanceof Error
+            ? error.message
+            : t("Failed to create a new card"),
+        );
+      }
+    },
+    [boardBlockId, onAddCards, selectCards, startEdit],
+  );
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape" && editingRef.current != null) {
@@ -291,6 +325,24 @@ export function Canvas({
           data-mouse-scheme={settings.mouseScheme}
           tabIndex={0}
           onMouseDown={onViewportMouseDown}
+          onDoubleClick={(event: React.MouseEvent<HTMLDivElement>) => {
+            const target = event.target as HTMLElement | null;
+            if (
+              target?.closest(
+                ".owb-card, .owb-edge-hit, .owb-edge-editor, .owb-edge-label, .owb-edge-link-badge",
+              )
+            ) {
+              return;
+            }
+            if (spaceHeldRef.current) return;
+            if (event.button !== 0) return;
+            event.preventDefault();
+            if (edgeDrop != null) closeEdgeDrop();
+            void createBlankAt(
+              pointerToWorld(event.clientX, event.clientY),
+              true,
+            );
+          }}
           onDragOver={onDragOver}
           onDragLeave={onDragLeave}
           onDrop={onDrop}
@@ -321,6 +373,7 @@ export function Canvas({
               apiRef={edgeApiRef}
               onSelect={selectEdge}
               onCommit={onCommitEdges}
+              onDropEmpty={setEdgeDrop}
             />
             {weekdayGuide != null ? (
               <div
@@ -377,6 +430,15 @@ export function Canvas({
           </div>
           <div ref={guidesRef} className="owb-guides" />
           <div ref={marqueeRef} className="owb-marquee" hidden />
+          <EdgeDropMenu
+            drop={edgeDrop}
+            cards={cards}
+            boardBlockId={boardBlockId}
+            edges={edges}
+            onAddCards={onAddCards}
+            onCommitEdges={onCommitEdges}
+            onClose={closeEdgeDrop}
+          />
           {cards.length === 0 && (
             <div className="owb-canvas-empty">
               <i className="ti ti-layout-grid owb-canvas-empty-icon" />
