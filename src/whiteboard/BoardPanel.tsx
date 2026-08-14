@@ -5,9 +5,13 @@ import { Canvas } from "./Canvas";
 import {
   boardName,
   clampScale,
-  fetchWeekJournalCards,
+  defaultGridColumns,
+  placeJournalCards,
   readCards,
+  viewportOrigin,
+  type CanvasOrigin,
 } from "./data";
+import { PlaceDialog, type PlaceDialogValue } from "./PlaceDialog";
 import {
   DEFAULT_VIEW,
   formatZoomPercent,
@@ -35,6 +39,8 @@ export default function BoardPanel({ panelId, blockId }: Props) {
   const [view, setView] = useState<CanvasView>(DEFAULT_VIEW);
   const [busy, setBusy] = useState(false);
   const [viewportWidth, setViewportWidth] = useState(800);
+  const [placeOpen, setPlaceOpen] = useState(false);
+  const [weekdayGuide, setWeekdayGuide] = useState<CanvasOrigin | null>(null);
   const zoomLabelRef = useRef<HTMLButtonElement | null>(null);
 
   useLayoutEffect(() => {
@@ -74,29 +80,47 @@ export default function BoardPanel({ panelId, blockId }: Props) {
     [patchCard],
   );
 
-  const placeWeekJournals = useCallback(async () => {
-    if (busy || blockId == null) return;
-    setBusy(true);
-    try {
-      const next = await fetchWeekJournalCards(cards, viewportWidth);
-      if (next.length === cards.length) {
-        orca.notify("info", t("No journals found for this week"));
-        return;
+  const confirmPlace = useCallback(
+    async (value: PlaceDialogValue) => {
+      if (busy || blockId == null) return;
+      setBusy(true);
+      try {
+        const result = await placeJournalCards({
+          ...value,
+          origin: viewportOrigin(view),
+          existing: cards,
+        });
+        if (result.placed > 0) {
+          // commitCards keeps the optimistic update, rolls back and notifies
+          // on failure, and runs the read-back verify inside writeCards.
+          const saved = await commitCards(result.cards);
+          if (!saved) return;
+          setWeekdayGuide(result.weekdayGuide);
+        }
+        setPlaceOpen(false);
+        orca.notify(
+          result.placed > 0 ? "success" : "info",
+          t(
+            "Added ${placed}, skipped ${existing} already on the board, filtered ${empty} empty journals",
+            {
+              placed: String(result.placed),
+              existing: String(result.skippedExisting),
+              empty: String(result.skippedEmpty),
+            },
+          ),
+        );
+      } catch (error) {
+        console.error("[whiteboard] failed to load journals", error);
+        orca.notify(
+          "error",
+          error instanceof Error ? error.message : t("Failed to load journals"),
+        );
+      } finally {
+        setBusy(false);
       }
-      const added = next.length - cards.length;
-      const saved = await commitCards(next);
-      if (!saved) return;
-      orca.notify(
-        "success",
-        t("Added ${count} journal cards", { count: String(added) }),
-      );
-    } catch (error) {
-      console.error("[whiteboard] failed to load this week's journals", error);
-      orca.notify("error", t("Failed to load this week's journals"));
-    } finally {
-      setBusy(false);
-    }
-  }, [blockId, busy, cards, commitCards, viewportWidth]);
+    },
+    [blockId, busy, cards, commitCards, view],
+  );
 
   if (blockId == null) {
     return (
@@ -114,10 +138,11 @@ export default function BoardPanel({ panelId, blockId }: Props) {
         view={view}
         busy={busy}
         zoomLabelRef={zoomLabelRef}
+        weekdayGuide={weekdayGuide}
         onViewChange={setView}
         onMoveEnd={onMoveEnd}
         onResizeEnd={onResizeEnd}
-        onPlaceWeek={() => void placeWeekJournals()}
+        onPlaceWeek={() => setPlaceOpen(true)}
         onViewportWidth={setViewportWidth}
       />
       <div className="owb-toolbar">
@@ -127,9 +152,9 @@ export default function BoardPanel({ panelId, blockId }: Props) {
           type="button"
           className="owb-toolbar-btn"
           disabled={busy}
-          onClick={() => void placeWeekJournals()}
+          onClick={() => setPlaceOpen(true)}
         >
-          {t("Place this week's journals")}
+          {t("Place journals…")}
         </button>
         <div className="owb-toolbar-sep" />
         <div className="owb-zoom">
@@ -168,6 +193,15 @@ export default function BoardPanel({ panelId, blockId }: Props) {
           </button>
         </div>
       </div>
+      <PlaceDialog
+        visible={placeOpen}
+        defaultColumns={defaultGridColumns(viewportWidth)}
+        submitting={busy}
+        onClose={() => {
+          if (!busy) setPlaceOpen(false);
+        }}
+        onConfirm={(value) => void confirmPlace(value)}
+      />
     </div>
   );
 }

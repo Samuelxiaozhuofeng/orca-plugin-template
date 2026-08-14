@@ -1,6 +1,10 @@
 import type { DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n";
-import type { WhiteboardCard } from "./data";
+import {
+  WEEKDAY_LABELS_MON,
+  type CanvasOrigin,
+  type WhiteboardCard,
+} from "./data";
 import { JournalCard } from "./JournalCard";
 import {
   applyViewToDom,
@@ -31,6 +35,7 @@ type Props = {
   onResizeEnd: (blockId: DbId, w: number, h: number) => void;
   onPlaceWeek: () => void;
   onViewportWidth: (width: number) => void;
+  weekdayGuide?: CanvasOrigin | null;
 };
 
 type Runtime = {
@@ -50,6 +55,7 @@ export function Canvas({
   onResizeEnd,
   onPlaceWeek,
   onViewportWidth,
+  weekdayGuide,
 }: Props) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLDivElement | null>(null);
@@ -289,7 +295,7 @@ export function Canvas({
       menu={(close) => (
         <orca.components.Menu>
           <orca.components.MenuText
-            title={t("Place this week's journals")}
+            title={t("Place journals…")}
             disabled={busy}
             onClick={() => {
               close();
@@ -312,6 +318,18 @@ export function Canvas({
         >
           <div ref={gridRef} className="owb-grid" />
           <div ref={canvasRef} className="owb-canvas">
+            {weekdayGuide != null ? (
+              <div
+                className="owb-cal-weekdays"
+                style={{ left: weekdayGuide.x, top: weekdayGuide.y }}
+              >
+                {WEEKDAY_LABELS_MON.map((label) => (
+                  <div key={label} className="owb-cal-weekday">
+                    {label}
+                  </div>
+                ))}
+              </div>
+            ) : null}
             {shownCards.map((card: WhiteboardCard) => (
               <JournalCard
                 key={`${card.date}-${card.blockId}`}
