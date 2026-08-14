@@ -11,9 +11,6 @@ export const PANEL_CSS = `
   --owb-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   --owb-duration: 120ms;
   --owb-grid: 24px;
-  --owb-shadow-rest: 3px 3px 0px 0px var(--orca-color-border);
-  --owb-shadow-hover: 5px 5px 0px 0px var(--orca-color-border);
-  --owb-shadow-drag: 6px 6px 0px 0px var(--orca-color-border);
   --owb-shadow-toolbar: 3px 3px 0px 0px var(--orca-color-border);
   --owb-dot-alpha: 14%;
   position: relative;
@@ -29,9 +26,6 @@ export const PANEL_CSS = `
 
 @media (prefers-color-scheme: dark) {
   .owb-panel {
-    --owb-shadow-rest: 3px 3px 0px 0px var(--orca-color-border);
-    --owb-shadow-hover: 5px 5px 0px 0px var(--orca-color-border);
-    --owb-shadow-drag: 6px 6px 0px 0px var(--orca-color-border);
     --owb-shadow-toolbar: 3px 3px 0px 0px var(--orca-color-border);
     --owb-dot-alpha: 10%;
   }

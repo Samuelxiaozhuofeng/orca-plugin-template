@@ -13,9 +13,7 @@ export const CARD_CSS = `
   background: var(--orca-color-bg-1);
   border: 2px solid var(--orca-color-border);
   border-radius: var(--owb-radius-card, 6px);
-  box-shadow: var(--owb-shadow-rest);
   transition:
-    box-shadow var(--owb-duration) var(--owb-ease),
     transform var(--owb-duration) var(--owb-ease),
     border-color var(--owb-duration) var(--owb-ease);
 }
@@ -24,22 +22,11 @@ export const CARD_CSS = `
   user-select: none;
 }
 
-.owb-card:hover:not(.is-dragging):not(.is-resizing):not(.is-selected):not(.is-editing):not(.is-marquee-hit) {
-  transform: translate(-2px, -2px);
-  box-shadow: var(--owb-shadow-hover);
-}
-
-.owb-card.is-selected:hover:not(.is-dragging):not(.is-editing),
-.owb-card.is-editing:hover:not(.is-dragging) {
-  transform: translate(-2px, -2px);
-}
-
 .owb-card.is-dragging {
   z-index: 4;
   cursor: grabbing;
   transform: translate(-3px, -3px) scale(1.01);
   transition: none;
-  box-shadow: var(--owb-shadow-drag);
 }
 
 .owb-card.is-resizing {
@@ -47,23 +34,20 @@ export const CARD_CSS = `
   transition: none;
 }
 
-/* Selected state with Bamboo Jade border and hard shadow */
+/* Selected state with Bamboo Jade border */
 .owb-card.is-selected:not(.is-editing):not(.is-dragging):not(.is-resizing) {
   z-index: 2;
   border-color: var(--orca-color-primary-5, #00a896);
-  box-shadow: 4px 4px 0px 0px var(--orca-color-primary-5, #00a896);
 }
 
 .owb-card.is-marquee-hit:not(.is-selected):not(.is-editing) {
-  border-color: var(--orca-color-primary-5, #00a896);
-  box-shadow: 3px 3px 0px 0px color-mix(in oklab, var(--orca-color-primary-5, #00a896) 50%, transparent);
+  border-color: color-mix(in oklab, var(--orca-color-primary-5, #00a896) 60%, transparent);
 }
 
-/* Editing state with Imperial Amber border and hard shadow */
+/* Editing state with Imperial Amber border */
 .owb-card.is-editing:not(.is-dragging):not(.is-resizing) {
   z-index: 3;
   border-color: var(--orca-color-warning-5, #f4a259);
-  box-shadow: 4px 4px 0px 0px var(--orca-color-warning-5, #f4a259);
 }
 
 .owb-card.is-editing .owb-card-body {
@@ -349,11 +333,9 @@ export const CARD_CSS = `
 @keyframes owb-card-focus-flash {
   0%, 50%, 100% {
     border-color: var(--orca-color-primary-5, #00a896);
-    box-shadow: 4px 4px 0px 0px var(--orca-color-primary-5, #00a896);
   }
   25%, 75% {
     border-color: var(--orca-color-warning-5, #f4a259);
-    box-shadow: 6px 6px 0px 0px var(--orca-color-warning-5, #f4a259);
   }
 }
 
