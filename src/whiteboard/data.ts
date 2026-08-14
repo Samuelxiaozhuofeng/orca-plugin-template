@@ -37,10 +37,27 @@ export function formatDateKey(date: Date): string {
 }
 
 export function formatCardTitle(dateKey: string): string {
+  const meta = cardDateMeta(dateKey);
+  return `${meta.date} ${meta.weekday}`.trim();
+}
+
+export function cardDateMeta(dateKey: string): {
+  date: string;
+  weekday: string;
+  isToday: boolean;
+  isWeekend: boolean;
+} {
   const [y, m, d] = dateKey.split("-").map((part) => Number(part));
-  if (!y || !m || !d) return dateKey;
+  if (!y || !m || !d) {
+    return { date: dateKey, weekday: "", isToday: false, isWeekend: false };
+  }
   const date = new Date(y, m - 1, d);
-  return `${dateKey} ${WEEKDAYS[date.getDay()]}`;
+  return {
+    date: dateKey,
+    weekday: WEEKDAYS[date.getDay()] ?? "",
+    isToday: dateKey === formatDateKey(new Date()),
+    isWeekend: date.getDay() === 0 || date.getDay() === 6,
+  };
 }
 
 /** Today and the 6 local days before it, oldest first. */

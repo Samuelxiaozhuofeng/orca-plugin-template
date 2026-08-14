@@ -17,8 +17,10 @@ const zhCN = {
   "No journals found for this week": "本周没有可放入的日记",
   "Added ${count} journal cards": "已放入 ${count} 张日记卡片",
   "${count} cards": "${count} 张卡片",
-  "Empty board. Right-click here or use the toolbar button.":
-    "白板还是空的。在这里右键，或点上方的「放入本周日记」。",
+  "This board is empty": "这块白板还是空的",
+  "Right-click or use the toolbar to place journals.":
+    "在空白处右键，或点工具栏的「放入本周日记」",
+  "No notes this day": "这天还没有写日记",
   "Double-click to edit": "双击进入编辑",
   Editing: "编辑中",
   "Drag to resize": "拖动调整大小",

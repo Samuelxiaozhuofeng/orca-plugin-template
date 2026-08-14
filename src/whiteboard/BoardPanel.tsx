@@ -3,6 +3,7 @@ import { t } from "../libs/l10n";
 import { Canvas, type CanvasView } from "./Canvas";
 import {
   boardName,
+  clampScale,
   fetchWeekJournalCards,
   readCards,
   writeCards,
@@ -133,25 +134,6 @@ export default function BoardPanel({ panelId, blockId }: Props) {
 
   return (
     <div className="owb-panel">
-      <div className="owb-toolbar">
-        <div className="owb-toolbar-title">{boardName(block)}</div>
-        <orca.components.Button
-          variant="soft"
-          disabled={busy}
-          onClick={() => void placeWeekJournals()}
-        >
-          {t("Place this week's journals")}
-        </orca.components.Button>
-        <span className="owb-toolbar-scale">
-          {`${Math.round(view.scale * 100)}%`}
-        </span>
-        <orca.components.Button
-          variant="outline"
-          onClick={() => setView({ x: 0, y: 0, scale: 1 })}
-        >
-          {t("Reset view")}
-        </orca.components.Button>
-      </div>
       <Canvas
         panelId={panelId}
         cards={cards}
@@ -163,6 +145,54 @@ export default function BoardPanel({ panelId, blockId }: Props) {
         onPlaceWeek={() => void placeWeekJournals()}
         onViewportWidth={setViewportWidth}
       />
+      <div className="owb-toolbar">
+        <div className="owb-toolbar-title">{boardName(block)}</div>
+        <div className="owb-toolbar-sep" />
+        <button
+          type="button"
+          className="owb-toolbar-btn"
+          disabled={busy}
+          onClick={() => void placeWeekJournals()}
+        >
+          {t("Place this week's journals")}
+        </button>
+        <div className="owb-toolbar-sep" />
+        <div className="owb-zoom">
+          <button
+            type="button"
+            className="owb-zoom-btn"
+            onClick={() =>
+              setView((current: CanvasView) => ({
+                ...current,
+                scale: clampScale(current.scale / 1.1),
+              }))
+            }
+          >
+            −
+          </button>
+          <div className="owb-zoom-sep" />
+          <button
+            type="button"
+            className="owb-zoom-btn"
+            onClick={() => setView({ x: 0, y: 0, scale: 1 })}
+          >
+            {`${Math.round(view.scale * 100)}%`}
+          </button>
+          <div className="owb-zoom-sep" />
+          <button
+            type="button"
+            className="owb-zoom-btn"
+            onClick={() =>
+              setView((current: CanvasView) => ({
+                ...current,
+                scale: clampScale(current.scale * 1.1),
+              }))
+            }
+          >
+            +
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

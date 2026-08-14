@@ -64,7 +64,8 @@ export default function BoardBlock({
       contentClassName="owb-repr-content"
       contentAttrs={{ contentEditable: false }}
       contentJsx={
-        <div className="owb-block-card">
+        <div className="owb-block-card" onClick={onOpen}>
+          <i className="ti ti-chalkboard owb-block-icon" />
           <span className="owb-block-title">{boardName(block)}</span>
           <span className="owb-block-count">
             {t("${count} cards", { count: String(cards.length) })}

@@ -162,6 +162,13 @@ export function Canvas({
           }}
         >
           <div
+            className="owb-grid"
+            style={{
+              backgroundSize: `${24 * view.scale}px ${24 * view.scale}px`,
+              backgroundPosition: `${view.x}px ${view.y}px`,
+            }}
+          />
+          <div
             className="owb-canvas"
             style={{
               transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`,
@@ -184,7 +191,13 @@ export function Canvas({
           </div>
           {cards.length === 0 && (
             <div className="owb-canvas-empty">
-              {t("Empty board. Right-click here or use the toolbar button.")}
+              <i className="ti ti-layout-grid owb-canvas-empty-icon" />
+              <div className="owb-canvas-empty-title">
+                {t("This board is empty")}
+              </div>
+              <div className="owb-canvas-empty-sub">
+                {t("Right-click or use the toolbar to place journals.")}
+              </div>
             </div>
           )}
         </div>

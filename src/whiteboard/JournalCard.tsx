@@ -1,8 +1,8 @@
 import type { DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n";
 import {
+  cardDateMeta,
   clampCardSize,
-  formatCardTitle,
   MIN_CARD_HEIGHT,
   type WhiteboardCard,
 } from "./data";
@@ -61,6 +61,13 @@ export function JournalCard({
   const w = size?.w ?? card.w;
   const h = size?.h ?? card.h;
   const zoom = scale === 0 ? 1 : scale;
+  const { blocks } = useSnapshot(orca.state);
+  const journal = blocks[card.blockId];
+  const isEmptyJournal =
+    journal != null &&
+    !(typeof journal.text === "string" && journal.text.trim().length > 0) &&
+    (journal.children?.length ?? 0) === 0;
+  const dateMeta = cardDateMeta(card.date);
 
   useEffect(() => {
     if (!editing) return;
@@ -208,8 +215,18 @@ export function JournalCard({
           }}
         >
           <div className="owb-card-title" onMouseDown={onTitleMouseDown}>
-            {formatCardTitle(card.date)}
-            {editing ? ` · ${t("Editing")}` : ""}
+            <span className="owb-card-title-main">
+              {dateMeta.isToday ? <span className="owb-card-today-dot" /> : null}
+              <span className="owb-card-date">{dateMeta.date}</span>
+              <span
+                className={`owb-card-weekday${dateMeta.isWeekend ? " is-weekend" : ""}`}
+              >
+                {dateMeta.weekday}
+              </span>
+            </span>
+            {editing ? (
+              <span className="owb-card-edit-badge">{t("Editing")}</span>
+            ) : null}
           </div>
           <div
             className="owb-card-body"
@@ -220,6 +237,8 @@ export function JournalCard({
           >
             {editing ? (
               <JournalEditor blockId={card.blockId} />
+            ) : isEmptyJournal ? (
+              <div className="owb-card-empty">{t("No notes this day")}</div>
             ) : (
               <orca.components.Block
                 panelId={panelId}
