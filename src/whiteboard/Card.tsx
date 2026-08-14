@@ -21,6 +21,7 @@ import type { ArrangeAction } from "./selection";
 import { isHostOverlayTarget } from "./hostOverlay";
 import { useCardBlockView } from "./blockWatch";
 import { CardBlockTree } from "./CardBlockTree";
+import { canRestoreExtract } from "./cardExtractModel";
 import {
   blockIdFromCardEventTarget,
   isExtractPointerTarget,
@@ -61,6 +62,7 @@ type Props = {
   onMoveFrame?: (boxes: Map<DbId, { x: number; y: number; w: number; h: number }>) => void;
   promotedKey?: string;
   onExtractRow?: (blockId: DbId, sourceCard: WhiteboardCard) => void;
+  onRestoreExtract?: (card: WhiteboardCard) => void;
 };
 
 type CardBox = { x: number; y: number; w: number; h: number };
@@ -169,6 +171,7 @@ export function Card({
   onMoveFrame,
   promotedKey = "",
   onExtractRow,
+  onRestoreExtract,
 }: Props) {
   const cardRef = useRef<HTMLDivElement | null>(null);
   const extractRowRef = useRef<DbId | null>(null);
@@ -331,6 +334,16 @@ export function Card({
               />
             );
           })()}
+          {onRestoreExtract != null &&
+          canRestoreExtract(orca.state.blocks[card.blockId]) ? (
+            <orca.components.MenuText
+              title={t("Move back to source card")}
+              onClick={() => {
+                close();
+                onRestoreExtract(card);
+              }}
+            />
+          ) : null}
           <orca.components.MenuSeparator />
           <orca.components.MenuText
             title={t("Fit content height")}

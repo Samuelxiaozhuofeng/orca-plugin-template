@@ -7,6 +7,9 @@ import {
   parseExtractSource,
   planExtractEdge,
 } from "./cardExtract";
+import { type ExtractRestoreInfo } from "./cardExtractModel";
+import { moveBlockOutAsExtract } from "./cardExtractMove";
+import { makeExtractNoteAction } from "./cardExtractRestore";
 import {
   dropMessage,
   parseDroppedBlockIds,
@@ -55,26 +58,53 @@ export async function extractBlocksToBoard(opts: {
     }
   }
 
+  const infos: ExtractRestoreInfo[] = [];
+  const note = makeExtractNoteAction(infos);
+
   const savedIncoming = await runAsHistoryStep(
     opts.boardBlockId,
     { cards: [...opts.existing], edges: [...opts.existingEdges] },
     async () => {
-      const saved = await opts.addCards(result.incoming);
-      if (!saved) {
-        discardLastRecord(opts.boardBlockId);
-        return false;
-      }
-      if (edgesToAdd.length > 0) {
-        const ok = await opts.commitEdges([
-          ...opts.existingEdges,
-          ...edgesToAdd,
-        ]);
-        if (!ok) {
-          orca.notify("error", t("Failed to save connections"));
+      try {
+        for (const card of result.incoming) {
+          infos.push(
+            await moveBlockOutAsExtract({
+              blockId: card.blockId,
+              sourceCardId: opts.sourceCardId,
+              boardBlockId: opts.boardBlockId,
+            }),
+          );
         }
+        const saved = await opts.addCards(result.incoming);
+        if (!saved) {
+          await note.undo();
+          discardLastRecord(opts.boardBlockId);
+          return false;
+        }
+        if (edgesToAdd.length > 0) {
+          const ok = await opts.commitEdges([
+            ...opts.existingEdges,
+            ...edgesToAdd,
+          ]);
+          if (!ok) {
+            orca.notify("error", t("Failed to save connections"));
+          }
+        }
+        return true;
+      } catch (error) {
+        try {
+          if (infos.length > 0) await note.undo();
+        } catch (rollbackError) {
+          console.error(
+            "[whiteboard] failed to roll back extract notes",
+            rollbackError,
+          );
+        }
+        discardLastRecord(opts.boardBlockId);
+        throw error;
       }
-      return true;
     },
+    note,
   );
 
   if (!savedIncoming) return [];

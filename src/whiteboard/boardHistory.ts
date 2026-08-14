@@ -4,9 +4,16 @@ import type { WhiteboardEdge } from "./edges";
 
 export const HISTORY_LIMIT = 50;
 
+/** Optional note-structure undo/redo, attached to one history entry. */
+export type NoteHistoryAction = {
+  undo: () => Promise<void>;
+  redo: () => Promise<void>;
+};
+
 export type BoardSnapshot = {
   cards: WhiteboardCard[];
   edges: WhiteboardEdge[];
+  note?: NoteHistoryAction;
 };
 
 type BoardHistory = {
@@ -18,11 +25,21 @@ const histories = new Map<DbId, BoardHistory>();
 let holdCount = 0;
 let blankUndoTold = false;
 
+/** Cards and edges only — `note` is a live function pair and is not copied. */
 export function cloneSnapshot(snapshot: BoardSnapshot): BoardSnapshot {
   return {
     cards: snapshot.cards.map((card) => ({ ...card })),
     edges: snapshot.edges.map((edge) => ({ ...edge })),
   };
+}
+
+function withNote(
+  snapshot: BoardSnapshot,
+  note: NoteHistoryAction | undefined,
+): BoardSnapshot {
+  if (note == null) return snapshot;
+  snapshot.note = note;
+  return snapshot;
 }
 
 function getOrCreate(boardId: DbId): BoardHistory {
@@ -85,10 +102,14 @@ export function historyDepth(boardId: DbId): number {
   return histories.get(boardId)?.past.length ?? 0;
 }
 
-export function recordBefore(boardId: DbId, current: BoardSnapshot): void {
+export function recordBefore(
+  boardId: DbId,
+  current: BoardSnapshot,
+  note?: NoteHistoryAction,
+): void {
   if (holdCount > 0) return;
   const history = getOrCreate(boardId);
-  history.past.push(cloneSnapshot(current));
+  history.past.push(withNote(cloneSnapshot(current), note));
   if (history.past.length > HISTORY_LIMIT) history.past.shift();
   history.future = [];
 }
@@ -104,7 +125,7 @@ export function takeUndo(
   const history = histories.get(boardId);
   const prev = history?.past.pop();
   if (prev == null || history == null) return null;
-  history.future.push(cloneSnapshot(current));
+  history.future.push(withNote(cloneSnapshot(current), prev.note));
   return prev;
 }
 
@@ -115,24 +136,29 @@ export function takeRedo(
   const history = histories.get(boardId);
   const next = history?.future.pop();
   if (next == null || history == null) return null;
-  history.past.push(cloneSnapshot(current));
+  history.past.push(withNote(cloneSnapshot(current), next.note));
   if (history.past.length > HISTORY_LIMIT) history.past.shift();
   return next;
 }
 
-export function restoreFailedUndo(boardId: DbId): void {
+/** Put `prev` back when given, so a failed undo can be retried. */
+export function restoreFailedUndo(boardId: DbId, prev?: BoardSnapshot): void {
   const history = histories.get(boardId);
   const pushed = history?.future.pop();
-  if (pushed == null || history == null) return;
-  history.past.push(pushed);
+  if (history == null) return;
+  const back = prev ?? pushed;
+  if (back == null) return;
+  history.past.push(back);
   if (history.past.length > HISTORY_LIMIT) history.past.shift();
 }
 
-export function restoreFailedRedo(boardId: DbId): void {
+export function restoreFailedRedo(boardId: DbId, next?: BoardSnapshot): void {
   const history = histories.get(boardId);
   const pushed = history?.past.pop();
-  if (pushed == null || history == null) return;
-  history.future.push(pushed);
+  if (history == null) return;
+  const back = next ?? pushed;
+  if (back == null) return;
+  history.future.push(back);
 }
 
 /** Keep live `linked` on edges that still exist. Deleted edges follow the snapshot. */
@@ -206,8 +232,9 @@ export async function runAsHistoryStep<T>(
   boardId: DbId,
   current: BoardSnapshot,
   run: () => Promise<T>,
+  note?: NoteHistoryAction,
 ): Promise<T> {
-  recordBefore(boardId, current);
+  recordBefore(boardId, current, note);
   const release = holdHistory();
   try {
     return await run();

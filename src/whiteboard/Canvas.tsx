@@ -1,7 +1,11 @@
 import type { DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n";
 import type { CanvasOrigin, WhiteboardCard } from "./data";
-import { useCanvasFocusApi, type CanvasFocusApi } from "./cardFocus";
+import {
+  tryFocusCardFromRefClick,
+  useCanvasFocusApi,
+  type CanvasFocusApi,
+} from "./cardFocus";
 import { boardMenu, canOpenBoardMenu } from "./canvasBoardMenu";
 import { CanvasCards } from "./CanvasCards";
 import { EdgeDropMenu } from "./EdgeDropMenu";
@@ -36,6 +40,7 @@ type Props = {
   ) => Promise<boolean>;
   onUndo: () => void;
   onRedo: () => void;
+  onRestoreExtract: (cardBlockId: DbId) => Promise<boolean>;
   edges: WhiteboardEdge[];
   onViewportWidth: (width: number) => void;
   weekdayGuide?: CanvasOrigin | null;
@@ -55,6 +60,7 @@ export function Canvas({
   onCommitEdges,
   onUndo,
   onRedo,
+  onRestoreExtract,
   edges,
   onViewportWidth,
   weekdayGuide,
@@ -112,6 +118,7 @@ export function Canvas({
     closeEdgeDrop,
     createBlankAt,
     extractRow,
+    restoreExtracted,
     shownCards,
     degraded,
     selectedSet,
@@ -135,6 +142,7 @@ export function Canvas({
     onCommitEdges,
     onUndo,
     onRedo,
+    onRestoreExtract,
   });
 
   const {
@@ -232,6 +240,14 @@ export function Canvas({
           onDragOverCapture={onDragOverCapture}
           onDragLeaveCapture={onDragLeaveCapture}
           onDropCapture={onDropCapture}
+          onClickCapture={(event: React.MouseEvent<HTMLDivElement>) => {
+            tryFocusCardFromRefClick(
+              event,
+              cardsRef.current,
+              (cardBlockId) =>
+                focusApiRef.current?.focusCard(cardBlockId) ?? false,
+            );
+          }}
           onContextMenu={(event) => {
             const target = event.target as HTMLElement | null;
             if (target?.closest(".owb-card, .owb-edge-hit, .owb-edge-editor")) return;
@@ -281,6 +297,7 @@ export function Canvas({
               onMoveFrame={onMoveFrame}
               edgeApiRef={edgeApiRef}
               onExtractRow={extractRow}
+              onRestoreExtract={restoreExtracted}
             />
           </div>
           <div ref={guidesRef} className="owb-guides" />

@@ -14,6 +14,11 @@ import {
   takeUndo,
   type BoardSnapshot,
 } from "./boardHistory";
+import { planBoardAfterRestore, readExtractRestore } from "./cardExtractModel";
+import {
+  invertNoteAction,
+  makeExtractNoteAction,
+} from "./cardExtractRestore";
 import { type WhiteboardCard } from "./cards";
 import {
   cardsEqual,
@@ -204,27 +209,129 @@ export function useBoardCommands(opts: {
     [blockId, commitBoard],
   );
 
+  const applyHistoryTarget = useCallback(
+    async (
+      target: BoardSnapshot,
+      current: BoardSnapshot,
+      direction: "undo" | "redo",
+    ): Promise<boolean> => {
+      const note = target.note;
+      if (note != null) {
+        try {
+          if (direction === "undo") await note.undo();
+          else await note.redo();
+        } catch (error) {
+          console.error("[whiteboard] note history action failed", error);
+          orca.notify(
+            "error",
+            direction === "undo"
+              ? t("Could not undo the note change for this action")
+              : t("Could not redo the note change for this action"),
+          );
+          return false;
+        }
+      }
+      const ok = await applySnapshot(target, current);
+      if (ok || note == null) return ok;
+      try {
+        if (direction === "undo") await note.redo();
+        else await note.undo();
+      } catch (error) {
+        console.error(
+          "[whiteboard] failed to reverse note action after board restore failed",
+          error,
+        );
+        orca.notify(
+          "error",
+          t("The note change was applied but the board could not be restored"),
+        );
+      }
+      return false;
+    },
+    [applySnapshot],
+  );
+
   const onUndo = useCallback(() => {
     if (blockId == null) return;
     const current = snapshotNow();
     const prev = takeUndo(blockId, current);
     if (prev == null) return;
-    void applySnapshot(prev, current).then((ok: boolean) => {
-      if (!ok) restoreFailedUndo(blockId);
+    void applyHistoryTarget(prev, current, "undo").then((ok: boolean) => {
+      if (!ok) restoreFailedUndo(blockId, prev);
       bumpHistory();
     });
-  }, [applySnapshot, blockId, bumpHistory, snapshotNow]);
+  }, [applyHistoryTarget, blockId, bumpHistory, snapshotNow]);
 
   const onRedo = useCallback(() => {
     if (blockId == null) return;
     const current = snapshotNow();
     const next = takeRedo(blockId, current);
     if (next == null) return;
-    void applySnapshot(next, current).then((ok: boolean) => {
-      if (!ok) restoreFailedRedo(blockId);
+    void applyHistoryTarget(next, current, "redo").then((ok: boolean) => {
+      if (!ok) restoreFailedRedo(blockId, next);
       bumpHistory();
     });
-  }, [applySnapshot, blockId, bumpHistory, snapshotNow]);
+  }, [applyHistoryTarget, blockId, bumpHistory, snapshotNow]);
+
+  const onRestoreExtract = useCallback(
+    async (cardBlockId: DbId): Promise<boolean> => {
+      if (blockId == null) return false;
+      const info = readExtractRestore(orca.state.blocks[cardBlockId]);
+      if (info == null) {
+        orca.notify("info", t("This card can no longer be moved back"));
+        return false;
+      }
+      const current = snapshotNow();
+      const next = planBoardAfterRestore<WhiteboardCard, WhiteboardEdge>(
+        current.cards,
+        current.edges,
+        [info],
+      );
+      const note = invertNoteAction(makeExtractNoteAction([info]));
+      recordBefore(blockId, current, note);
+      const release = holdHistory();
+      let notesRestored = false;
+      try {
+        await note.redo();
+        notesRestored = true;
+        const saved = await commitBoard(next.cards, next.edges);
+        if (!saved) {
+          try {
+            await note.undo();
+          } catch (rollbackError) {
+            console.error(
+              "[whiteboard] failed to roll back extract restore",
+              rollbackError,
+            );
+          }
+          discardLastRecord(blockId);
+          return false;
+        }
+        bumpHistory();
+        return true;
+      } catch (error) {
+        console.error("[whiteboard] restore extract failed", error);
+        if (notesRestored) {
+          try {
+            await note.undo();
+          } catch {
+            // already failing
+          }
+        }
+        discardLastRecord(blockId);
+        orca.notify(
+          "error",
+          error instanceof Error
+            ? error.message
+            : t("Failed to move this card back to the source card"),
+        );
+        return false;
+      } finally {
+        release();
+      }
+    },
+    [blockId, bumpHistory, commitBoard, snapshotNow],
+  );
 
   const confirmPlace = useCallback(
     async (value: PlaceDialogValue) => {
@@ -280,6 +387,7 @@ export function useBoardCommands(opts: {
     onRemoveCards,
     onUndo,
     onRedo,
+    onRestoreExtract,
     confirmPlace,
   };
 }

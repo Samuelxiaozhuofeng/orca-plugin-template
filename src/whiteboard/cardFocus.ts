@@ -69,6 +69,61 @@ export function clearAllPendingCardFocus(): void {
   flashTimers.clear();
 }
 
+const INLINE_REF_SELECTOR =
+  ".orca-inline[data-type='r'], .orca-inline-r-content";
+
+export function cardBlockIdFromInlineRefTarget(
+  target: EventTarget | null,
+): DbId | null {
+  if (!(target instanceof Element)) return null;
+  const hit = target.closest(INLINE_REF_SELECTOR);
+  if (hit == null) return null;
+  const host =
+    hit.closest<HTMLElement>(".orca-inline[data-type='r']") ??
+    (hit instanceof HTMLElement ? hit : null);
+  if (host == null) return null;
+  const id = Number(host.getAttribute("data-ref"));
+  return Number.isFinite(id) ? id : null;
+}
+
+export function shouldInterceptRefClick(event: {
+  altKey: boolean;
+  metaKey: boolean;
+  ctrlKey: boolean;
+  shiftKey: boolean;
+  button?: number;
+}): boolean {
+  if (event.button != null && event.button !== 0) return false;
+  return !event.altKey && !event.metaKey && !event.ctrlKey && !event.shiftKey;
+}
+
+/** Pan to the card when an inline ref points at a block that is on this board. */
+export function tryFocusCardFromRefClick(
+  event: {
+    target: EventTarget | null;
+    altKey: boolean;
+    metaKey: boolean;
+    ctrlKey: boolean;
+    shiftKey: boolean;
+    button?: number;
+    preventDefault: () => void;
+    stopPropagation: () => void;
+    nativeEvent?: { stopImmediatePropagation?: () => void };
+  },
+  cards: readonly { blockId: DbId }[],
+  focusCard: ((cardBlockId: DbId) => boolean) | null | undefined,
+): boolean {
+  if (!shouldInterceptRefClick(event)) return false;
+  const id = cardBlockIdFromInlineRefTarget(event.target);
+  if (id == null) return false;
+  if (!cards.some((card) => card.blockId === id)) return false;
+  if (focusCard == null || !focusCard(id)) return false;
+  event.preventDefault();
+  event.stopPropagation();
+  event.nativeEvent?.stopImmediatePropagation?.();
+  return true;
+}
+
 export function applyCanvasCardFocus(opts: {
   cardBlockId: DbId;
   cards: readonly WhiteboardCard[];
