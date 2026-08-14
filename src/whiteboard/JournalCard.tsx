@@ -1,11 +1,20 @@
 import type { DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n";
+import { ArrangeMenuItems } from "./ArrangeMenu";
+import {
+  applyCardBox,
+  cardHasLiveGesture,
+  isOnCardScrollbar,
+  RESIZE_HANDLES,
+  startResizeCard,
+  type ResizeHandle,
+} from "./cardGestures";
 import {
   cardDateMeta,
-  clampCardSize,
   MIN_CARD_HEIGHT,
   type WhiteboardCard,
 } from "./data";
+import type { ArrangeAction } from "./selection";
 import { cachedBlockPlainText, cardExcerpt } from "./viewTransform";
 
 const { useEffect, useLayoutEffect, useRef } = window.React;
@@ -16,11 +25,22 @@ type Props = {
   card: WhiteboardCard;
   degraded: boolean;
   editing: boolean;
+  selected: boolean;
+  showResize: boolean;
+  selectedCount: number;
   pointerToWorld: (clientX: number, clientY: number) => { x: number; y: number };
   onStartEdit: (blockId: DbId) => void;
   onEndEdit: () => void;
-  onMoveEnd: (blockId: DbId, x: number, y: number) => void;
-  onResizeEnd: (blockId: DbId, w: number, h: number) => void;
+  onCardMouseDown: (
+    event: React.MouseEvent<HTMLDivElement>,
+    card: WhiteboardCard,
+  ) => void;
+  onPatchCard: (
+    blockId: DbId,
+    patch: { x?: number; y?: number; w?: number; h?: number },
+  ) => void;
+  onArrange: (action: ArrangeAction) => void;
+  onSelectOnly: (blockId: DbId) => void;
 };
 
 type CardBox = { x: number; y: number; w: number; h: number };
@@ -47,24 +67,21 @@ function JournalEditor({ blockId }: { blockId: DbId }) {
   );
 }
 
-function applyCardBox(el: HTMLElement | null, box: CardBox): void {
-  if (el == null) return;
-  el.style.left = `${box.x}px`;
-  el.style.top = `${box.y}px`;
-  el.style.width = `${box.w}px`;
-  el.style.height = `${box.h}px`;
-}
-
 export function JournalCard({
   panelId,
   card,
   degraded,
   editing,
+  selected,
+  showResize,
+  selectedCount,
   pointerToWorld,
   onStartEdit,
   onEndEdit,
-  onMoveEnd,
-  onResizeEnd,
+  onCardMouseDown,
+  onPatchCard,
+  onArrange,
+  onSelectOnly,
 }: Props) {
   const cardRef = useRef<HTMLDivElement | null>(null);
   const liveRef = useRef<CardBox>({
@@ -73,15 +90,8 @@ export function JournalCard({
     w: card.w,
     h: card.h,
   });
-  const draggingRef = useRef(false);
-  const resizingRef = useRef(false);
-  const rafRef = useRef(0);
-  const listenersRef = useRef<{
-    move: ((event: MouseEvent) => void) | null;
-    up: ((event: MouseEvent) => void) | null;
-  }>({ move: null, up: null });
 
-  if (!draggingRef.current && !resizingRef.current) {
+  if (!cardHasLiveGesture(cardRef.current)) {
     liveRef.current = { x: card.x, y: card.y, w: card.w, h: card.h };
   }
 
@@ -96,20 +106,9 @@ export function JournalCard({
 
   useLayoutEffect(() => {
     const el = cardRef.current;
-    if (el == null) return;
+    if (el == null || cardHasLiveGesture(el)) return;
     applyCardBox(el, liveRef.current);
-    el.classList.toggle("is-dragging", draggingRef.current);
-    el.classList.toggle("is-resizing", resizingRef.current);
   });
-
-  useEffect(() => {
-    return () => {
-      if (rafRef.current !== 0) window.cancelAnimationFrame(rafRef.current);
-      const { move, up } = listenersRef.current;
-      if (move) window.removeEventListener("mousemove", move);
-      if (up) window.removeEventListener("mouseup", up);
-    };
-  }, []);
 
   useEffect(() => {
     if (!editing) return;
@@ -129,102 +128,45 @@ export function JournalCard({
     };
   }, [editing, onEndEdit]);
 
-  const paintBox = () => {
-    if (rafRef.current !== 0) return;
-    rafRef.current = window.requestAnimationFrame(() => {
-      rafRef.current = 0;
-      applyCardBox(cardRef.current, liveRef.current);
+  const onRootMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest(".owb-card-handle")) return;
+    if (editing && target?.closest(".owb-card-body")) return;
+    if (isOnCardScrollbar(event.target, event.clientX, event.clientY)) return;
+    onCardMouseDown(event, card);
+  };
+
+  const onResizeMouseDown = (
+    event: React.MouseEvent<HTMLDivElement>,
+    handle: ResizeHandle,
+  ) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const el = cardRef.current;
+    if (el == null) return;
+    const origin = { ...liveRef.current };
+    startResizeCard({
+      handle,
+      startX: event.clientX,
+      startY: event.clientY,
+      origin,
+      el,
+      pointerToWorld,
+      onEnd: (box) => {
+        liveRef.current = box;
+        applyCardBox(el, box);
+        if (
+          box.x === card.x &&
+          box.y === card.y &&
+          box.w === card.w &&
+          box.h === card.h
+        ) {
+          return;
+        }
+        onPatchCard(card.blockId, box);
+      },
     });
-  };
-
-  const detachPointer = () => {
-    const { move, up } = listenersRef.current;
-    if (move) window.removeEventListener("mousemove", move);
-    if (up) window.removeEventListener("mouseup", up);
-    listenersRef.current = { move: null, up: null };
-    if (rafRef.current !== 0) {
-      window.cancelAnimationFrame(rafRef.current);
-      rafRef.current = 0;
-    }
-  };
-
-  const onTitleMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (event.button !== 0) return;
-    event.preventDefault();
-    event.stopPropagation();
-
-    const originX = liveRef.current.x;
-    const originY = liveRef.current.y;
-    const start = pointerToWorld(event.clientX, event.clientY);
-    draggingRef.current = true;
-    cardRef.current?.classList.add("is-dragging");
-
-    const onMove = (moveEvent: MouseEvent) => {
-      const now = pointerToWorld(moveEvent.clientX, moveEvent.clientY);
-      liveRef.current = {
-        ...liveRef.current,
-        x: originX + now.x - start.x,
-        y: originY + now.y - start.y,
-      };
-      paintBox();
-    };
-
-    const onUp = (upEvent: MouseEvent) => {
-      detachPointer();
-      draggingRef.current = false;
-      cardRef.current?.classList.remove("is-dragging");
-      const now = pointerToWorld(upEvent.clientX, upEvent.clientY);
-      const nextX = originX + now.x - start.x;
-      const nextY = originY + now.y - start.y;
-      liveRef.current = { ...liveRef.current, x: nextX, y: nextY };
-      applyCardBox(cardRef.current, liveRef.current);
-      if (nextX === card.x && nextY === card.y) return;
-      onMoveEnd(card.blockId, nextX, nextY);
-    };
-
-    listenersRef.current = { move: onMove, up: onUp };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
-  };
-
-  const onResizeMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (event.button !== 0) return;
-    event.preventDefault();
-    event.stopPropagation();
-
-    const originW = liveRef.current.w;
-    const originH = liveRef.current.h;
-    const start = pointerToWorld(event.clientX, event.clientY);
-    resizingRef.current = true;
-    cardRef.current?.classList.add("is-resizing");
-
-    const onMove = (moveEvent: MouseEvent) => {
-      const now = pointerToWorld(moveEvent.clientX, moveEvent.clientY);
-      liveRef.current = {
-        ...liveRef.current,
-        ...clampCardSize(originW + now.x - start.x, originH + now.y - start.y),
-      };
-      paintBox();
-    };
-
-    const onUp = (upEvent: MouseEvent) => {
-      detachPointer();
-      resizingRef.current = false;
-      cardRef.current?.classList.remove("is-resizing");
-      const now = pointerToWorld(upEvent.clientX, upEvent.clientY);
-      const next = clampCardSize(
-        originW + now.x - start.x,
-        originH + now.y - start.y,
-      );
-      liveRef.current = { ...liveRef.current, ...next };
-      applyCardBox(cardRef.current, liveRef.current);
-      if (next.w === card.w && next.h === card.h) return;
-      onResizeEnd(card.blockId, next.w, next.h);
-    };
-
-    listenersRef.current = { move: onMove, up: onUp };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
   };
 
   const fitContentHeight = () => {
@@ -242,14 +184,13 @@ export function JournalCard({
       (title?.offsetHeight ?? 0) + contentH + 8,
     );
     if (nextH === card.h) return;
-    onResizeEnd(card.blockId, card.w, nextH);
+    onPatchCard(card.blockId, { w: card.w, h: nextH });
   };
 
   const className = [
     "owb-card",
-    draggingRef.current ? "is-dragging" : "",
-    resizingRef.current ? "is-resizing" : "",
     editing ? "is-editing" : "",
+    selected ? "is-selected" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -267,6 +208,11 @@ export function JournalCard({
               fitContentHeight();
             }}
           />
+          <ArrangeMenuItems
+            close={close}
+            selectedCount={selected ? selectedCount : 1}
+            onArrange={onArrange}
+          />
         </orca.components.Menu>
       )}
     >
@@ -274,13 +220,16 @@ export function JournalCard({
         <div
           ref={cardRef}
           className={className}
+          data-block-id={card.blockId}
           style={{ left: box.x, top: box.y, width: box.w, height: box.h }}
+          onMouseDown={onRootMouseDown}
           onContextMenu={(event) => {
             if (editing) return;
+            if (!selected) onSelectOnly(card.blockId);
             open(event);
           }}
         >
-          <div className="owb-card-title" onMouseDown={onTitleMouseDown}>
+          <div className="owb-card-title">
             <span className="owb-card-title-main">
               {dateMeta.isToday ? <span className="owb-card-today-dot" /> : null}
               <span className="owb-card-date">{dateMeta.date}</span>
@@ -316,11 +265,16 @@ export function JournalCard({
               />
             )}
           </div>
-          <div
-            className="owb-card-resize"
-            title={t("Drag to resize")}
-            onMouseDown={onResizeMouseDown}
-          />
+          {showResize
+            ? RESIZE_HANDLES.map((handle) => (
+                <div
+                  key={handle}
+                  className={`owb-card-handle owb-card-handle-${handle}`}
+                  title={t("Drag to resize")}
+                  onMouseDown={(event) => onResizeMouseDown(event, handle)}
+                />
+              ))
+            : null}
         </div>
       )}
     </orca.components.ContextMenu>

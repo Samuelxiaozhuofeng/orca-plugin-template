@@ -32,7 +32,7 @@ export default function BoardPanel({ panelId, blockId }: Props) {
   const { blocks } = useSnapshot(orca.state);
   const block = blockId == null ? undefined : blocks[blockId];
   const serverCards = readCards(block);
-  const { cards, patchCard, commitCards } = useCardPersist(
+  const { cards, patchCards, commitCards } = useCardPersist(
     blockId ?? null,
     serverCards,
   );
@@ -66,18 +66,23 @@ export default function BoardPanel({ panelId, blockId }: Props) {
     };
   }, [blockId]);
 
-  const onMoveEnd = useCallback(
-    (cardBlockId: DbId, x: number, y: number) => {
-      patchCard(cardBlockId, { x, y });
+  const onRemoveCards = useCallback(
+    async (ids: DbId[]): Promise<boolean> => {
+      if (ids.length === 0) return true;
+      const drop = new Set(ids);
+      const next = cards.filter((card) => !drop.has(card.blockId));
+      const saved = await commitCards(next);
+      if (!saved) return false;
+      orca.notify(
+        "info",
+        t(
+          "Removed ${count} cards from the board. Journals themselves were not deleted.",
+          { count: String(ids.length) },
+        ),
+      );
+      return true;
     },
-    [patchCard],
-  );
-
-  const onResizeEnd = useCallback(
-    (cardBlockId: DbId, w: number, h: number) => {
-      patchCard(cardBlockId, { w, h });
-    },
-    [patchCard],
+    [cards, commitCards],
   );
 
   const confirmPlace = useCallback(
@@ -140,8 +145,8 @@ export default function BoardPanel({ panelId, blockId }: Props) {
         zoomLabelRef={zoomLabelRef}
         weekdayGuide={weekdayGuide}
         onViewChange={setView}
-        onMoveEnd={onMoveEnd}
-        onResizeEnd={onResizeEnd}
+        onPatchCards={patchCards}
+        onRemoveCards={onRemoveCards}
         onPlaceWeek={() => setPlaceOpen(true)}
         onViewportWidth={setViewportWidth}
       />

@@ -138,16 +138,25 @@ export function cardIntersectsViewport(
   );
 }
 
+function asIdSet(
+  alwaysInclude: DbId | Iterable<DbId> | null,
+): Set<DbId> | null {
+  if (alwaysInclude == null) return null;
+  if (typeof alwaysInclude === "number") return new Set([alwaysInclude]);
+  return new Set(alwaysInclude);
+}
+
 export function visibleCards<T extends WhiteboardCard>(
   cards: T[],
   view: CanvasView,
   viewport: { width: number; height: number },
-  alwaysInclude: DbId | null,
+  alwaysInclude: DbId | Iterable<DbId> | null,
 ): T[] {
   if (cards.length === 0) return cards;
+  const pinned = asIdSet(alwaysInclude);
   return cards.filter(
     (card) =>
-      (alwaysInclude != null && card.blockId === alwaysInclude) ||
+      (pinned != null && pinned.has(card.blockId)) ||
       cardIntersectsViewport(card, view, viewport),
   );
 }

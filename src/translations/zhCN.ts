@@ -49,6 +49,18 @@ const zhCN = {
   "Drag to resize": "拖动调整大小",
   "Fit content height": "适应内容高度",
   "Editor unavailable": "宿主编辑器不可用",
+  Arrange: "排列",
+  "Align left": "左对齐",
+  "Align horizontal centers": "水平居中对齐",
+  "Align right": "右对齐",
+  "Align top": "顶对齐",
+  "Align vertical centers": "垂直居中对齐",
+  "Align bottom": "底对齐",
+  "Distribute horizontally": "水平等距",
+  "Distribute vertically": "垂直等距",
+  "Tidy up to grid": "整理成网格",
+  "Removed ${count} cards from the board. Journals themselves were not deleted.":
+    "已从白板移除 ${count} 张卡片。只是从白板拿掉，日记本身没有被删除。",
 };
 
 export default zhCN;

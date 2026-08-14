@@ -143,12 +143,58 @@ const SHELL_CSS = `
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
-  cursor: grab;
+  cursor: default;
   background: var(--orca-color-bg-2);
+}
+
+.owb-viewport:focus {
+  outline: none;
+}
+
+.owb-viewport.is-space-pan {
+  cursor: grab;
 }
 
 .owb-viewport.is-panning {
   cursor: grabbing;
+}
+
+.owb-viewport.is-marqueeing {
+  cursor: crosshair;
+}
+
+.owb-marquee {
+  position: absolute;
+  z-index: 30;
+  box-sizing: border-box;
+  pointer-events: none;
+  background: color-mix(in oklab, var(--orca-color-primary-5) 10%, transparent);
+  box-shadow: inset 0 0 0 1px var(--orca-color-primary-5);
+}
+
+.owb-guides {
+  position: absolute;
+  inset: 0;
+  z-index: 25;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.owb-guide {
+  position: absolute;
+  background: color-mix(in oklab, var(--orca-color-primary-5) 55%, transparent);
+}
+
+.owb-guide-x {
+  top: 0;
+  width: 1px;
+  height: 100%;
+}
+
+.owb-guide-y {
+  left: 0;
+  width: 100%;
+  height: 1px;
 }
 
 .owb-grid {

@@ -45,6 +45,9 @@ export function useCardPersist(
 ): {
   cards: WhiteboardCard[];
   patchCard: (cardBlockId: DbId, patch: CardBoxPatch) => void;
+  patchCards: (
+    entries: ReadonlyArray<{ blockId: DbId; patch: CardBoxPatch }>,
+  ) => void;
   commitCards: (next: WhiteboardCard[]) => Promise<boolean>;
   flush: () => Promise<void>;
 } {
@@ -91,10 +94,17 @@ export function useCardPersist(
         return true;
       } catch (error) {
         if (box.blockId === id) {
-          box.pending = null;
-          box.dirty = false;
-          box.awaitingEcho = false;
-          show(box.baseline);
+          // A newer patch may have landed in `pending` while this write
+          // was in flight. Keep it so the queued flush can still run;
+          // only roll back when nothing newer is waiting.
+          if (box.pending == null) {
+            box.dirty = false;
+            box.awaitingEcho = false;
+            show(box.baseline);
+          } else {
+            box.dirty = true;
+            box.awaitingEcho = false;
+          }
           notifyWriteError(error);
         }
         return false;
@@ -127,15 +137,29 @@ export function useCardPersist(
     }, WRITE_DEBOUNCE_MS);
   }, [flushNow]);
 
-  const patchCard = useCallback(
-    (cardBlockId: DbId, patch: CardBoxPatch) => {
-      const next = boxRef.current.local.map((card: WhiteboardCard) =>
-        card.blockId === cardBlockId ? { ...card, ...patch } : card,
-      );
+  const patchCards = useCallback(
+    (entries: ReadonlyArray<{ blockId: DbId; patch: CardBoxPatch }>) => {
+      if (entries.length === 0) return;
+      const byId = new Map<DbId, CardBoxPatch>();
+      for (const entry of entries) {
+        const prev = byId.get(entry.blockId);
+        byId.set(entry.blockId, prev == null ? entry.patch : { ...prev, ...entry.patch });
+      }
+      const next = boxRef.current.local.map((card: WhiteboardCard) => {
+        const patch = byId.get(card.blockId);
+        return patch == null ? card : { ...card, ...patch };
+      });
       show(next);
       scheduleWrite();
     },
     [scheduleWrite, show],
+  );
+
+  const patchCard = useCallback(
+    (cardBlockId: DbId, patch: CardBoxPatch) => {
+      patchCards([{ blockId: cardBlockId, patch }]);
+    },
+    [patchCards],
   );
 
   const commitCards = useCallback(
@@ -196,5 +220,5 @@ export function useCardPersist(
     }
   }, [serverCards, show]);
 
-  return { cards, patchCard, commitCards, flush: flushNow };
+  return { cards, patchCard, patchCards, commitCards, flush: flushNow };
 }

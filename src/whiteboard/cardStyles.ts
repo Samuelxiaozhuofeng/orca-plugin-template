@@ -5,7 +5,7 @@ export const CARD_CSS = `
   flex-direction: column;
   box-sizing: border-box;
   overflow: hidden;
-  cursor: default;
+  cursor: grab;
   background: var(--orca-color-bg-1);
   border: none;
   border-radius: var(--owb-radius-card);
@@ -17,11 +17,20 @@ export const CARD_CSS = `
     transform var(--owb-duration) var(--owb-ease);
 }
 
-.owb-card:hover:not(.is-dragging):not(.is-resizing) {
+.owb-card:not(.is-editing) {
+  user-select: none;
+}
+
+.owb-card:hover:not(.is-dragging):not(.is-resizing):not(.is-selected):not(.is-editing):not(.is-marquee-hit) {
   transform: translateY(-1px);
   box-shadow:
     var(--owb-shadow-hover),
     0 0 0 1px var(--orca-color-border);
+}
+
+.owb-card.is-selected:hover:not(.is-dragging):not(.is-editing),
+.owb-card.is-editing:hover:not(.is-dragging) {
+  transform: translateY(-1px);
 }
 
 .owb-card.is-dragging {
@@ -38,11 +47,29 @@ export const CARD_CSS = `
   transition: none;
 }
 
-.owb-card.is-editing {
+.owb-card.is-selected:not(.is-editing):not(.is-dragging):not(.is-resizing) {
+  z-index: 2;
+  box-shadow:
+    var(--owb-shadow-hover),
+    0 0 0 2px color-mix(in oklab, var(--orca-color-primary-5) 70%, transparent),
+    0 0 0 6px color-mix(in oklab, var(--orca-color-primary-5) 16%, transparent);
+}
+
+.owb-card.is-marquee-hit:not(.is-selected):not(.is-editing) {
+  box-shadow:
+    var(--owb-shadow-rest),
+    0 0 0 2px color-mix(in oklab, var(--orca-color-primary-5) 45%, transparent);
+}
+
+.owb-card.is-editing:not(.is-dragging):not(.is-resizing) {
   z-index: 3;
   box-shadow:
     var(--owb-shadow-hover),
     0 0 0 2px var(--orca-color-primary-5);
+}
+
+.owb-card.is-editing .owb-card-body {
+  cursor: text;
 }
 
 .owb-card-title {
@@ -175,34 +202,65 @@ export const CARD_CSS = `
   word-break: break-word;
 }
 
-.owb-card-resize {
+.owb-card-handle {
   position: absolute;
-  right: 2px;
-  bottom: 2px;
-  width: 16px;
-  height: 16px;
-  cursor: nwse-resize;
+  z-index: 5;
+  box-sizing: border-box;
+  background: var(--orca-color-bg-1);
+  box-shadow: 0 0 0 1px var(--orca-color-primary-5);
+  border-radius: 2px;
   opacity: 0;
+  pointer-events: none;
   transition: opacity var(--owb-duration) var(--owb-ease);
-  background:
-    linear-gradient(
-      135deg,
-      transparent 0 52%,
-      var(--orca-color-text-3) 52% 58%,
-      transparent 58% 72%,
-      var(--orca-color-text-3) 72% 78%,
-      transparent 78%
-    );
 }
 
-.owb-card:hover .owb-card-resize {
-  opacity: 0.5;
+.owb-card:hover .owb-card-handle,
+.owb-card.is-selected .owb-card-handle,
+.owb-card.is-resizing .owb-card-handle {
+  opacity: 0.85;
+  pointer-events: auto;
 }
 
-.owb-card .owb-card-resize:hover,
-.owb-card.is-resizing .owb-card-resize {
+.owb-card .owb-card-handle:hover,
+.owb-card.is-resizing .owb-card-handle {
   opacity: 1;
 }
+
+.owb-card-handle-n,
+.owb-card-handle-s {
+  left: 50%;
+  width: 16px;
+  height: 8px;
+  margin-left: -8px;
+  cursor: ns-resize;
+}
+
+.owb-card-handle-e,
+.owb-card-handle-w {
+  top: 50%;
+  width: 8px;
+  height: 16px;
+  margin-top: -8px;
+  cursor: ew-resize;
+}
+
+.owb-card-handle-n { top: 2px; }
+.owb-card-handle-s { bottom: 2px; }
+.owb-card-handle-e { right: 2px; }
+.owb-card-handle-w { left: 2px; }
+
+.owb-card-handle-ne,
+.owb-card-handle-nw,
+.owb-card-handle-se,
+.owb-card-handle-sw {
+  width: 8px;
+  height: 8px;
+}
+
+.owb-card-handle-ne { top: 2px; right: 2px; cursor: nesw-resize; }
+.owb-card-handle-nw { top: 2px; left: 2px; cursor: nwse-resize; }
+.owb-card-handle-se { bottom: 2px; right: 2px; cursor: nwse-resize; }
+.owb-card-handle-sw { bottom: 2px; left: 2px; cursor: nesw-resize; }
 
 .owb-card-editor,
 .owb-card-editor .orca-panel,
