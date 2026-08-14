@@ -6,7 +6,6 @@ import {
   type WhiteboardCard,
 } from "./data";
 import type { CardBox } from "./edgeGeometry";
-import type { Side } from "./edges";
 import type { ArrangeAction } from "./selection";
 import type { CardPatchEntry } from "./useCanvasPointer";
 import type { EdgeLayerApi } from "./EdgeLayer";
@@ -108,16 +107,17 @@ export function CanvasCards({
           }
           onArrange={applyArrange}
           onMoveFrame={onMoveFrame}
-          onAnchorMouseDown={(
+          onStartConnect={(
             card: WhiteboardCard,
-            side: Side,
-            event: React.MouseEvent<HTMLDivElement>,
+            event: React.MouseEvent,
+            mode: "drag" | "click",
           ) => {
             edgeApiRef.current?.startDraw(
               card,
-              side,
+              undefined,
               event.clientX,
               event.clientY,
+              mode === "click" ? "mousedown" : "mouseup",
             );
           }}
           promotedKey={promotedKey}

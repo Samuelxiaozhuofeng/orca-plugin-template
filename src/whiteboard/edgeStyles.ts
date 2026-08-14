@@ -67,6 +67,11 @@ export const EDGE_CSS = `
   stroke-linecap: round;
   pointer-events: none;
   vector-effect: non-scaling-stroke;
+  animation: owb-edge-ghost-flow 0.6s linear infinite;
+}
+
+@keyframes owb-edge-ghost-flow {
+  to { stroke-dashoffset: -11; }
 }
 
 .owb-edge-handle {
@@ -161,42 +166,6 @@ export const EDGE_CSS = `
   border-color: var(--orca-color-primary-5, #00a896);
   box-shadow: 2px 2px 0px 0px var(--orca-color-border);
 }
-
-.owb-card-anchors {
-  position: absolute;
-  inset: 0;
-  z-index: 6;
-  pointer-events: none;
-}
-
-.owb-card-anchor {
-  position: absolute;
-  width: 10px;
-  height: 10px;
-  margin: -5px 0 0 -5px;
-  border-radius: 50%;
-  box-sizing: border-box;
-  background: var(--orca-color-bg-1);
-  box-shadow: 0 0 0 1.5px var(--orca-color-primary-5, #00a896);
-  opacity: 0;
-  pointer-events: none;
-  cursor: crosshair;
-  transition: opacity var(--owb-duration) var(--owb-ease);
-}
-
-.owb-card:hover:not(.is-editing):not(.is-dragging):not(.is-resizing) .owb-card-anchor {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.owb-card.is-editing .owb-card-anchors {
-  display: none;
-}
-
-.owb-card-anchor-t { top: 0; left: 50%; }
-.owb-card-anchor-r { top: 50%; left: 100%; }
-.owb-card-anchor-b { top: 100%; left: 50%; }
-.owb-card-anchor-l { top: 50%; left: 0; }
 
 .owb-card.is-edge-target:not(.is-editing) {
   border-color: var(--orca-color-primary-5, #00a896);

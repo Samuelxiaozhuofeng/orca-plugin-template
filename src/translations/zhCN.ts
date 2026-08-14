@@ -80,6 +80,7 @@ const zhCN = {
   Editing: "编辑中",
   "Drag to resize": "拖动调整大小",
   "Fit content height": "适应内容高度",
+  "Connect to another card": "连到其他卡片",
   "Open in side panel": "在侧边面板打开",
   "Open in this panel": "在当前面板打开",
   "Locate on whiteboard": "在白板上定位",

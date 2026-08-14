@@ -24,7 +24,13 @@ import type { ReferenceEdge } from "./edgeRefs";
 const { useLayoutEffect, useRef } = window.React;
 
 export type EdgeLayerApi = {
-  startDraw: (card: WhiteboardCard, side: Side, clientX: number, clientY: number) => void;
+  startDraw: (
+    card: WhiteboardCard,
+    side: Side | undefined,
+    clientX: number,
+    clientY: number,
+    finishOn?: "mouseup" | "mousedown",
+  ) => void;
   onFrame: (boxes: Map<DbId, CardBox>) => void;
   clearGhost: () => void;
 };
@@ -212,9 +218,10 @@ export function useEdgeLayerApi(opts: {
   useLayoutEffect(() => {
     const startDraw = (
       card: WhiteboardCard,
-      side: Side,
+      side: Side | undefined,
       clientX: number,
       clientY: number,
+      finishOn?: "mouseup" | "mousedown",
     ) => {
       const canvas = canvasRef.current;
       const ghost = ghostRef.current;
@@ -240,19 +247,18 @@ export function useEdgeLayerApi(opts: {
               pairKey(edge.from, edge.to),
             ),
           ),
+        finishOn,
         onComplete: (toId, fromSide) => {
           dismissDrawRef.current = null;
           const current = edgesRef.current;
-          void commitRef.current([
-            ...current,
-            {
-              id: nextEdgeId(card.blockId, toId, current),
-              from: card.blockId,
-              to: toId,
-              arrow: "end",
-              fromSide,
-            },
-          ]);
+          const next: WhiteboardEdge = {
+            id: nextEdgeId(card.blockId, toId, current),
+            from: card.blockId,
+            to: toId,
+            arrow: "end",
+          };
+          if (fromSide != null) next.fromSide = fromSide;
+          void commitRef.current([...current, next]);
         },
         onCancel: () => {
           dismissDrawRef.current = null;

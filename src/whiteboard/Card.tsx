@@ -16,7 +16,6 @@ import {
   openCardInThisPanel,
 } from "./CardToolbar";
 import { MIN_CARD_HEIGHT, type WhiteboardCard } from "./data";
-import type { Side } from "./edges";
 import type { ArrangeAction } from "./selection";
 import { isHostOverlayTarget } from "./hostOverlay";
 import { useCardBlockView } from "./blockWatch";
@@ -26,8 +25,6 @@ import {
   blockIdFromCardEventTarget,
   isExtractPointerTarget,
 } from "./cardExtractDrag";
-
-const ANCHOR_SIDES: Side[] = ["t", "r", "b", "l"];
 
 const { useEffect, useLayoutEffect, useRef } = window.React;
 const { useSnapshot } = window.Valtio;
@@ -54,10 +51,10 @@ type Props = {
   ) => void;
   onArrange: (action: ArrangeAction) => void;
   onSelectOnly: (blockId: DbId) => void;
-  onAnchorMouseDown: (
+  onStartConnect: (
     card: WhiteboardCard,
-    side: Side,
-    event: React.MouseEvent<HTMLDivElement>,
+    event: React.MouseEvent,
+    mode: "drag" | "click",
   ) => void;
   onMoveFrame?: (boxes: Map<DbId, { x: number; y: number; w: number; h: number }>) => void;
   promotedKey?: string;
@@ -167,7 +164,7 @@ export function Card({
   onPatchCard,
   onArrange,
   onSelectOnly,
-  onAnchorMouseDown,
+  onStartConnect,
   onMoveFrame,
   promotedKey = "",
   onExtractRow,
@@ -224,7 +221,6 @@ export function Card({
     const target = event.target as HTMLElement | null;
     if (target?.closest(".owb-card-handle") && event.button === 0) return;
     if (isExtractPointerTarget(target)) return;
-    if (target?.closest(".owb-card-anchor")) return;
     if (target?.closest(".owb-card-floating-toolbar")) return;
     if (editing && target?.closest(".owb-card-body")) return;
     if (isOnCardScrollbar(event.target, event.clientX, event.clientY)) return;
@@ -382,6 +378,7 @@ export function Card({
             card={card}
             fitContentHeight={fitContentHeight}
             onPatchCard={onPatchCard}
+            onStartConnect={onStartConnect}
           />
           <CardTitle card={card} editing={editing} />
           <div
@@ -415,21 +412,6 @@ export function Card({
                 />
               ))
             : null}
-          <div className="owb-card-anchors">
-            {ANCHOR_SIDES.map((side) => (
-              <div
-                key={side}
-                className={`owb-card-anchor owb-card-anchor-${side}`}
-                data-side={side}
-                onMouseDown={(event) => {
-                  if (event.button !== 0) return;
-                  event.preventDefault();
-                  event.stopPropagation();
-                  onAnchorMouseDown(card, side, event);
-                }}
-              />
-            ))}
-          </div>
         </div>
       )}
     </orca.components.ContextMenu>

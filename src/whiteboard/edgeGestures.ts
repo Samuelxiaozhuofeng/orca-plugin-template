@@ -108,7 +108,7 @@ export type DrawDropEmpty = {
   clientY: number;
   world: { x: number; y: number };
   fromId: DbId;
-  fromSide: Side;
+  fromSide?: Side;
 };
 
 type TrackedGesture = {
@@ -151,24 +151,28 @@ export function abortEdgeGestures(root: object | null | undefined): void {
 
 export function startDrawEdge(opts: {
   fromId: DbId;
-  fromSide: Side;
+  fromSide?: Side;
   fromBox: CardBox;
   cards: () => readonly BoxedCard[];
   canvas: HTMLElement;
   ghost: SVGPathElement;
   pointerToWorld: (clientX: number, clientY: number) => { x: number; y: number };
   occupiedPairs: () => ReadonlySet<string>;
-  onComplete: (toId: DbId, fromSide: Side) => void;
+  onComplete: (toId: DbId, fromSide?: Side) => void;
   onCancel: () => void;
   onDropEmpty: (drop: DrawDropEmpty) => void;
+  finishOn?: "mouseup" | "mousedown";
 }): { dismiss: () => void } {
+  const finishOn = opts.finishOn ?? "mouseup";
   let live = true;
+  let ignoreFirstUp = finishOn === "mousedown";
   opts.canvas.classList.add("is-drawing-edge");
   setGhostPath(opts.ghost, "");
 
   const detach = () => {
     window.removeEventListener("mousemove", onMove);
     window.removeEventListener("mouseup", onUp);
+    window.removeEventListener("mousedown", onDown, true);
     window.removeEventListener("keydown", onKey, true);
   };
 
@@ -179,6 +183,9 @@ export function startDrawEdge(opts: {
       detach();
       clearTargets(opts.canvas);
       opts.canvas.classList.remove("is-drawing-edge");
+      opts.canvas
+        .querySelectorAll(".owb-card-tb-btn.is-connecting")
+        .forEach((el) => el.classList.remove("is-connecting"));
     }
     if (clearGhost) setGhostPath(opts.ghost, "");
   };
@@ -207,12 +214,7 @@ export function startDrawEdge(opts: {
     setGhostPath(opts.ghost, curve.d);
   };
 
-  const onMove = (event: MouseEvent) => {
-    if (!live) return;
-    paint(event.clientX, event.clientY);
-  };
-
-  const onUp = (event: MouseEvent) => {
+  const finish = (event: MouseEvent) => {
     if (!live) return;
     const world = opts.pointerToWorld(event.clientX, event.clientY);
     const cards = opts.cards();
@@ -247,6 +249,28 @@ export function startDrawEdge(opts: {
     opts.onComplete(hit, opts.fromSide);
   };
 
+  const onMove = (event: MouseEvent) => {
+    if (!live) return;
+    paint(event.clientX, event.clientY);
+  };
+
+  const onUp = (event: MouseEvent) => {
+    if (!live) return;
+    if (finishOn === "mousedown") {
+      if (ignoreFirstUp) ignoreFirstUp = false;
+      return;
+    }
+    finish(event);
+  };
+
+  const onDown = (event: MouseEvent) => {
+    if (!live || finishOn !== "mousedown") return;
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    finish(event);
+  };
+
   const onKey = (event: KeyboardEvent) => {
     if (!live) return;
     if (event.key !== "Escape") return;
@@ -258,6 +282,9 @@ export function startDrawEdge(opts: {
 
   window.addEventListener("mousemove", onMove);
   window.addEventListener("mouseup", onUp);
+  if (finishOn === "mousedown") {
+    window.addEventListener("mousedown", onDown, true);
+  }
   window.addEventListener("keydown", onKey, true);
   return { dismiss: () => cleanup(true) };
 }

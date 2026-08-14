@@ -1,4 +1,4 @@
-/** Styles for the card colour themes, floating toolbar and edge anchors. */
+/** Styles for the card colour themes and floating toolbar. */
 export const CARD_CHROME_CSS = `
 /* Card Color Themes (Traditional Chinese Mineral Pigments) */
 .owb-card.owb-card-theme-blue {
@@ -84,6 +84,24 @@ export const CARD_CHROME_CSS = `
   box-shadow: none;
 }
 
+.owb-card-tb-btn.is-connecting {
+  background: var(--orca-color-primary-5, #00a896);
+  color: #111417;
+  border-color: var(--orca-color-border);
+  box-shadow: 1.5px 1.5px 0px 0px var(--orca-color-border);
+  animation: owb-tb-connecting 1.2s ease-in-out infinite;
+}
+
+.owb-card:has(.owb-card-tb-btn.is-connecting) .owb-card-floating-toolbar {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+@keyframes owb-tb-connecting {
+  50% { opacity: 0.72; }
+}
+
 .owb-card-tb-popover-wrapper {
   position: relative;
 }
@@ -125,40 +143,4 @@ export const CARD_CHROME_CSS = `
   box-shadow: 0 0 0 2px var(--orca-color-primary-5, #00a896), 2px 2px 0px 0px var(--orca-color-border);
   transform: scale(1.15);
 }
-
-/* Connection Anchor Dots with Neobrutalist Frame */
-.owb-card-anchor {
-  position: absolute;
-  z-index: 12;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--orca-color-primary-5, #00a896);
-  border: 1.5px solid var(--orca-color-border);
-  box-shadow: 1.5px 1.5px 0px 0px var(--orca-color-border);
-  opacity: 0;
-  transform: scale(0.7);
-  transition: opacity var(--owb-duration) var(--owb-ease),
-              transform var(--owb-duration) var(--owb-ease),
-              box-shadow var(--owb-duration) var(--owb-ease);
-  cursor: pointer;
-}
-
-.owb-card:hover .owb-card-anchor,
-.owb-card.is-selected .owb-card-anchor {
-  opacity: 1;
-  transform: scale(1);
-}
-
-.owb-card-anchor:hover {
-  opacity: 1 !important;
-  transform: scale(1.4) !important;
-  background: var(--orca-color-warning-5, #f4a259);
-  box-shadow: 2px 2px 0px 0px var(--orca-color-border) !important;
-}
-
-.owb-card-anchor-t { top: -5px; left: 50%; margin-left: -5px; }
-.owb-card-anchor-r { top: 50%; right: -5px; margin-top: -5px; }
-.owb-card-anchor-b { bottom: -5px; left: 50%; margin-left: -5px; }
-.owb-card-anchor-l { top: 50%; left: -5px; margin-top: -5px; }
 `.trim();

@@ -29,10 +29,13 @@ export const COLOR_PRESETS = [
   { id: "purple", label: "Purple", bg: "rgba(168, 85, 247, 0.18)" },
 ];
 
+const CONNECT_DRAG_PX = 4;
+
 export function CardToolbar({
   card,
   fitContentHeight,
   onPatchCard,
+  onStartConnect,
 }: {
   card: WhiteboardCard;
   fitContentHeight: () => void;
@@ -40,9 +43,16 @@ export function CardToolbar({
     blockId: DbId,
     patch: { x?: number; y?: number; w?: number; h?: number; color?: string },
   ) => void;
+  onStartConnect: (
+    card: WhiteboardCard,
+    event: React.MouseEvent,
+    mode: "drag" | "click",
+  ) => void;
 }) {
   const [colorMenuOpen, setColorMenuOpen] = window.React.useState(false);
   const popoverRef = useRef<HTMLDivElement | null>(null);
+  const connectBtnRef = useRef<HTMLButtonElement | null>(null);
+  const connectTrackRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (!colorMenuOpen) return;
@@ -61,6 +71,52 @@ export function CardToolbar({
       document.removeEventListener("keydown", onKey);
     };
   }, [colorMenuOpen]);
+
+  useEffect(() => {
+    return () => {
+      connectTrackRef.current?.();
+      connectTrackRef.current = null;
+    };
+  }, []);
+
+  const onConnectMouseDown = (event: React.MouseEvent<HTMLButtonElement>) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    connectTrackRef.current?.();
+    const originX = event.clientX;
+    const originY = event.clientY;
+    let fired = false;
+    const startEvent = event;
+
+    const fire = (mode: "drag" | "click") => {
+      if (fired) return;
+      fired = true;
+      detach();
+      onStartConnect(card, startEvent, mode);
+      // After startDraw: a previous session's cleanup would strip this class.
+      if (mode === "click") {
+        connectBtnRef.current?.classList.add("is-connecting");
+      }
+    };
+
+    const onMove = (move: MouseEvent) => {
+      if (Math.hypot(move.clientX - originX, move.clientY - originY) <= CONNECT_DRAG_PX) {
+        return;
+      }
+      fire("drag");
+    };
+    const onUp = () => fire("click");
+    const detach = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      if (connectTrackRef.current === detach) connectTrackRef.current = null;
+    };
+
+    connectTrackRef.current = detach;
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
 
   return (
     <div
@@ -82,6 +138,15 @@ export function CardToolbar({
         onClick={fitContentHeight}
       >
         <i className="ti ti-arrows-vertical" />
+      </button>
+      <button
+        type="button"
+        ref={connectBtnRef}
+        className="owb-card-tb-btn"
+        title={t("Connect to another card")}
+        onMouseDown={onConnectMouseDown}
+      >
+        <i className="ti ti-arrow-up-right" />
       </button>
       <div className="owb-card-tb-popover-wrapper" ref={popoverRef}>
         <button
