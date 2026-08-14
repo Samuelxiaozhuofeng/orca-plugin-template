@@ -1,5 +1,6 @@
 import type { Block, DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n";
+import { emitBoardCardsChanged } from "./boardEvents";
 import {
   CARD_HEIGHT,
   CARD_WIDTH,
@@ -196,4 +197,5 @@ export async function writeCards(
   }
 
   orca.broadcasts.broadcast("orca.refresh-blocks", [blockId]);
+  emitBoardCardsChanged(blockId);
 }

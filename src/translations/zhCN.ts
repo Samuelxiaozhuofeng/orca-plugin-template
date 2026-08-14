@@ -70,6 +70,11 @@ const zhCN = {
   "Open in side panel": "在侧边面板打开",
   "Open in this panel": "在当前面板打开",
   "Locate on whiteboard": "在白板上定位",
+  'On the "${name}" whiteboard': "在「${name}」白板上",
+  "On ${count} whiteboards": "在 ${count} 块白板上",
+  "Mark outline blocks already on a whiteboard": "在大纲里标记已上白板的块",
+  "Show a small mark next to outline rows that already have a card on a whiteboard.":
+    "已做成白板卡片的大纲行右侧会显示小标记。",
   "This block is not on any whiteboard yet": "这个块还不在任何白板上",
   "This card is no longer on the board": "这张卡片已经不在白板上了",
   "On this board": "在这块白板上",

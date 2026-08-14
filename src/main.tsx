@@ -3,10 +3,12 @@ import zhCN from "./translations/zhCN";
 import {
   AddToBoardMenuItem,
   addToBoardCommandId,
+  locateBlockOnWhiteboard,
   LocateOnBoardMenuItem,
   locateOnBoardCommandId,
   mountAddToBoardHost,
 } from "./whiteboard/addToBoard";
+import { startBlockMarks, stopBlockMarks } from "./whiteboard/blockMarks";
 import { clearAllPendingCardFocus } from "./whiteboard/cardFocus";
 import BoardBlock from "./whiteboard/BoardBlock";
 import BoardPanel from "./whiteboard/BoardPanel";
@@ -32,6 +34,8 @@ let unmountAddToBoard: (() => void) | null = null;
 
 const INSERT_COMMAND = "insertWhiteboard";
 const INSERT_SLASH = "insertWhiteboardSlash";
+const LOCATE_COMMAND = "locateBlockOnWhiteboard";
+const LOCATE_SHORTCUT = "alt+shift+w";
 
 function commandId(name: string): string {
   return `${pluginName}.${name}`;
@@ -89,6 +93,25 @@ export async function load(_name: string) {
     command: commandId(INSERT_COMMAND),
   });
 
+  const locateId = commandId(LOCATE_COMMAND);
+  orca.commands.registerEditorCommand(
+    locateId,
+    ([_panelId, _rootBlockId, cursor]) => {
+      const blockId = cursor?.anchor.blockId;
+      if (blockId == null) {
+        orca.notify("warn", t("Place the cursor first"));
+        return null;
+      }
+      void locateBlockOnWhiteboard(blockId);
+      return null;
+    },
+    () => {},
+    { label: t("Locate on whiteboard") },
+  );
+  void assignLocateShortcutIfFree(locateId);
+
+  startBlockMarks(pluginName);
+
   orca.blockMenuCommands.registerBlockMenuCommand(
     addToBoardCommandId(pluginName),
     {
@@ -120,6 +143,7 @@ export async function unload() {
   orca.converters.unregisterBlock("plain", WHITEBOARD_TYPE);
   if (pluginName) {
     orca.commands.unregisterEditorCommand(commandId(INSERT_COMMAND));
+    orca.commands.unregisterEditorCommand(commandId(LOCATE_COMMAND));
     orca.slashCommands.unregisterSlashCommand(commandId(INSERT_SLASH));
     orca.blockMenuCommands.unregisterBlockMenuCommand(
       addToBoardCommandId(pluginName),
@@ -131,5 +155,28 @@ export async function unload() {
   unmountAddToBoard?.();
   unmountAddToBoard = null;
   clearAllPendingCardFocus();
+  stopBlockMarks();
   removeWhiteboardStyles();
+}
+
+function assignLocateShortcutIfFree(locateId: string): Promise<void> {
+  const shortcuts = orca.state.shortcuts;
+  if (locateShortcutTaken(shortcuts, locateId)) return Promise.resolve();
+  return orca.shortcuts.assign(LOCATE_SHORTCUT, locateId).catch((err: unknown) => {
+    console.error("[whiteboard] failed to assign locate shortcut", err);
+  });
+}
+
+function locateShortcutTaken(
+  shortcuts: Record<string, string | undefined>,
+  locateId: string,
+): boolean {
+  const bound = shortcuts[LOCATE_SHORTCUT];
+  if (bound != null && bound !== "") return true;
+  for (const [key, value] of Object.entries(shortcuts)) {
+    if (key === locateId && value != null && value !== "") return true;
+    if (value === locateId) return true;
+    if (value === LOCATE_SHORTCUT) return true;
+  }
+  return false;
 }

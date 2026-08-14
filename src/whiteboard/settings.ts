@@ -9,12 +9,14 @@ export type WhiteboardSettings = {
   mouseScheme: MouseScheme;
   showAlignGuides: boolean;
   showReferenceEdges: boolean;
+  markOutlineBlocks: boolean;
 };
 
 const DEFAULTS: WhiteboardSettings = {
   mouseScheme: "standard",
   showAlignGuides: false,
   showReferenceEdges: true,
+  markOutlineBlocks: true,
 };
 
 let pluginName = "";
@@ -61,6 +63,14 @@ export function whiteboardSettingsSchema(): PluginSettingsSchema {
       type: "boolean",
       defaultValue: DEFAULTS.showReferenceEdges,
     },
+    markOutlineBlocks: {
+      label: t("Mark outline blocks already on a whiteboard"),
+      description: t(
+        "Show a small mark next to outline rows that already have a card on a whiteboard.",
+      ),
+      type: "boolean",
+      defaultValue: DEFAULTS.markOutlineBlocks,
+    },
   };
 }
 
@@ -71,6 +81,7 @@ export function readWhiteboardSettings(
     mouseScheme: raw?.mouseScheme === "rightDrag" ? "rightDrag" : "standard",
     showAlignGuides: raw?.showAlignGuides === true,
     showReferenceEdges: raw?.showReferenceEdges !== false,
+    markOutlineBlocks: raw?.markOutlineBlocks !== false,
   };
 }
 
