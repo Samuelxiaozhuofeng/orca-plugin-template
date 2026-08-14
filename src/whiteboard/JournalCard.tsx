@@ -6,20 +6,24 @@ import {
   MIN_CARD_HEIGHT,
   type WhiteboardCard,
 } from "./data";
+import { cachedBlockPlainText, cardExcerpt } from "./viewTransform";
 
-const { useEffect, useRef, useState } = window.React;
+const { useEffect, useLayoutEffect, useRef } = window.React;
 const { useSnapshot } = window.Valtio;
 
 type Props = {
   panelId: string;
   card: WhiteboardCard;
-  scale: number;
+  degraded: boolean;
   editing: boolean;
+  pointerToWorld: (clientX: number, clientY: number) => { x: number; y: number };
   onStartEdit: (blockId: DbId) => void;
   onEndEdit: () => void;
-  onMoveEnd: (blockId: DbId, x: number, y: number) => Promise<void>;
-  onResizeEnd: (blockId: DbId, w: number, h: number) => Promise<void>;
+  onMoveEnd: (blockId: DbId, x: number, y: number) => void;
+  onResizeEnd: (blockId: DbId, w: number, h: number) => void;
 };
+
+type CardBox = { x: number; y: number; w: number; h: number };
 
 function JournalEditor({ blockId }: { blockId: DbId }) {
   const { panelRenderers } = useSnapshot(orca.state);
@@ -43,24 +47,44 @@ function JournalEditor({ blockId }: { blockId: DbId }) {
   );
 }
 
+function applyCardBox(el: HTMLElement | null, box: CardBox): void {
+  if (el == null) return;
+  el.style.left = `${box.x}px`;
+  el.style.top = `${box.y}px`;
+  el.style.width = `${box.w}px`;
+  el.style.height = `${box.h}px`;
+}
+
 export function JournalCard({
   panelId,
   card,
-  scale,
+  degraded,
   editing,
+  pointerToWorld,
   onStartEdit,
   onEndEdit,
   onMoveEnd,
   onResizeEnd,
 }: Props) {
   const cardRef = useRef<HTMLDivElement | null>(null);
-  const [draft, setDraft] = useState<{ x: number; y: number } | null>(null);
-  const [size, setSize] = useState<{ w: number; h: number } | null>(null);
-  const x = draft?.x ?? card.x;
-  const y = draft?.y ?? card.y;
-  const w = size?.w ?? card.w;
-  const h = size?.h ?? card.h;
-  const zoom = scale === 0 ? 1 : scale;
+  const liveRef = useRef<CardBox>({
+    x: card.x,
+    y: card.y,
+    w: card.w,
+    h: card.h,
+  });
+  const draggingRef = useRef(false);
+  const resizingRef = useRef(false);
+  const rafRef = useRef(0);
+  const listenersRef = useRef<{
+    move: ((event: MouseEvent) => void) | null;
+    up: ((event: MouseEvent) => void) | null;
+  }>({ move: null, up: null });
+
+  if (!draggingRef.current && !resizingRef.current) {
+    liveRef.current = { x: card.x, y: card.y, w: card.w, h: card.h };
+  }
+
   const { blocks } = useSnapshot(orca.state);
   const journal = blocks[card.blockId];
   const isEmptyJournal =
@@ -68,6 +92,24 @@ export function JournalCard({
     !(typeof journal.text === "string" && journal.text.trim().length > 0) &&
     (journal.children?.length ?? 0) === 0;
   const dateMeta = cardDateMeta(card.date);
+  const excerpt = cardExcerpt(cachedBlockPlainText(card.blockId, blocks));
+
+  useLayoutEffect(() => {
+    const el = cardRef.current;
+    if (el == null) return;
+    applyCardBox(el, liveRef.current);
+    el.classList.toggle("is-dragging", draggingRef.current);
+    el.classList.toggle("is-resizing", resizingRef.current);
+  });
+
+  useEffect(() => {
+    return () => {
+      if (rafRef.current !== 0) window.cancelAnimationFrame(rafRef.current);
+      const { move, up } = listenersRef.current;
+      if (move) window.removeEventListener("mousemove", move);
+      if (up) window.removeEventListener("mouseup", up);
+    };
+  }, []);
 
   useEffect(() => {
     if (!editing) return;
@@ -87,38 +129,60 @@ export function JournalCard({
     };
   }, [editing, onEndEdit]);
 
+  const paintBox = () => {
+    if (rafRef.current !== 0) return;
+    rafRef.current = window.requestAnimationFrame(() => {
+      rafRef.current = 0;
+      applyCardBox(cardRef.current, liveRef.current);
+    });
+  };
+
+  const detachPointer = () => {
+    const { move, up } = listenersRef.current;
+    if (move) window.removeEventListener("mousemove", move);
+    if (up) window.removeEventListener("mouseup", up);
+    listenersRef.current = { move: null, up: null };
+    if (rafRef.current !== 0) {
+      window.cancelAnimationFrame(rafRef.current);
+      rafRef.current = 0;
+    }
+  };
+
   const onTitleMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
     event.preventDefault();
     event.stopPropagation();
 
-    const originX = x;
-    const originY = y;
-    const startX = event.clientX;
-    const startY = event.clientY;
+    const originX = liveRef.current.x;
+    const originY = liveRef.current.y;
+    const start = pointerToWorld(event.clientX, event.clientY);
+    draggingRef.current = true;
+    cardRef.current?.classList.add("is-dragging");
 
     const onMove = (moveEvent: MouseEvent) => {
-      setDraft({
-        x: originX + (moveEvent.clientX - startX) / zoom,
-        y: originY + (moveEvent.clientY - startY) / zoom,
-      });
+      const now = pointerToWorld(moveEvent.clientX, moveEvent.clientY);
+      liveRef.current = {
+        ...liveRef.current,
+        x: originX + now.x - start.x,
+        y: originY + now.y - start.y,
+      };
+      paintBox();
     };
 
     const onUp = (upEvent: MouseEvent) => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
-      const nextX = originX + (upEvent.clientX - startX) / zoom;
-      const nextY = originY + (upEvent.clientY - startY) / zoom;
-      if (nextX === card.x && nextY === card.y) {
-        setDraft(null);
-        return;
-      }
-      setDraft({ x: nextX, y: nextY });
-      void onMoveEnd(card.blockId, nextX, nextY).finally(() => {
-        setDraft(null);
-      });
+      detachPointer();
+      draggingRef.current = false;
+      cardRef.current?.classList.remove("is-dragging");
+      const now = pointerToWorld(upEvent.clientX, upEvent.clientY);
+      const nextX = originX + now.x - start.x;
+      const nextY = originY + now.y - start.y;
+      liveRef.current = { ...liveRef.current, x: nextX, y: nextY };
+      applyCardBox(cardRef.current, liveRef.current);
+      if (nextX === card.x && nextY === card.y) return;
+      onMoveEnd(card.blockId, nextX, nextY);
     };
 
+    listenersRef.current = { move: onMove, up: onUp };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
   };
@@ -128,37 +192,37 @@ export function JournalCard({
     event.preventDefault();
     event.stopPropagation();
 
-    const originW = w;
-    const originH = h;
-    const startX = event.clientX;
-    const startY = event.clientY;
+    const originW = liveRef.current.w;
+    const originH = liveRef.current.h;
+    const start = pointerToWorld(event.clientX, event.clientY);
+    resizingRef.current = true;
+    cardRef.current?.classList.add("is-resizing");
 
     const onMove = (moveEvent: MouseEvent) => {
-      setSize(
-        clampCardSize(
-          originW + (moveEvent.clientX - startX) / zoom,
-          originH + (moveEvent.clientY - startY) / zoom,
-        ),
-      );
+      const now = pointerToWorld(moveEvent.clientX, moveEvent.clientY);
+      liveRef.current = {
+        ...liveRef.current,
+        ...clampCardSize(originW + now.x - start.x, originH + now.y - start.y),
+      };
+      paintBox();
     };
 
     const onUp = (upEvent: MouseEvent) => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
+      detachPointer();
+      resizingRef.current = false;
+      cardRef.current?.classList.remove("is-resizing");
+      const now = pointerToWorld(upEvent.clientX, upEvent.clientY);
       const next = clampCardSize(
-        originW + (upEvent.clientX - startX) / zoom,
-        originH + (upEvent.clientY - startY) / zoom,
+        originW + now.x - start.x,
+        originH + now.y - start.y,
       );
-      if (next.w === card.w && next.h === card.h) {
-        setSize(null);
-        return;
-      }
-      setSize(next);
-      void onResizeEnd(card.blockId, next.w, next.h).finally(() => {
-        setSize(null);
-      });
+      liveRef.current = { ...liveRef.current, ...next };
+      applyCardBox(cardRef.current, liveRef.current);
+      if (next.w === card.w && next.h === card.h) return;
+      onResizeEnd(card.blockId, next.w, next.h);
     };
 
+    listenersRef.current = { move: onMove, up: onUp };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
   };
@@ -168,7 +232,7 @@ export function JournalCard({
     if (!el) return;
     const title = el.querySelector(".owb-card-title") as HTMLElement | null;
     const inner = el.querySelector(
-      ".orca-block, .orca-block-editor-blocks",
+      ".orca-block, .orca-block-editor-blocks, .owb-card-excerpt",
     ) as HTMLElement | null;
     const body = el.querySelector(".owb-card-body") as HTMLElement | null;
     const contentH =
@@ -178,17 +242,19 @@ export function JournalCard({
       (title?.offsetHeight ?? 0) + contentH + 8,
     );
     if (nextH === card.h) return;
-    void onResizeEnd(card.blockId, card.w, nextH);
+    onResizeEnd(card.blockId, card.w, nextH);
   };
 
   const className = [
     "owb-card",
-    draft ? "is-dragging" : "",
-    size ? "is-resizing" : "",
+    draggingRef.current ? "is-dragging" : "",
+    resizingRef.current ? "is-resizing" : "",
     editing ? "is-editing" : "",
   ]
     .filter(Boolean)
     .join(" ");
+
+  const box = liveRef.current;
 
   return (
     <orca.components.ContextMenu
@@ -208,7 +274,7 @@ export function JournalCard({
         <div
           ref={cardRef}
           className={className}
-          style={{ left: x, top: y, width: w, height: h }}
+          style={{ left: box.x, top: box.y, width: box.w, height: box.h }}
           onContextMenu={(event) => {
             if (editing) return;
             open(event);
@@ -239,6 +305,8 @@ export function JournalCard({
               <JournalEditor blockId={card.blockId} />
             ) : isEmptyJournal ? (
               <div className="owb-card-empty">{t("No notes this day")}</div>
+            ) : degraded ? (
+              <div className="owb-card-excerpt">{excerpt}</div>
             ) : (
               <orca.components.Block
                 panelId={panelId}

@@ -1,16 +1,21 @@
 import type { Block, DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n";
-import { Canvas, type CanvasView } from "./Canvas";
+import { useCardPersist } from "./cardPersist";
+import { Canvas } from "./Canvas";
 import {
   boardName,
   clampScale,
   fetchWeekJournalCards,
   readCards,
-  writeCards,
-  type WhiteboardCard,
 } from "./data";
+import {
+  DEFAULT_VIEW,
+  formatZoomPercent,
+  type CanvasView,
+} from "./viewTransform";
 
-const { useCallback, useEffect, useState } = window.React;
+const { useCallback, useEffect, useLayoutEffect, useRef, useState } =
+  window.React;
 const { useSnapshot } = window.Valtio;
 
 type Props = {
@@ -22,10 +27,20 @@ type Props = {
 export default function BoardPanel({ panelId, blockId }: Props) {
   const { blocks } = useSnapshot(orca.state);
   const block = blockId == null ? undefined : blocks[blockId];
-  const cards = readCards(block);
-  const [view, setView] = useState<CanvasView>({ x: 0, y: 0, scale: 1 });
+  const serverCards = readCards(block);
+  const { cards, patchCard, commitCards } = useCardPersist(
+    blockId ?? null,
+    serverCards,
+  );
+  const [view, setView] = useState<CanvasView>(DEFAULT_VIEW);
   const [busy, setBusy] = useState(false);
   const [viewportWidth, setViewportWidth] = useState(800);
+  const zoomLabelRef = useRef<HTMLButtonElement | null>(null);
+
+  useLayoutEffect(() => {
+    const el = zoomLabelRef.current;
+    if (el) el.textContent = formatZoomPercent(view.scale);
+  }, [view.scale]);
 
   useEffect(() => {
     if (blockId == null || orca.state.blocks[blockId]) return;
@@ -45,48 +60,18 @@ export default function BoardPanel({ panelId, blockId }: Props) {
     };
   }, [blockId]);
 
-  const persistCards = useCallback(
-    async (next: WhiteboardCard[]) => {
-      if (blockId == null) {
-        throw new Error(t("Failed to save card positions"));
-      }
-      await writeCards(blockId, next);
-    },
-    [blockId],
-  );
-
-  const persistPatch = useCallback(
-    async (cardBlockId: DbId, patch: Partial<WhiteboardCard>) => {
-      const next = cards.map((card) =>
-        card.blockId === cardBlockId ? { ...card, ...patch } : card,
-      );
-      try {
-        await persistCards(next);
-      } catch (error) {
-        console.error("[whiteboard] failed to save cards", error);
-        orca.notify(
-          "error",
-          error instanceof Error
-            ? error.message
-            : t("Failed to save card positions"),
-        );
-      }
-    },
-    [cards, persistCards],
-  );
-
   const onMoveEnd = useCallback(
-    async (cardBlockId: DbId, x: number, y: number) => {
-      await persistPatch(cardBlockId, { x, y });
+    (cardBlockId: DbId, x: number, y: number) => {
+      patchCard(cardBlockId, { x, y });
     },
-    [persistPatch],
+    [patchCard],
   );
 
   const onResizeEnd = useCallback(
-    async (cardBlockId: DbId, w: number, h: number) => {
-      await persistPatch(cardBlockId, { w, h });
+    (cardBlockId: DbId, w: number, h: number) => {
+      patchCard(cardBlockId, { w, h });
     },
-    [persistPatch],
+    [patchCard],
   );
 
   const placeWeekJournals = useCallback(async () => {
@@ -98,23 +83,12 @@ export default function BoardPanel({ panelId, blockId }: Props) {
         orca.notify("info", t("No journals found for this week"));
         return;
       }
-      try {
-        await persistCards(next);
-      } catch (error) {
-        console.error("[whiteboard] failed to save cards", error);
-        orca.notify(
-          "error",
-          error instanceof Error
-            ? error.message
-            : t("Failed to save card positions"),
-        );
-        return;
-      }
+      const added = next.length - cards.length;
+      const saved = await commitCards(next);
+      if (!saved) return;
       orca.notify(
         "success",
-        t("Added ${count} journal cards", {
-          count: String(next.length - cards.length),
-        }),
+        t("Added ${count} journal cards", { count: String(added) }),
       );
     } catch (error) {
       console.error("[whiteboard] failed to load this week's journals", error);
@@ -122,7 +96,7 @@ export default function BoardPanel({ panelId, blockId }: Props) {
     } finally {
       setBusy(false);
     }
-  }, [blockId, busy, cards, persistCards, viewportWidth]);
+  }, [blockId, busy, cards, commitCards, viewportWidth]);
 
   if (blockId == null) {
     return (
@@ -139,6 +113,7 @@ export default function BoardPanel({ panelId, blockId }: Props) {
         cards={cards}
         view={view}
         busy={busy}
+        zoomLabelRef={zoomLabelRef}
         onViewChange={setView}
         onMoveEnd={onMoveEnd}
         onResizeEnd={onResizeEnd}
@@ -174,10 +149,10 @@ export default function BoardPanel({ panelId, blockId }: Props) {
           <button
             type="button"
             className="owb-zoom-btn"
-            onClick={() => setView({ x: 0, y: 0, scale: 1 })}
-          >
-            {`${Math.round(view.scale * 100)}%`}
-          </button>
+            ref={zoomLabelRef}
+            title={t("Reset view")}
+            onClick={() => setView(DEFAULT_VIEW)}
+          />
           <div className="owb-zoom-sep" />
           <button
             type="button"

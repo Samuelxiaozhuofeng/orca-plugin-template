@@ -163,6 +163,18 @@ export const CARD_CSS = `
   color: var(--orca-color-text-3);
 }
 
+.owb-card-excerpt {
+  margin: 0;
+  line-height: 1.55;
+  color: var(--orca-color-text-1);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 8;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .owb-card-resize {
   position: absolute;
   right: 2px;
