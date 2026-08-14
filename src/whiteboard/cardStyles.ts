@@ -229,8 +229,48 @@ export const CARD_CSS = `
   min-width: 0;
 }
 
+.owb-card-block-node {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+
 .owb-card-block-node + .owb-card-block-node {
   margin-top: 2px;
+}
+
+.owb-card-block-node > .orca-block {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.owb-extract-bullet {
+  flex: 0 0 10px;
+  box-sizing: border-box;
+  width: 10px;
+  height: 10px;
+  margin-top: 0.45em;
+  border: 1.5px solid var(--orca-color-text-3);
+  border-radius: 50%;
+  background: transparent;
+  cursor: grab;
+  user-select: none;
+}
+
+.owb-extract-bullet.is-root {
+  cursor: default;
+  pointer-events: none;
+  opacity: 0.55;
+}
+
+.owb-extract-bullet:not(.is-root):hover {
+  border-color: var(--orca-color-text-2);
+  background: color-mix(in oklab, var(--orca-color-text-2) 18%, transparent);
+}
+
+.owb-extract-bullet:active {
+  cursor: grabbing;
 }
 
 .owb-card-body > .orca-block:last-child,

@@ -111,6 +111,7 @@ export function Canvas({
     endEdit,
     closeEdgeDrop,
     createBlankAt,
+    extractRow,
     shownCards,
     degraded,
     selectedSet,
@@ -139,8 +140,10 @@ export function Canvas({
   const { dropActive, onDragOver, onDragLeave, onDrop } = useBoardDrop({
     boardBlockId,
     cardsRef,
+    edgesRef,
     pointerToWorld,
     onAddCards,
+    onCommitEdges,
   });
 
   useCanvasFocusApi(focusApiRef, {
@@ -247,6 +250,7 @@ export function Canvas({
             />
             <CanvasCards
               panelId={panelId}
+              cards={cards}
               shownCards={shownCards}
               weekdayGuide={weekdayGuide}
               degraded={degraded}
@@ -263,6 +267,7 @@ export function Canvas({
               applyArrange={applyArrange}
               onMoveFrame={onMoveFrame}
               edgeApiRef={edgeApiRef}
+              onExtractRow={extractRow}
             />
           </div>
           <div ref={guidesRef} className="owb-guides" />

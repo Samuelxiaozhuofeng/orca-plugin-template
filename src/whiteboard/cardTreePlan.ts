@@ -72,19 +72,22 @@ export function cardTreePlanEqual(
 /**
  * Depth-first nodes to show on a read-only card. Ignores `_repr.fold`
  * so a folded outline still lists children. Does not walk into types
- * that render their own children.
+ * that render their own children. `promoted` ids (other cards on this
+ * board) are omitted with their subtrees so a block is only shown once.
  */
 export function planCardBlockTree(
   rootId: DbId,
   blocks: CardTreeLookup,
   maxDepth = 4,
   maxNodes = 80,
+  promoted?: ReadonlySet<DbId>,
 ): CardTreeNode[] {
   const out: CardTreeNode[] = [];
   const seen = new Set<DbId>();
 
   const walk = (id: DbId, depth: number) => {
     if (out.length >= maxNodes || depth > maxDepth) return;
+    if (depth > 0 && promoted?.has(id)) return;
     if (seen.has(id)) return;
     seen.add(id);
     const block = blocks[id];

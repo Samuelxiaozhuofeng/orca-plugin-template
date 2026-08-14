@@ -8,6 +8,7 @@ import { type WhiteboardCard } from "./data";
 import type { DrawDropEmpty } from "./edgeGestures";
 import type { EdgeLayerApi } from "./EdgeLayer";
 import type { WhiteboardEdge } from "./edges";
+import { extractBlocksToBoard } from "./cardExtractApply";
 import { addBlankCardToBoard } from "./newCard";
 import {
   arrangeCards,
@@ -167,6 +168,35 @@ export function useCanvasBoard({
     [boardBlockId, onAddCards, selectCards, startEdit],
   );
 
+  const extractRow = useCallback(
+    (blockId: DbId, sourceCard: WhiteboardCard) => {
+      void extractBlocksToBoard({
+        ids: [blockId],
+        sourceCardId: sourceCard.blockId,
+        existing: cardsRef.current,
+        existingEdges: edgesRef.current,
+        boardBlockId,
+        addCards: onAddCards,
+        commitEdges: onCommitEdges,
+      })
+        .then((incoming) => {
+          if (incoming.length > 0) {
+            selectCards(incoming.map((card) => card.blockId));
+          }
+        })
+        .catch((error: unknown) => {
+          console.error("[whiteboard] extract card failed", error);
+          orca.notify(
+            "error",
+            error instanceof Error
+              ? error.message
+              : t("Failed to add blocks to the board"),
+          );
+        });
+    },
+    [boardBlockId, onAddCards, onCommitEdges, selectCards],
+  );
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape" && editingRef.current != null) {
@@ -248,6 +278,7 @@ export function useCanvasBoard({
     endEdit,
     closeEdgeDrop,
     createBlankAt,
+    extractRow,
     shownCards,
     degraded,
     selectedSet,

@@ -6,7 +6,7 @@
     "dev": "vite",
     "build": "NODE_ENV=production tsc && vite build",
     "postbuild": "node scripts/deploy-dist.mjs",
-    "test": "node --experimental-strip-types src/whiteboard/cardTreeLoad.test.ts",
+    "test": "node --experimental-strip-types src/whiteboard/cardTreeLoad.test.ts && node --experimental-strip-types src/whiteboard/cardExtract.test.ts",
     "preview": "vite preview"
   },
   "peerDependencies": {

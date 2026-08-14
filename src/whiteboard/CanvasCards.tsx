@@ -10,10 +10,12 @@ import type { Side } from "./edges";
 import type { ArrangeAction } from "./selection";
 import type { CardPatchEntry } from "./useCanvasPointer";
 import type { EdgeLayerApi } from "./EdgeLayer";
+import { cardIdsKey } from "./cardExtract";
 import { cardTreeLoadIds, useVisibleCardTrees } from "./cardTreeLoad";
 
 type Props = {
   panelId: string;
+  cards: WhiteboardCard[];
   shownCards: WhiteboardCard[];
   weekdayGuide?: CanvasOrigin | null;
   degraded: boolean;
@@ -33,10 +35,12 @@ type Props = {
   applyArrange: (action: ArrangeAction) => void;
   onMoveFrame: (boxes: Map<DbId, CardBox>) => void;
   edgeApiRef: { current: EdgeLayerApi | null };
+  onExtractRow: (blockId: DbId, sourceCard: WhiteboardCard) => void;
 };
 
 export function CanvasCards({
   panelId,
+  cards,
   shownCards,
   weekdayGuide,
   degraded,
@@ -53,9 +57,12 @@ export function CanvasCards({
   applyArrange,
   onMoveFrame,
   edgeApiRef,
+  onExtractRow,
 }: Props) {
+  const promotedKey = cardIdsKey(cards);
   const treeRevByRoot = useVisibleCardTrees(
     cardTreeLoadIds(shownCards, degraded, editingId),
+    promotedKey,
   );
 
   return (
@@ -111,6 +118,8 @@ export function CanvasCards({
               event.clientY,
             );
           }}
+          promotedKey={promotedKey}
+          onExtractRow={onExtractRow}
         />
       ))}
     </>

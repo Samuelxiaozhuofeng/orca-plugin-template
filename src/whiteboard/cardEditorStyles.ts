@@ -66,9 +66,8 @@ export const CARD_EDITOR_CSS = `
   display: none !important;
 }
 
-/* Read-only cards stay compact. Edit mode keeps bullets so Tab indent shows. */
-.owb-card:not(.is-editing) .orca-block-bullet,
-.owb-card:not(.is-editing) .orca-block-bullet-dot,
+/* Read-only cards stay compact, but bullets stay visible so the outline
+   structure reads the same as in the note. Only the drag/menu chrome goes. */
 .owb-card:not(.is-editing) .orca-block-handle,
 .owb-card:not(.is-editing) .orca-block-drag-handle,
 .owb-card:not(.is-editing) .orca-block-selected-bg {

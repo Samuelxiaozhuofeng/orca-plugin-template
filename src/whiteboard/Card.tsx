@@ -21,6 +21,10 @@ import type { ArrangeAction } from "./selection";
 import { isHostOverlayTarget } from "./hostOverlay";
 import { useCardBlockView } from "./blockWatch";
 import { CardBlockTree } from "./CardBlockTree";
+import {
+  blockIdFromCardEventTarget,
+  isExtractPointerTarget,
+} from "./cardExtractDrag";
 
 const ANCHOR_SIDES: Side[] = ["t", "r", "b", "l"];
 
@@ -55,6 +59,8 @@ type Props = {
     event: React.MouseEvent<HTMLDivElement>,
   ) => void;
   onMoveFrame?: (boxes: Map<DbId, { x: number; y: number; w: number; h: number }>) => void;
+  promotedKey?: string;
+  onExtractRow?: (blockId: DbId, sourceCard: WhiteboardCard) => void;
 };
 
 type CardBox = { x: number; y: number; w: number; h: number };
@@ -161,8 +167,11 @@ export function Card({
   onSelectOnly,
   onAnchorMouseDown,
   onMoveFrame,
+  promotedKey = "",
+  onExtractRow,
 }: Props) {
   const cardRef = useRef<HTMLDivElement | null>(null);
+  const extractRowRef = useRef<DbId | null>(null);
   const bodyRef = useRef(document.body);
   const liveRef = useRef<CardBox>({
     x: card.x,
@@ -211,6 +220,7 @@ export function Card({
   const onRootMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement | null;
     if (target?.closest(".owb-card-handle") && event.button === 0) return;
+    if (isExtractPointerTarget(target)) return;
     if (target?.closest(".owb-card-anchor")) return;
     if (target?.closest(".owb-card-floating-toolbar")) return;
     if (editing && target?.closest(".owb-card-body")) return;
@@ -302,6 +312,25 @@ export function Card({
               openCardInThisPanel(card.blockId, panelId);
             }}
           />
+          {(() => {
+            const rowId = extractRowRef.current;
+            if (
+              onExtractRow == null ||
+              rowId == null ||
+              rowId === card.blockId
+            ) {
+              return null;
+            }
+            return (
+              <orca.components.MenuText
+                title={t("Extract as card")}
+                onClick={() => {
+                  close();
+                  onExtractRow(rowId, card);
+                }}
+              />
+            );
+          })()}
           <orca.components.MenuSeparator />
           <orca.components.MenuText
             title={t("Fit content height")}
@@ -330,6 +359,9 @@ export function Card({
             // contextmenu (and Canvas already skips .owb-card).
             if (editing) return;
             if (!selected) onSelectOnly(card.blockId);
+            const rowId = blockIdFromCardEventTarget(event.target);
+            extractRowRef.current =
+              rowId != null && rowId !== card.blockId ? rowId : null;
             open(event);
           }}
         >
@@ -357,6 +389,7 @@ export function Card({
                 key={treeRev}
                 panelId={panelId}
                 blockId={card.blockId}
+                promotedKey={promotedKey}
               />
             )}
           </div>

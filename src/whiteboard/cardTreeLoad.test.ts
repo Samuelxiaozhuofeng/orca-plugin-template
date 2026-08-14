@@ -128,5 +128,22 @@ check(
     .join(",") === "1,2",
   "plan node cap",
 );
+check(
+  planCardBlockTree(
+    1,
+    {
+      1: { children: [2, 3] },
+      2: { children: [4] },
+      3: { children: [] },
+      4: { children: [] },
+    },
+    4,
+    80,
+    new Set([2]),
+  )
+    .map((node) => node.id)
+    .join(",") === "1,3",
+  "plan skips a promoted subtree",
+);
 
 console.log("cardTreeLoad.test.ts ok");

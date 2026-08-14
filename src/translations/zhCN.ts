@@ -64,6 +64,8 @@ const zhCN = {
     "拖动卡片时画出对齐线。关掉后吸附仍然有效。",
   "No notes this day": "这天还没有写日记",
   "Double-click to edit": "双击进入编辑",
+  "Extract as card": "提取为卡片",
+  "Drag to extract as a card": "拖到画布空白处，提取为独立卡片",
   Editing: "编辑中",
   "Drag to resize": "拖动调整大小",
   "Fit content height": "适应内容高度",

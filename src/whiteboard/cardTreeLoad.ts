@@ -31,6 +31,7 @@ export function collectMissingCardTreeIds(
   maxDepth = CARD_TREE_LOAD_MAX_DEPTH,
   maxNodes = CARD_TREE_LOAD_MAX_NODES,
   skip: ReadonlySet<DbId> = absentIds,
+  promoted?: ReadonlySet<DbId>,
 ): DbId[] {
   const missing: DbId[] = [];
   const seen = new Set<DbId>();
@@ -39,6 +40,7 @@ export function collectMissingCardTreeIds(
     let nodes = 0;
     const walk = (id: DbId, depth: number) => {
       if (nodes >= maxNodes || depth > maxDepth) return;
+      if (depth > 0 && promoted?.has(id)) return;
       if (seen.has(id)) return;
       seen.add(id);
       nodes += 1;
@@ -64,11 +66,18 @@ export function cardRootsWithHoles(
   maxDepth = CARD_TREE_LOAD_MAX_DEPTH,
   maxNodes = CARD_TREE_LOAD_MAX_NODES,
   skip: ReadonlySet<DbId> = absentIds,
+  promoted?: ReadonlySet<DbId>,
 ): DbId[] {
   return roots.filter(
     (root) =>
-      collectMissingCardTreeIds([root], blocks, maxDepth, maxNodes, skip)
-        .length > 0,
+      collectMissingCardTreeIds(
+        [root],
+        blocks,
+        maxDepth,
+        maxNodes,
+        skip,
+        promoted,
+      ).length > 0,
   );
 }
 
@@ -149,13 +158,21 @@ export function cardTreeLoadIds(
 /** Fill missing nodes under `roots`, one batched get-blocks per level. */
 export async function loadCardTrees(
   roots: readonly DbId[],
+  promoted?: ReadonlySet<DbId>,
 ): Promise<{ fetched: number }> {
   const unique = [...new Set(roots)];
   if (unique.length === 0) return { fetched: 0 };
 
   let fetched = 0;
   for (let level = 0; level <= CARD_TREE_LOAD_MAX_DEPTH; level++) {
-    const missing = collectMissingCardTreeIds(unique, liveBlocks());
+    const missing = collectMissingCardTreeIds(
+      unique,
+      liveBlocks(),
+      CARD_TREE_LOAD_MAX_DEPTH,
+      CARD_TREE_LOAD_MAX_NODES,
+      absentIds,
+      promoted,
+    );
     if (missing.length === 0) break;
     fetched += await fetchAndCacheBlocks(missing);
   }
@@ -169,18 +186,31 @@ export async function loadCardTrees(
  */
 export function useVisibleCardTrees(
   rootIds: readonly DbId[],
+  promotedKey = "",
 ): Record<number, number> {
   const { useEffect, useRef, useState } = window.React;
   const [revByRoot, setRevByRoot] = useState<Record<number, number>>({});
   const idsKey = rootIds.join(",");
+  const loadKey = `${idsKey}|${promotedKey}`;
+  const promoted =
+    promotedKey === ""
+      ? undefined
+      : new Set(promotedKey.split(",").map(Number).filter(Number.isFinite));
   const holesAtRender =
     idsKey === ""
       ? []
-      : cardRootsWithHoles(idsKey.split(",").map(Number), liveBlocks());
+      : cardRootsWithHoles(
+          idsKey.split(",").map(Number),
+          liveBlocks(),
+          CARD_TREE_LOAD_MAX_DEPTH,
+          CARD_TREE_LOAD_MAX_NODES,
+          absentIds,
+          promoted,
+        );
   const holesForKeyRef = useRef<DbId[]>([]);
-  const idsKeyRef = useRef<string | null>(null);
-  if (idsKeyRef.current !== idsKey) {
-    idsKeyRef.current = idsKey;
+  const loadKeyRef = useRef<string | null>(null);
+  if (loadKeyRef.current !== loadKey) {
+    loadKeyRef.current = loadKey;
     holesForKeyRef.current = holesAtRender;
   }
 
@@ -188,9 +218,15 @@ export function useVisibleCardTrees(
     if (idsKey === "") return;
     const roots = idsKey.split(",").map(Number);
     const holes = holesForKeyRef.current;
+    const skipPromoted =
+      promotedKey === ""
+        ? undefined
+        : new Set(
+            promotedKey.split(",").map(Number).filter(Number.isFinite),
+          );
     let cancelled = false;
 
-    void loadCardTrees(roots).then((result) => {
+    void loadCardTrees(roots, skipPromoted).then((result) => {
       if (cancelled) return;
       if (result.fetched === 0 && holes.length === 0) return;
       const bump = holes.length > 0 ? holes : roots;
@@ -206,7 +242,7 @@ export function useVisibleCardTrees(
     return () => {
       cancelled = true;
     };
-  }, [idsKey]);
+  }, [idsKey, promotedKey]);
 
   return revByRoot;
 }
