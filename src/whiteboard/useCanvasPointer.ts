@@ -1,15 +1,19 @@
 import type { DbId } from "../orca.d.ts";
 import {
+  abortCardGestures,
   startMoveCards,
   startRightButtonSession,
   swallowNextContextMenu,
 } from "./cardGestures";
 import type { WhiteboardCard } from "./data";
-import { startMarquee } from "./marquee";
+import { abortEdgeGestures } from "./edgeGestures";
+import { abortMarquees, startMarquee } from "./marquee";
 import { toggleId } from "./selection";
 import type { CardRect } from "./selection";
 import type { WhiteboardSettings } from "./settings";
 import type { CanvasView } from "./viewTransform";
+
+const { useEffect, useRef } = window.React;
 
 export type CardPatchEntry = {
   blockId: DbId;
@@ -44,6 +48,22 @@ export function useCanvasPointer(opts: {
   ) => void;
 } {
   const { refs, pointerToWorld, startPan, setSelected, onPatchCards, onMoveFrame } = opts;
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      const canvas = refs.canvas.current;
+      const viewport = refs.viewport.current;
+      abortCardGestures(canvas);
+      abortCardGestures(viewport);
+      abortMarquees(canvas);
+      abortMarquees(viewport);
+      abortEdgeGestures(canvas);
+      abortEdgeGestures(viewport);
+    };
+  }, [refs.canvas]);
 
   const focusViewport = () => {
     refs.viewport.current?.focus({ preventScroll: true });
@@ -72,7 +92,7 @@ export function useCanvasPointer(opts: {
       view: () => refs.liveView.current,
       onFrame: onMoveFrame,
       onEnd: (moves) => {
-        if (moves.length === 0) return;
+        if (!mountedRef.current || moves.length === 0) return;
         onPatchCards(
           moves.map((item) => ({
             blockId: item.blockId,
@@ -92,11 +112,11 @@ export function useCanvasPointer(opts: {
     if (additive) {
       next = toggleId(next, card.blockId);
       refs.selected.current = next;
-      setSelected(next);
+      if (mountedRef.current) setSelected(next);
     } else if (!next.includes(card.blockId)) {
       next = [card.blockId];
       refs.selected.current = next;
-      setSelected(next);
+      if (mountedRef.current) setSelected(next);
     }
     return next.includes(card.blockId);
   };
@@ -133,7 +153,9 @@ export function useCanvasPointer(opts: {
       (event.button === 0 && event.altKey && blank)
     ) {
       event.preventDefault();
-      if (event.button === 2) swallowNextContextMenu();
+      if (event.button === 2) {
+        swallowNextContextMenu(refs.canvas.current ?? refs.viewport.current);
+      }
       startPan(event.clientX, event.clientY);
       return;
     }
@@ -146,9 +168,12 @@ export function useCanvasPointer(opts: {
       startRightButtonSession({
         startX: event.clientX,
         startY: event.clientY,
+        root: refs.canvas.current ?? refs.viewport.current,
         onDrag: () => startPan(event.clientX, event.clientY),
-        onIdleRelease: () =>
-          fireAppContextMenu(event.clientX, event.clientY, event.target),
+        onIdleRelease: () => {
+          if (!mountedRef.current) return;
+          fireAppContextMenu(event.clientX, event.clientY, event.target);
+        },
       });
       return;
     }
@@ -169,6 +194,7 @@ export function useCanvasPointer(opts: {
       selected: refs.selected.current,
       pointerToWorld,
       onCommit: (result) => {
+        if (!mountedRef.current) return;
         if (result.kind === "click") {
           if (!event.shiftKey) setSelected([]);
           return;
@@ -184,7 +210,9 @@ export function useCanvasPointer(opts: {
   ) => {
     if (event.button === 1 || refs.spaceHeld.current) {
       event.preventDefault();
-      if (event.button === 2) swallowNextContextMenu();
+      if (event.button === 2) {
+        swallowNextContextMenu(refs.canvas.current ?? refs.viewport.current);
+      }
       startPan(event.clientX, event.clientY);
       return;
     }
@@ -198,8 +226,11 @@ export function useCanvasPointer(opts: {
       startRightButtonSession({
         startX: event.clientX,
         startY: event.clientY,
-        onIdleRelease: () =>
-          fireAppContextMenu(event.clientX, event.clientY, event.target),
+        root: refs.canvas.current ?? refs.viewport.current,
+        onIdleRelease: () => {
+          if (!mountedRef.current) return;
+          fireAppContextMenu(event.clientX, event.clientY, event.target);
+        },
       });
       return;
     }

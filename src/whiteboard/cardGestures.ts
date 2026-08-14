@@ -55,30 +55,83 @@ function cardEl(canvas: HTMLElement, blockId: DbId): HTMLElement | null {
 
 export const RIGHT_BUTTON_THRESHOLD_PX = 3;
 
-export function swallowNextContextMenu(): void {
+type TrackedGesture = {
+  abort: () => void;
+  untrack: () => void;
+};
+
+const cardGestureBuckets = new WeakMap<object, Set<TrackedGesture>>();
+
+function trackCardGesture(root: object, onAbort: () => void): TrackedGesture {
+  let open = true;
+  let bucket = cardGestureBuckets.get(root);
+  if (bucket == null) {
+    bucket = new Set();
+    cardGestureBuckets.set(root, bucket);
+  }
+  const entry: TrackedGesture = {
+    abort() {
+      if (!open) return;
+      open = false;
+      bucket!.delete(entry);
+      onAbort();
+    },
+    untrack() {
+      if (!open) return;
+      open = false;
+      bucket!.delete(entry);
+    },
+  };
+  bucket.add(entry);
+  return entry;
+}
+
+export function abortCardGestures(root: object | null | undefined): void {
+  if (root == null) return;
+  const bucket = cardGestureBuckets.get(root);
+  if (bucket == null) return;
+  for (const entry of [...bucket]) entry.abort();
+}
+
+function gestureRoot(el: HTMLElement | null | undefined): object | null {
+  if (el == null) return null;
+  return el.closest(".owb-canvas") ?? el.closest(".owb-viewport") ?? el;
+}
+
+export function swallowNextContextMenu(root?: object | null): void {
+  let timer = 0;
   const onMenu = (event: Event) => {
     event.preventDefault();
     event.stopPropagation();
   };
-  window.addEventListener("contextmenu", onMenu, true);
-  const done = () => {
-    window.removeEventListener("mouseup", done);
-    window.setTimeout(() => {
-      window.removeEventListener("contextmenu", onMenu, true);
-    }, 0);
+  const detachMenu = () => {
+    window.removeEventListener("contextmenu", onMenu, true);
   };
+  const done = () => {
+    tracked.untrack();
+    window.removeEventListener("mouseup", done);
+    timer = window.setTimeout(detachMenu, 0);
+  };
+  const tracked = trackCardGesture(root ?? window, () => {
+    window.removeEventListener("mouseup", done);
+    if (timer !== 0) window.clearTimeout(timer);
+    detachMenu();
+  });
+  window.addEventListener("contextmenu", onMenu, true);
   window.addEventListener("mouseup", done);
 }
 
 export function startRightButtonSession(opts: {
   startX: number;
   startY: number;
+  root?: object | null;
   onDrag?: () => void;
   onIdleRelease: () => void;
 }): void {
   let dragged = false;
   let finished = false;
   let allowSynthetic = false;
+  let timer = 0;
 
   const onMenu = (event: Event) => {
     if (allowSynthetic) return;
@@ -86,8 +139,15 @@ export function startRightButtonSession(opts: {
     event.stopPropagation();
   };
 
+  const detach = () => {
+    window.removeEventListener("mousemove", onMove);
+    window.removeEventListener("mouseup", onUp);
+    window.removeEventListener("contextmenu", onMenu, true);
+    if (timer !== 0) window.clearTimeout(timer);
+  };
+
   const onMove = (event: MouseEvent) => {
-    if (dragged) return;
+    if (finished || dragged) return;
     const dx = event.clientX - opts.startX;
     const dy = event.clientY - opts.startY;
     if (
@@ -103,6 +163,7 @@ export function startRightButtonSession(opts: {
   const onUp = () => {
     if (finished) return;
     finished = true;
+    tracked.untrack();
     window.removeEventListener("mousemove", onMove);
     window.removeEventListener("mouseup", onUp);
     if (!dragged) {
@@ -110,10 +171,16 @@ export function startRightButtonSession(opts: {
       opts.onIdleRelease();
       allowSynthetic = false;
     }
-    window.setTimeout(() => {
+    timer = window.setTimeout(() => {
       window.removeEventListener("contextmenu", onMenu, true);
     }, 0);
   };
+
+  const tracked = trackCardGesture(opts.root ?? window, () => {
+    if (finished) return;
+    finished = true;
+    detach();
+  });
 
   window.addEventListener("contextmenu", onMenu, true);
   window.addEventListener("mousemove", onMove);
@@ -138,6 +205,7 @@ export function startMoveCards(opts: {
   let lastDx = 0;
   let lastDy = 0;
   let started = false;
+  let finished = false;
 
   const paint = (clientX: number, clientY: number, alt: boolean) => {
     raf = 0;
@@ -183,7 +251,22 @@ export function startMoveCards(opts: {
     }
   };
 
+  const detach = () => {
+    window.removeEventListener("mousemove", onMove);
+    window.removeEventListener("mouseup", onUp);
+    if (raf !== 0) window.cancelAnimationFrame(raf);
+    raf = 0;
+  };
+
+  const finishVisual = () => {
+    clearGuides(opts.guidesEl);
+    for (const card of opts.moving) {
+      cardEl(opts.canvas, card.blockId)?.classList.remove("is-dragging");
+    }
+  };
+
   const onMove = (event: MouseEvent) => {
+    if (finished) return;
     const distX = event.clientX - opts.startX;
     const distY = event.clientY - opts.startY;
     if (
@@ -199,21 +282,20 @@ export function startMoveCards(opts: {
       }
     }
     if (raf === 0) {
-      raf = window.requestAnimationFrame(() =>
-        paint(event.clientX, event.clientY, event.altKey),
-      );
+      raf = window.requestAnimationFrame(() => {
+        if (finished) return;
+        paint(event.clientX, event.clientY, event.altKey);
+      });
     }
   };
 
   const onUp = (event: MouseEvent) => {
-    window.removeEventListener("mousemove", onMove);
-    window.removeEventListener("mouseup", onUp);
-    if (raf !== 0) window.cancelAnimationFrame(raf);
+    if (finished) return;
+    finished = true;
+    tracked.untrack();
+    detach();
     if (started) paint(event.clientX, event.clientY, event.altKey);
-    clearGuides(opts.guidesEl);
-    for (const card of opts.moving) {
-      cardEl(opts.canvas, card.blockId)?.classList.remove("is-dragging");
-    }
+    finishVisual();
     if (!started || (lastDx === 0 && lastDy === 0)) {
       opts.onEnd([]);
       return;
@@ -226,6 +308,13 @@ export function startMoveCards(opts: {
       })),
     );
   };
+
+  const tracked = trackCardGesture(opts.canvas, () => {
+    if (finished) return;
+    finished = true;
+    detach();
+    finishVisual();
+  });
 
   window.addEventListener("mousemove", onMove);
   window.addEventListener("mouseup", onUp);
@@ -320,10 +409,12 @@ export function startResizeCard(opts: {
   const start = opts.pointerToWorld(opts.startX, opts.startY);
   let raf = 0;
   let last = { ...opts.origin };
+  let finished = false;
   opts.el.classList.add("is-resizing");
 
   const paint = (clientX: number, clientY: number, shift: boolean) => {
     raf = 0;
+    if (finished) return;
     const now = opts.pointerToWorld(clientX, clientY);
     last = resizeBox(
       opts.origin,
@@ -338,7 +429,15 @@ export function startResizeCard(opts: {
     }
   };
 
+  const detach = () => {
+    window.removeEventListener("mousemove", onMove);
+    window.removeEventListener("mouseup", onUp);
+    if (raf !== 0) window.cancelAnimationFrame(raf);
+    raf = 0;
+  };
+
   const onMove = (event: MouseEvent) => {
+    if (finished) return;
     if (raf === 0) {
       raf = window.requestAnimationFrame(() =>
         paint(event.clientX, event.clientY, event.shiftKey),
@@ -347,9 +446,10 @@ export function startResizeCard(opts: {
   };
 
   const onUp = (event: MouseEvent) => {
-    window.removeEventListener("mousemove", onMove);
-    window.removeEventListener("mouseup", onUp);
-    if (raf !== 0) window.cancelAnimationFrame(raf);
+    if (finished) return;
+    finished = true;
+    tracked.untrack();
+    detach();
     paint(event.clientX, event.clientY, event.shiftKey);
     opts.el.classList.remove("is-resizing");
     if (
@@ -363,6 +463,13 @@ export function startResizeCard(opts: {
     }
     opts.onEnd(last);
   };
+
+  const tracked = trackCardGesture(gestureRoot(opts.el) ?? opts.el, () => {
+    if (finished) return;
+    finished = true;
+    detach();
+    opts.el.classList.remove("is-resizing");
+  });
 
   window.addEventListener("mousemove", onMove);
   window.addEventListener("mouseup", onUp);

@@ -17,6 +17,9 @@ type Runtime = {
   gesture: "pan" | "wheel" | null;
   raf: number;
   wheelTimer: number;
+  panMove: ((event: MouseEvent) => void) | null;
+  panUp: (() => void) | null;
+  mounted: boolean;
 };
 
 type Opts = {
@@ -54,6 +57,9 @@ export function useCanvasView({
     gesture: null,
     raf: 0,
     wheelTimer: 0,
+    panMove: null,
+    panUp: null,
+    mounted: true,
   });
 
   const paint = useCallback(() => {
@@ -76,6 +82,7 @@ export function useCanvasView({
 
   const commitView = useCallback(() => {
     const runtime = runtimeRef.current;
+    if (!runtime.mounted) return;
     if (runtime.raf !== 0) {
       window.cancelAnimationFrame(runtime.raf);
       runtime.raf = 0;
@@ -165,10 +172,28 @@ export function useCanvasView({
   }, []);
 
   useEffect(() => {
+    runtimeRef.current.mounted = true;
     return () => {
       const runtime = runtimeRef.current;
-      if (runtime.raf !== 0) window.cancelAnimationFrame(runtime.raf);
-      if (runtime.wheelTimer !== 0) window.clearTimeout(runtime.wheelTimer);
+      runtime.mounted = false;
+      if (runtime.panMove != null) {
+        window.removeEventListener("mousemove", runtime.panMove);
+        runtime.panMove = null;
+      }
+      if (runtime.panUp != null) {
+        window.removeEventListener("mouseup", runtime.panUp);
+        runtime.panUp = null;
+      }
+      runtime.gesture = null;
+      viewportRef.current?.classList.remove("is-panning");
+      if (runtime.raf !== 0) {
+        window.cancelAnimationFrame(runtime.raf);
+        runtime.raf = 0;
+      }
+      if (runtime.wheelTimer !== 0) {
+        window.clearTimeout(runtime.wheelTimer);
+        runtime.wheelTimer = 0;
+      }
     };
   }, []);
 
@@ -184,7 +209,7 @@ export function useCanvasView({
   const startPan = useCallback(
     (startX: number, startY: number) => {
       const runtime = runtimeRef.current;
-      if (runtime.gesture === "pan") return;
+      if (!runtime.mounted || runtime.gesture === "pan") return;
       if (runtime.wheelTimer !== 0) {
         window.clearTimeout(runtime.wheelTimer);
         runtime.wheelTimer = 0;
@@ -194,6 +219,7 @@ export function useCanvasView({
       const origin = liveViewRef.current;
 
       const onMove = (moveEvent: MouseEvent) => {
+        if (!runtime.mounted) return;
         liveViewRef.current = {
           ...origin,
           x: origin.x + moveEvent.clientX - startX,
@@ -203,11 +229,16 @@ export function useCanvasView({
       };
 
       const onUp = () => {
+        if (runtime.panMove === onMove) runtime.panMove = null;
+        if (runtime.panUp === onUp) runtime.panUp = null;
         window.removeEventListener("mousemove", onMove);
         window.removeEventListener("mouseup", onUp);
+        if (!runtime.mounted) return;
         commitView();
       };
 
+      runtime.panMove = onMove;
+      runtime.panUp = onUp;
       window.addEventListener("mousemove", onMove);
       window.addEventListener("mouseup", onUp);
     },

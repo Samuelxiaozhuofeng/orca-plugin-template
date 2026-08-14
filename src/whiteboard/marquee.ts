@@ -63,6 +63,44 @@ function hitIds(cards: readonly WhiteboardCard[], world: CardRect): DbId[] {
     .map((card) => card.blockId);
 }
 
+type TrackedGesture = {
+  abort: () => void;
+  untrack: () => void;
+};
+
+const marqueeBuckets = new WeakMap<object, Set<TrackedGesture>>();
+
+function trackMarquee(root: object, onAbort: () => void): TrackedGesture {
+  let open = true;
+  let bucket = marqueeBuckets.get(root);
+  if (bucket == null) {
+    bucket = new Set();
+    marqueeBuckets.set(root, bucket);
+  }
+  const entry: TrackedGesture = {
+    abort() {
+      if (!open) return;
+      open = false;
+      bucket!.delete(entry);
+      onAbort();
+    },
+    untrack() {
+      if (!open) return;
+      open = false;
+      bucket!.delete(entry);
+    },
+  };
+  bucket.add(entry);
+  return entry;
+}
+
+export function abortMarquees(root: object | null | undefined): void {
+  if (root == null) return;
+  const bucket = marqueeBuckets.get(root);
+  if (bucket == null) return;
+  for (const entry of [...bucket]) entry.abort();
+}
+
 export function startMarquee(opts: {
   startX: number;
   startY: number;
@@ -77,6 +115,7 @@ export function startMarquee(opts: {
 }): void {
   const startWorld = opts.pointerToWorld(opts.startX, opts.startY);
   let raf = 0;
+  let finished = false;
   let last: { x: number; y: number } = { x: opts.startX, y: opts.startY };
 
   opts.viewport.classList.add("is-marqueeing");
@@ -88,6 +127,7 @@ export function startMarquee(opts: {
 
   const paint = () => {
     raf = 0;
+    if (finished) return;
     const screen = screenRect(opts.viewport, opts.startX, opts.startY, last.x, last.y);
     paintMarquee(opts.marqueeEl, screen);
     const now = opts.pointerToWorld(last.x, last.y);
@@ -95,18 +135,31 @@ export function startMarquee(opts: {
     setMarqueeHits(opts.canvas, new Set(hitIds(opts.cards, world)));
   };
 
+  const detach = () => {
+    window.removeEventListener("mousemove", onMove);
+    window.removeEventListener("mouseup", onUp);
+    if (raf !== 0) window.cancelAnimationFrame(raf);
+    raf = 0;
+  };
+
+  const finishVisual = () => {
+    opts.viewport.classList.remove("is-marqueeing");
+    paintMarquee(opts.marqueeEl, null);
+    clearMarqueeHits(opts.canvas);
+  };
+
   const onMove = (event: MouseEvent) => {
+    if (finished) return;
     last = { x: event.clientX, y: event.clientY };
     if (raf === 0) raf = window.requestAnimationFrame(paint);
   };
 
   const onUp = (event: MouseEvent) => {
-    window.removeEventListener("mousemove", onMove);
-    window.removeEventListener("mouseup", onUp);
-    if (raf !== 0) window.cancelAnimationFrame(raf);
-    opts.viewport.classList.remove("is-marqueeing");
-    paintMarquee(opts.marqueeEl, null);
-    clearMarqueeHits(opts.canvas);
+    if (finished) return;
+    finished = true;
+    tracked.untrack();
+    detach();
+    finishVisual();
 
     const dx = event.clientX - opts.startX;
     const dy = event.clientY - opts.startY;
@@ -122,6 +175,13 @@ export function startMarquee(opts: {
       ids: opts.additive ? unionIds(opts.selected, hits) : hits,
     });
   };
+
+  const tracked = trackMarquee(opts.canvas, () => {
+    if (finished) return;
+    finished = true;
+    detach();
+    finishVisual();
+  });
 
   window.addEventListener("mousemove", onMove);
   window.addEventListener("mouseup", onUp);

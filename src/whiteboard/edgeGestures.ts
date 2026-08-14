@@ -88,6 +88,44 @@ export type DrawDropEmpty = {
   fromSide: Side;
 };
 
+type TrackedGesture = {
+  abort: () => void;
+  untrack: () => void;
+};
+
+const edgeGestureBuckets = new WeakMap<object, Set<TrackedGesture>>();
+
+function trackEdgeGesture(root: object, onAbort: () => void): TrackedGesture {
+  let open = true;
+  let bucket = edgeGestureBuckets.get(root);
+  if (bucket == null) {
+    bucket = new Set();
+    edgeGestureBuckets.set(root, bucket);
+  }
+  const entry: TrackedGesture = {
+    abort() {
+      if (!open) return;
+      open = false;
+      bucket!.delete(entry);
+      onAbort();
+    },
+    untrack() {
+      if (!open) return;
+      open = false;
+      bucket!.delete(entry);
+    },
+  };
+  bucket.add(entry);
+  return entry;
+}
+
+export function abortEdgeGestures(root: object | null | undefined): void {
+  if (root == null) return;
+  const bucket = edgeGestureBuckets.get(root);
+  if (bucket == null) return;
+  for (const entry of [...bucket]) entry.abort();
+}
+
 export function startDrawEdge(opts: {
   fromId: DbId;
   fromSide: Side;
@@ -114,6 +152,7 @@ export function startDrawEdge(opts: {
   const cleanup = (clearGhost: boolean) => {
     if (live) {
       live = false;
+      tracked.untrack();
       detach();
       clearTargets(opts.canvas);
       opts.canvas.classList.remove("is-drawing-edge");
@@ -121,7 +160,10 @@ export function startDrawEdge(opts: {
     if (clearGhost) setGhostPath(opts.ghost, "");
   };
 
+  const tracked = trackEdgeGesture(opts.canvas, () => cleanup(true));
+
   const paint = (clientX: number, clientY: number) => {
+    if (!live) return;
     const world = opts.pointerToWorld(clientX, clientY);
     const cards = opts.cards();
     const rawHit = hitCardAt(cards, world);
@@ -143,10 +185,12 @@ export function startDrawEdge(opts: {
   };
 
   const onMove = (event: MouseEvent) => {
+    if (!live) return;
     paint(event.clientX, event.clientY);
   };
 
   const onUp = (event: MouseEvent) => {
+    if (!live) return;
     const world = opts.pointerToWorld(event.clientX, event.clientY);
     const cards = opts.cards();
     const rawHit = hitCardAt(cards, world);
@@ -181,6 +225,7 @@ export function startDrawEdge(opts: {
   };
 
   const onKey = (event: KeyboardEvent) => {
+    if (!live) return;
     if (event.key !== "Escape") return;
     event.preventDefault();
     event.stopPropagation();

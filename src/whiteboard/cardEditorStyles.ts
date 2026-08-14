@@ -52,7 +52,7 @@ export const CARD_EDITOR_CSS = `
   background: color-mix(in oklab, var(--orca-color-text-3) 30%, transparent);
 }
 
-/* Hide heavy document editor chromes in card edit mode */
+/* Card edit: body + children only. Keep bullets and indent visible. */
 .owb-card-editor .orca-block-editor-title,
 .owb-card-editor .orca-block-editor-header,
 .owb-card-editor .orca-block-editor-cover,
@@ -62,17 +62,12 @@ export const CARD_EDITOR_CSS = `
   display: none !important;
 }
 
-/* Suppress outline bullets and drag handles inside cards for clean Heptabase text presentation */
-.owb-card .orca-block-bullet,
-.owb-card .orca-block-bullet-dot,
-.owb-card .orca-block-handle,
-.owb-card .orca-block-drag-handle,
-.owb-card .orca-block-selected-bg,
-.owb-card-editor .orca-block-bullet,
-.owb-card-editor .orca-block-bullet-dot,
-.owb-card-editor .orca-block-handle,
-.owb-card-editor .orca-block-drag-handle,
-.owb-card-editor .orca-block-selected-bg {
+/* Read-only cards stay compact. Edit mode keeps bullets so Tab indent shows. */
+.owb-card:not(.is-editing) .orca-block-bullet,
+.owb-card:not(.is-editing) .orca-block-bullet-dot,
+.owb-card:not(.is-editing) .orca-block-handle,
+.owb-card:not(.is-editing) .orca-block-drag-handle,
+.owb-card:not(.is-editing) .orca-block-selected-bg {
   display: none !important;
   visibility: hidden !important;
   opacity: 0 !important;
@@ -82,14 +77,16 @@ export const CARD_EDITOR_CSS = `
   padding: 0 !important;
 }
 
-/* Ensure clean text block alignment without indentation offset */
-.owb-card .orca-block-children,
-.owb-card-editor .orca-block-children {
+.owb-card.is-editing .orca-block-handle,
+.owb-card.is-editing .orca-block-drag-handle {
+  display: none !important;
+}
+
+.owb-card:not(.is-editing) .orca-block-children {
   padding-left: 12px !important;
 }
 
-.owb-card .orca-block,
-.owb-card-editor .orca-block {
+.owb-card:not(.is-editing) .orca-block {
   margin-left: 0 !important;
   padding-left: 0 !important;
 }

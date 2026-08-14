@@ -69,18 +69,13 @@ function firstEditableLine(root: HTMLElement): HTMLElement | null {
   return null;
 }
 
-function caretToStart(target: HTMLElement): void {
-  if (target.getAttribute("contenteditable") !== "true") return;
-  const sel = window.getSelection();
-  if (sel == null) return;
-  const range = document.createRange();
-  range.selectNodeContents(target);
-  range.collapse(true);
-  sel.removeAllRanges();
-  sel.addRange(range);
-}
-
-function CardEditor({ blockId }: { blockId: DbId }) {
+function CardEditor({
+  panelId,
+  blockId,
+}: {
+  panelId: string;
+  blockId: DbId;
+}) {
   const { panelRenderers } = useSnapshot(orca.state);
   const BlockPanel = panelRenderers.block;
   const editorRef = useRef<HTMLDivElement | null>(null);
@@ -103,8 +98,8 @@ function CardEditor({ blockId }: { blockId: DbId }) {
       }
 
       target.focus({ preventScroll: true });
-      // Orca derives its caret from a real pointer hit; aim at the very start
-      // of the first line so editing mode opens there instead of at (0, 0).
+      // Host CursorData is derived from a pointer hit. Deliver one hit so
+      // the editor activates; do not then overwrite the caret it places.
       const rect = target.getBoundingClientRect();
       const clientX = rect.left + 2;
       const clientY = rect.top + Math.min(10, rect.height / 2);
@@ -119,15 +114,12 @@ function CardEditor({ blockId }: { blockId: DbId }) {
         target.dispatchEvent(new MouseEvent("mousedown", opts));
         target.dispatchEvent(new MouseEvent("mouseup", opts));
         target.dispatchEvent(new MouseEvent("click", opts));
-      } catch {
-        // ignore event dispatch errors if any
+      } catch (err) {
+        console.error(
+          "Whiteboard card editor: failed to deliver focus click",
+          err,
+        );
       }
-
-      caretToStart(target);
-      // Orca may re-apply its own caret right after the synthetic click.
-      timer = window.setTimeout(() => {
-        if (!cancelled) caretToStart(target);
-      }, 0);
     };
 
     timer = window.setTimeout(focusEditor, 10);
@@ -135,23 +127,16 @@ function CardEditor({ blockId }: { blockId: DbId }) {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [blockId]);
+  }, [blockId, panelId]);
 
   if (BlockPanel == null) {
     return <div className="owb-card-editor-missing">{t("Editor unavailable")}</div>;
   }
+  // No extra .orca-panel[data-panel-id] wrapper: the real panel already
+  // owns that id. A second node with the same id would steal closest().
   return (
     <div ref={editorRef} className="owb-card-editor">
-      <div className="orca-panel" data-panel-id="_reference">
-        <div className="orca-hideable">
-          <BlockPanel
-            panelId="_reference"
-            blockId={blockId}
-            preview="content"
-            active
-          />
-        </div>
-      </div>
+      <BlockPanel panelId={panelId} blockId={blockId} active />
     </div>
   );
 }
@@ -360,7 +345,7 @@ export function Card({
             }}
           >
             {editing ? (
-              <CardEditor blockId={card.blockId} />
+              <CardEditor panelId={panelId} blockId={card.blockId} />
             ) : isEmptyJournal ? (
               <div className="owb-card-empty">{t("No notes this day")}</div>
             ) : degraded ? (

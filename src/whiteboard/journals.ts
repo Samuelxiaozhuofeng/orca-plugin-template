@@ -66,10 +66,7 @@ export function journalDateKey(block: Block | undefined): string | null {
   if (raw == null) return null;
   const date = raw instanceof Date ? raw : new Date(raw as string | number);
   if (Number.isNaN(date.getTime())) return null;
-  const y = date.getUTCFullYear();
-  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const d = String(date.getUTCDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+  return formatDateKey(date);
 }
 
 /** Same empty rule as Card: no trimmed text and no children. */
