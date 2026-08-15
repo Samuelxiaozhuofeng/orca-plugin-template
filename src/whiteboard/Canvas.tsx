@@ -64,7 +64,6 @@ type Props = {
   areas: WhiteboardArea[];
   onViewportWidth: (width: number) => void;
   onPlaceJournalsAt: (origin: CanvasOrigin) => void;
-  weekdayGuide?: CanvasOrigin | null;
   focusApiRef: { current: CanvasFocusApi | null };
 };
 
@@ -90,7 +89,6 @@ export function Canvas({
   areas,
   onViewportWidth,
   onPlaceJournalsAt,
-  weekdayGuide,
   focusApiRef,
 }: Props) {
   const editingRef = useRef<DbId | null>(null);
@@ -399,7 +397,6 @@ export function Canvas({
             cards={visible.cards}
             shownCards={visible.shownCards}
             lodSimplified={lodSimplified}
-            weekdayGuide={weekdayGuide}
             editingId={editingId}
             selected={selected}
             selectedSet={selectedSet}

@@ -85,7 +85,6 @@ export default function BoardPanel({ panelId, blockId }: Props) {
   // Set when the journal dialog was opened from the canvas context menu, so
   // the cards land where the user right-clicked instead of at the viewport.
   const [placeOrigin, setPlaceOrigin] = useState<CanvasOrigin | null>(null);
-  const [weekdayGuide, setWeekdayGuide] = useState<CanvasOrigin | null>(null);
   const [pendingFocus, setPendingFocus] = useState<DbId | null>(null);
   const zoomLabelRef = useRef<HTMLButtonElement | null>(null);
   const focusApiRef = useRef<CanvasFocusApi | null>(null);
@@ -120,7 +119,6 @@ export default function BoardPanel({ panelId, blockId }: Props) {
     busy,
     setBusy,
     setPlaceOpen,
-    setWeekdayGuide,
     persist: {
       patchCards,
       appendCards,
@@ -293,7 +291,6 @@ export default function BoardPanel({ panelId, blockId }: Props) {
         cards={cards}
         view={view}
         zoomLabelRef={zoomLabelRef}
-        weekdayGuide={weekdayGuide}
         onViewChange={setViewAndRemember}
         onPatchCards={onPatchCards}
         onRemoveCards={onRemoveCards}

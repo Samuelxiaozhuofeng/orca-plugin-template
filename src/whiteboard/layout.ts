@@ -13,18 +13,8 @@ export const CARD_MOUNT_CAP = 300;
 export const MAX_RANGE_DAYS = 92;
 export const MIN_GRID_COLUMNS = 1;
 export const MAX_GRID_COLUMNS = 14;
-export const WEEKDAY_HEADER_H = 22;
 
 const WEEKDAYS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
-export const WEEKDAY_LABELS_MON = [
-  "周一",
-  "周二",
-  "周三",
-  "周四",
-  "周五",
-  "周六",
-  "周日",
-];
 
 export type DateRange = { start: Date; end: Date };
 export type LayoutMode = "calendar" | "grid";
@@ -237,10 +227,6 @@ export function viewportOrigin(view: {
     x: -view.x / scale + GRID_ORIGIN,
     y: -view.y / scale + GRID_ORIGIN,
   };
-}
-
-export function weekdayGuideAt(origin: CanvasOrigin): CanvasOrigin {
-  return { x: origin.x, y: origin.y - WEEKDAY_HEADER_H };
 }
 
 export function clampScale(scale: number): number {

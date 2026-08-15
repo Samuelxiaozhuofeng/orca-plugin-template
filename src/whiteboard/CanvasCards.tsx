@@ -1,10 +1,6 @@
 import type { DbId } from "../orca.d.ts";
 import { Card } from "./Card";
-import {
-  WEEKDAY_LABELS_MON,
-  type CanvasOrigin,
-  type WhiteboardCard,
-} from "./data";
+import type { WhiteboardCard } from "./data";
 import type { CardBox } from "./edgeGeometry";
 import type { ArrangeAction } from "./selection";
 import type { CardPatchEntry } from "./useCanvasPointer";
@@ -17,7 +13,6 @@ type Props = {
   cards: WhiteboardCard[];
   shownCards: WhiteboardCard[];
   lodSimplified: boolean;
-  weekdayGuide?: CanvasOrigin | null;
   editingId: DbId | null;
   selected: DbId[];
   selectedSet: Set<DbId>;
@@ -44,7 +39,6 @@ export function CanvasCards({
   cards,
   shownCards,
   lodSimplified,
-  weekdayGuide,
   editingId,
   selected,
   selectedSet,
@@ -73,18 +67,6 @@ export function CanvasCards({
 
   return (
     <>
-      {weekdayGuide != null ? (
-        <div
-          className="owb-cal-weekdays"
-          style={{ left: weekdayGuide.x, top: weekdayGuide.y }}
-        >
-          {WEEKDAY_LABELS_MON.map((label) => (
-            <div key={label} className="owb-cal-weekday">
-              {label}
-            </div>
-          ))}
-        </div>
-      ) : null}
       {shownCards.map((card: WhiteboardCard) => (
         <Card
           key={card.blockId}

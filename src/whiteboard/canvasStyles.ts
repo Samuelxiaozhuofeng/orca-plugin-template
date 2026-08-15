@@ -1,5 +1,3 @@
-import { CARD_WIDTH, GRID_GAP, WEEKDAY_HEADER_H } from "./layout";
-
 export const CANVAS_CSS = `
 .owb-viewport {
   position: relative;
@@ -150,25 +148,6 @@ export const CANVAS_CSS = `
 
 .owb-block-card .orca-button {
   margin-left: auto;
-}
-
-.owb-cal-weekdays {
-  position: absolute;
-  display: flex;
-  gap: ${GRID_GAP}px;
-  height: ${WEEKDAY_HEADER_H}px;
-  pointer-events: none;
-  z-index: 1;
-}
-
-.owb-cal-weekday {
-  width: ${CARD_WIDTH}px;
-  font-size: 11px;
-  font-weight: 500;
-  line-height: ${WEEKDAY_HEADER_H}px;
-  text-align: center;
-  color: var(--orca-color-text-3);
-  opacity: 0.65;
 }
 
 .owb-lod-hint {

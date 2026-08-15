@@ -186,6 +186,11 @@ export const CARD_CSS = `
   padding-top: 36px;
 }
 
+/* The journal date row duplicates the card's own date badge. */
+.owb-card-body .orca-repr-main-content:has(.orca-repr-journal-date) {
+  display: none;
+}
+
 .owb-card:hover .owb-card-body {
   scrollbar-color: color-mix(in oklab, var(--orca-color-text-3) 30%, transparent) transparent;
 }
@@ -284,6 +289,12 @@ export const CARD_CSS = `
   cursor: default;
   pointer-events: none;
   background: var(--orca-color-text-2, #666);
+}
+
+/* The journal root row is hidden, so its bullet would float alone. */
+.owb-card-block-node:has(> .orca-block[data-type="journal"])
+  > .owb-extract-bullet.is-root {
+  display: none;
 }
 
 .owb-extract-bullet:not(.is-root):hover {

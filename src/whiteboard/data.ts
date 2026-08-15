@@ -18,8 +18,6 @@ export {
   MIN_GRID_COLUMNS,
   MAX_GRID_COLUMNS,
   MIN_SCALE,
-  WEEKDAY_HEADER_H,
-  WEEKDAY_LABELS_MON,
   cardDateMeta,
   clampCardSize,
   clampGridColumns,

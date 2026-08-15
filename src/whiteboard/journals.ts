@@ -14,7 +14,6 @@ import {
   normalizeRange,
   parseDateKey,
   utcMidnightMs,
-  weekdayGuideAt,
 } from "./layout";
 import type { WhiteboardCard } from "./cards";
 
@@ -33,7 +32,6 @@ export type PlaceResult = {
   placed: number;
   skippedExisting: number;
   skippedEmpty: number;
-  weekdayGuide: CanvasOrigin | null;
 };
 
 function asBlockId(value: unknown): DbId | null {
@@ -187,9 +185,5 @@ export async function placeJournalCards(
     placed: incoming.length,
     skippedExisting,
     skippedEmpty,
-    weekdayGuide:
-      request.layout === "calendar" && incoming.length > 0
-        ? weekdayGuideAt(request.origin)
-        : null,
   };
 }

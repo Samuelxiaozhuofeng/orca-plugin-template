@@ -70,7 +70,6 @@ export function useBoardCommands(opts: {
   busy: boolean;
   setBusy: (busy: boolean) => void;
   setPlaceOpen: (open: boolean) => void;
-  setWeekdayGuide: (guide: CanvasOrigin | null) => void;
   persist: Persist;
 }) {
   const {
@@ -84,7 +83,6 @@ export function useBoardCommands(opts: {
     busy,
     setBusy,
     setPlaceOpen,
-    setWeekdayGuide,
     persist,
   } = opts;
   const {
@@ -273,7 +271,6 @@ export function useBoardCommands(opts: {
             discardLastRecord(blockId);
             return;
           }
-          setWeekdayGuide(result.weekdayGuide);
         }
         setPlaceOpen(false);
         orca.notify(
