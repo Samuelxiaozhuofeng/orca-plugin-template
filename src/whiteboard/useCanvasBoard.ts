@@ -29,8 +29,12 @@ import {
   visibleCards,
   type CanvasView,
 } from "./viewTransform";
+import {
+  blurCardEditor,
+  cardEditorFlushDelayMs,
+} from "./cardEditorFlush";
 
-const { useCallback, useEffect, useMemo, useState } = window.React;
+const { useCallback, useEffect, useMemo, useRef, useState } = window.React;
 
 type Args = {
   panelId: string;
@@ -233,14 +237,49 @@ export function useCanvasBoard({
     [onPatchCards, viewportSize.width],
   );
 
-  const startEdit = useCallback((blockId: DbId) => {
-    setEditingId(blockId);
-    setSelectedEdge(null);
-    selectArea(null);
-    setSelected((prev: DbId[]) => (prev.includes(blockId) ? prev : [blockId]));
-  }, [selectArea]);
+  const editGenRef = useRef(0);
+  const flushTimerRef = useRef(0);
 
-  const endEdit = useCallback(() => setEditingId(null), []);
+  useEffect(() => {
+    return () => window.clearTimeout(flushTimerRef.current);
+  }, []);
+
+  const afterEditorFlush = useCallback((fn: () => void) => {
+    window.clearTimeout(flushTimerRef.current);
+    blurCardEditor(viewportRef.current);
+    const gen = ++editGenRef.current;
+    const wait = cardEditorFlushDelayMs();
+    const run = () => {
+      if (gen !== editGenRef.current) return;
+      fn();
+    };
+    if (wait <= 0) {
+      run();
+      return;
+    }
+    flushTimerRef.current = window.setTimeout(run, wait);
+  }, []);
+
+  const startEdit = useCallback((blockId: DbId) => {
+    const apply = () => {
+      setEditingId(blockId);
+      setSelectedEdge(null);
+      selectArea(null);
+      setSelected((prev: DbId[]) => (prev.includes(blockId) ? prev : [blockId]));
+    };
+    if (editingRef.current != null && editingRef.current !== blockId) {
+      afterEditorFlush(apply);
+      return;
+    }
+    editGenRef.current += 1;
+    window.clearTimeout(flushTimerRef.current);
+    apply();
+  }, [afterEditorFlush, selectArea]);
+
+  const endEdit = useCallback(() => {
+    if (editingRef.current == null) return;
+    afterEditorFlush(() => setEditingId(null));
+  }, [afterEditorFlush]);
 
   const closeEdgeDrop = useCallback(() => {
     setEdgeDrop(null);
@@ -304,7 +343,7 @@ export function useCanvasBoard({
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape" && editingRef.current != null) {
-        setEditingId(null);
+        endEdit();
         return;
       }
       if (
@@ -365,6 +404,7 @@ export function useCanvasBoard({
     return () => window.removeEventListener("keydown", onKey);
   }, [
     deleteSelectedArea,
+    endEdit,
     onCommitEdges,
     onExitDrawArea,
     onPatchCards,

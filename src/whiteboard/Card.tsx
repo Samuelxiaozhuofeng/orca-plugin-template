@@ -27,10 +27,10 @@ import {
   isExtractPointerTarget,
 } from "./cardExtractDrag";
 import { FIT_HEIGHT_EPS, measureCardFitHeight } from "./cardFitHeight";
+import { CardEditor } from "./CardEditor";
 import { useCardAutoHeight } from "./useCardAutoHeight";
 
 const { useEffect, useLayoutEffect, useRef } = window.React;
-const { useSnapshot } = window.Valtio;
 
 type Props = {
   panelId: string;
@@ -69,90 +69,6 @@ type Props = {
 };
 
 type CardBox = { x: number; y: number; w: number; h: number };
-
-/** First visible editable line inside the card editor (hidden chrome skipped). */
-function firstEditableLine(root: HTMLElement): HTMLElement | null {
-  const candidates = root.querySelectorAll<HTMLElement>(
-    '[contenteditable="true"], input, textarea',
-  );
-  for (const node of Array.from(candidates)) {
-    const rect = node.getBoundingClientRect();
-    if (rect.width > 0 && rect.height > 0) return node;
-  }
-  return null;
-}
-
-function CardEditor({
-  panelId,
-  blockId,
-}: {
-  panelId: string;
-  blockId: DbId;
-}) {
-  const { panelRenderers } = useSnapshot(orca.state);
-  const BlockPanel = panelRenderers.block;
-  const editorRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    let timer = 0;
-    let attempts = 0;
-
-    const focusEditor = () => {
-      if (cancelled) return;
-      attempts++;
-      const el = editorRef.current;
-      if (el == null) return;
-
-      const target = firstEditableLine(el);
-      if (target == null) {
-        if (attempts < 20) timer = window.setTimeout(focusEditor, 25);
-        return;
-      }
-
-      target.focus({ preventScroll: true });
-      // Host CursorData is derived from a pointer hit. Deliver one hit so
-      // the editor activates; do not then overwrite the caret it places.
-      const rect = target.getBoundingClientRect();
-      const clientX = rect.left + 2;
-      const clientY = rect.top + Math.min(10, rect.height / 2);
-      try {
-        const opts = {
-          bubbles: true,
-          cancelable: true,
-          view: window,
-          clientX,
-          clientY,
-        };
-        target.dispatchEvent(new MouseEvent("mousedown", opts));
-        target.dispatchEvent(new MouseEvent("mouseup", opts));
-        target.dispatchEvent(new MouseEvent("click", opts));
-      } catch (err) {
-        console.error(
-          "Whiteboard card editor: failed to deliver focus click",
-          err,
-        );
-      }
-    };
-
-    timer = window.setTimeout(focusEditor, 10);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [blockId, panelId]);
-
-  if (BlockPanel == null) {
-    return <div className="owb-card-editor-missing">{t("Editor unavailable")}</div>;
-  }
-  // No extra .orca-panel[data-panel-id] wrapper: the real panel already
-  // owns that id. A second node with the same id would steal closest().
-  return (
-    <div ref={editorRef} className="owb-card-editor">
-      <BlockPanel panelId={panelId} blockId={blockId} active />
-    </div>
-  );
-}
 
 export function Card({
   panelId,
