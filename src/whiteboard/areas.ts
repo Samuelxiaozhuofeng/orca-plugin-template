@@ -11,6 +11,19 @@ export const AREA_TITLE_H = 28;
 export const MIN_AREA_W = 80;
 export const MIN_AREA_H = 64;
 
+/** Same five ids as `COLOR_PRESETS` in CardToolbar (default = no field). */
+export const AREA_COLOR_IDS = [
+  "blue",
+  "green",
+  "yellow",
+  "coral",
+  "purple",
+] as const;
+
+export type AreaColorId = (typeof AREA_COLOR_IDS)[number];
+
+const AREA_COLOR_SET: ReadonlySet<string> = new Set(AREA_COLOR_IDS);
+
 export type WhiteboardArea = {
   id: string;
   x: number;
@@ -18,10 +31,21 @@ export type WhiteboardArea = {
   w: number;
   h: number;
   name: string;
+  /** Present only when the user picked a colour. Omitted = no colour. */
+  color?: AreaColorId;
+  /** Present only when collapsed. Omitted = expanded. */
+  collapsed?: true;
 };
 
 function asFinite(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+/** Unknown / empty / "default" → no colour. Never fails the parent area. */
+export function areaColorIfValid(value: unknown): AreaColorId | undefined {
+  return typeof value === "string" && AREA_COLOR_SET.has(value)
+    ? (value as AreaColorId)
+    : undefined;
 }
 
 export function nextAreaId(
@@ -44,7 +68,11 @@ export function normalizeArea(value: unknown): WhiteboardArea | null {
   const h = asFinite(raw.h);
   if (x == null || y == null || w == null || h == null) return null;
   if (w <= 0 || h <= 0) return null;
-  return { id: raw.id, x, y, w, h, name: raw.name };
+  const area: WhiteboardArea = { id: raw.id, x, y, w, h, name: raw.name };
+  const color = areaColorIfValid(raw.color);
+  if (color != null) area.color = color;
+  if (raw.collapsed === true) area.collapsed = true;
+  return area;
 }
 
 export function tryParseAreas(value: unknown): JsonParseResult<WhiteboardArea[]> {
@@ -107,7 +135,9 @@ function areaEqual(left: WhiteboardArea, right: WhiteboardArea): boolean {
     left.y === right.y &&
     left.w === right.w &&
     left.h === right.h &&
-    left.name === right.name
+    left.name === right.name &&
+    left.color === right.color &&
+    left.collapsed === right.collapsed
   );
 }
 
@@ -263,13 +293,21 @@ export function pointInArea(
 export function hitAreaAt(
   x: number,
   y: number,
-  areas: ReadonlyArray<{ id: string; x: number; y: number; w: number; h: number }>,
+  areas: ReadonlyArray<{
+    id: string;
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    collapsed?: boolean;
+  }>,
 ): string | null {
   let bestId: string | null = null;
   let bestSize = Infinity;
   for (const area of areas) {
-    if (!pointInArea(x, y, area)) continue;
-    const size = area.w * area.h;
+    const box = areaHitBox(area);
+    if (box == null || !pointInArea(x, y, box)) continue;
+    const size = box.w * box.h;
     if (size <= bestSize) {
       bestSize = size;
       bestId = area.id;
@@ -291,4 +329,63 @@ export function removeArea(
   id: string,
 ): WhiteboardArea[] {
   return areas.filter((area) => area.id !== id);
+}
+
+export function areaIsCollapsed(
+  area: { collapsed?: boolean },
+): boolean {
+  return area.collapsed === true;
+}
+
+/**
+ * Painted box. Collapsed areas shrink to nothing in world space — the title
+ * chip above the frame is the only chrome, and it handles its own pointers.
+ */
+export function areaVisualBox(area: WhiteboardArea): {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+} {
+  if (!areaIsCollapsed(area)) {
+    return { x: area.x, y: area.y, w: area.w, h: area.h };
+  }
+  return { x: area.x, y: area.y, w: area.w, h: 0 };
+}
+
+/** Interior of a collapsed frame is empty space; title chrome handles hits. */
+export function areaHitBox(area: {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  collapsed?: boolean;
+}): { x: number; y: number; w: number; h: number } | null {
+  if (areaIsCollapsed(area)) return null;
+  return { x: area.x, y: area.y, w: area.w, h: area.h };
+}
+
+/** Viewport culling: collapsed frames keep the title chip in view. */
+export function areaCullBox(area: WhiteboardArea): {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+} {
+  if (!areaIsCollapsed(area)) {
+    return { x: area.x, y: area.y, w: area.w, h: area.h };
+  }
+  const lift = AREA_TITLE_H + 8;
+  return { x: area.x, y: area.y - lift, w: area.w, h: lift };
+}
+
+export function countCardsInArea(
+  area: { x: number; y: number; w: number; h: number },
+  cards: ReadonlyArray<{ x: number; y: number; w: number; h: number }>,
+): number {
+  let n = 0;
+  for (const card of cards) {
+    if (cardInArea(card, area)) n += 1;
+  }
+  return n;
 }

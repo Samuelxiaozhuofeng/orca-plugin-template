@@ -233,6 +233,10 @@ const zhCN = {
     "有 ${edges} 条连线和 ${areas} 个区域读不出来，已停止保存以免覆盖，你现在做的改动不会被保留。",
   "${cards} cards, ${edges} connections and ${areas} sections could not be read. Saving has been stopped so nothing is overwritten. Changes you make now will not be kept.":
     "有 ${cards} 张卡片、${edges} 条连线和 ${areas} 个区域读不出来，已停止保存以免覆盖，你现在做的改动不会被保留。",
+  "Section color": "区域颜色",
+  "No color": "无颜色",
+  "Collapse section": "收起区域",
+  "Expand section": "展开区域",
 };
 
 export default zhCN;

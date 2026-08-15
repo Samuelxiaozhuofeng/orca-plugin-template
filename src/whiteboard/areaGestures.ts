@@ -1,5 +1,11 @@
 import type { DbId } from "../orca.d.ts";
-import { cardInArea, MIN_AREA_H, MIN_AREA_W, type WhiteboardArea } from "./areas";
+import {
+  areaVisualBox,
+  cardInArea,
+  MIN_AREA_H,
+  MIN_AREA_W,
+  type WhiteboardArea,
+} from "./areas";
 import { applyCardBox } from "./cardGestures";
 import { CLICK_THRESHOLD_PX } from "./marquee";
 import { normalizeRect, type CardRect } from "./selection";
@@ -265,11 +271,12 @@ export function startMoveArea(opts: {
     const now = opts.pointerToWorld(clientX, clientY);
     lastDx = now.x - start.x;
     lastDy = now.y - start.y;
+    const visual = areaVisualBox(opts.area);
     applyAreaBox(opts.areaEl, {
-      x: opts.area.x + lastDx,
-      y: opts.area.y + lastDy,
-      w: opts.area.w,
-      h: opts.area.h,
+      x: visual.x + lastDx,
+      y: visual.y + lastDy,
+      w: visual.w,
+      h: visual.h,
     });
     const boxes = new Map<DbId, CardRect>();
     for (const card of followers) {
@@ -299,7 +306,7 @@ export function startMoveArea(opts: {
       el?.classList.remove("is-dragging");
       if (restore) applyCardBox(el, card);
     }
-    if (restore) applyAreaBox(opts.areaEl, opts.area);
+    if (restore) applyAreaBox(opts.areaEl, areaVisualBox(opts.area));
   };
 
   const onMove = (event: MouseEvent) => {
