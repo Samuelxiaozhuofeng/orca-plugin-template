@@ -2,7 +2,8 @@ import type { Block, DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n";
 import { canRedo, canUndo } from "./boardHistory";
 import { BoardTitle } from "./BoardTitle";
-import { boardName, clampScale } from "./data";
+import { boardName } from "./data";
+import { nextZoomScale } from "./fitView";
 import { openBoardAsOutline } from "./pageBoardRedirect";
 import {
   DEFAULT_VIEW,
@@ -84,7 +85,7 @@ export function BoardToolbar({
           onClick={() =>
             setView((current: CanvasView) => ({
               ...current,
-              scale: clampScale(current.scale / 1.1),
+              scale: nextZoomScale(current.scale, -1),
             }))
           }
         >
@@ -108,7 +109,7 @@ export function BoardToolbar({
           onClick={() =>
             setView((current: CanvasView) => ({
               ...current,
-              scale: clampScale(current.scale * 1.1),
+              scale: nextZoomScale(current.scale, 1),
             }))
           }
         >

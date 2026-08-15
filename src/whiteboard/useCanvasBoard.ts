@@ -1,11 +1,8 @@
 import type { DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n";
 import type { WhiteboardArea } from "./areas";
-import { canRedo, canUndo } from "./boardHistory";
-import {
-  handleWhiteboardKey,
-  isWhiteboardShortcutTarget,
-} from "./canvasKeys";
+import { planColorPatches, planUnifySizePatches, type UnifySizeMode } from "./cardBatch";
+import type { CanvasFocusApi } from "./cardFocus";
 import { GRID_GAP, type WhiteboardCard } from "./data";
 import type { DrawDropEmpty } from "./edgeGestures";
 import type { EdgeLayerApi } from "./EdgeLayer";
@@ -22,7 +19,8 @@ import {
   type ArrangeAction,
 } from "./selection";
 import { useCanvasAreas } from "./useCanvasAreas";
-import type { CardPatchEntry, PatchCardsFn } from "./useCanvasPointer";
+import { useCanvasKeys } from "./useCanvasKeys";
+import type { PatchCardsFn } from "./useCanvasPointer";
 import {
   isLodSimplified,
   planShownCards,
@@ -67,6 +65,10 @@ type Args = {
   onExitDrawArea: () => void;
   onUndo: () => void;
   onRedo: () => void;
+  liveViewRef: { current: CanvasView };
+  focusApiRef: { current: CanvasFocusApi | null };
+  onViewChange: (view: CanvasView) => void;
+  searchOpen: boolean;
 };
 
 export function useCanvasBoard({
@@ -95,6 +97,10 @@ export function useCanvasBoard({
   onExitDrawArea,
   onUndo,
   onRedo,
+  liveViewRef,
+  focusApiRef,
+  onViewChange,
+  searchOpen,
 }: Args) {
   const [editingId, setEditingId] = useState<DbId | null>(null);
   const [selected, setSelected] = useState<DbId[]>([]);
@@ -224,6 +230,26 @@ export function useCanvasBoard({
     [onPatchCards, viewportSize.width],
   );
 
+  const applyCardColor = useCallback(
+    (color: string | undefined, over?: readonly DbId[]) => {
+      const ids = new Set<DbId>(over ?? selectedRef.current);
+      const patches = planColorPatches(cardsRef.current, ids, color);
+      if (patches.length === 0) return;
+      onPatchCards(patches);
+    },
+    [onPatchCards],
+  );
+
+  const applyUnifySize = useCallback(
+    (mode: UnifySizeMode, over?: readonly DbId[]) => {
+      const ids = new Set<DbId>(over ?? selectedRef.current);
+      const patches = planUnifySizePatches(cardsRef.current, ids, mode);
+      if (patches.length === 0) return;
+      onPatchCards(patches);
+    },
+    [onPatchCards],
+  );
+
   const editGenRef = useRef(0);
   const flushTimerRef = useRef(0);
   const hostUndoOnceRef = useRef(false);
@@ -329,91 +355,33 @@ export function useCanvasBoard({
     [boardBlockId, onAddCards, onCommitEdges, selectCards],
   );
 
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && editingRef.current != null) {
-        endEdit();
-        return;
-      }
-      if (
-        !isWhiteboardShortcutTarget(event, {
-          panelId,
-          editing: editingRef.current != null,
-          viewport: viewportRef.current,
-        })
-      ) {
-        return;
-      }
-      handleWhiteboardKey(event, {
-        nudge: (dx, dy) => {
-          const ids = new Set<DbId>(selectedRef.current);
-          if (ids.size === 0) return;
-          const entries: CardPatchEntry[] = [];
-          cardsRef.current = cardsRef.current.map((card: WhiteboardCard) => {
-            if (!ids.has(card.blockId)) return card;
-            const next = { ...card, x: card.x + dx, y: card.y + dy };
-            entries.push({
-              blockId: card.blockId,
-              patch: { x: next.x, y: next.y },
-            });
-            return next;
-          });
-          onPatchCards(entries);
-        },
-        selectAll: () => {
-          selectCards(cardsRef.current.map((card: WhiteboardCard) => card.blockId));
-        },
-        escape: () => {
-          selectCards([]);
-          selectArea(null);
-          onExitDrawArea();
-        },
-        remove: () => {
-          const edgeId = selectedEdgeRef.current;
-          if (edgeId != null) {
-            void onCommitEdges(
-              edgesRef.current.filter((edge: WhiteboardEdge) => edge.id !== edgeId),
-            ).then((ok) => {
-              if (ok) setSelectedEdge(null);
-            });
-            return;
-          }
-          if (deleteSelectedArea()) return;
-          const ids = selectedRef.current;
-          if (ids.length === 0) return;
-          void onRemoveCards(ids).then((ok) => {
-            if (ok) selectCards([]);
-          });
-        },
-        undo: onUndo,
-        redo: onRedo,
-      }, {
-        canUndo: canUndo(boardBlockId),
-        canRedo: canRedo(boardBlockId),
-        takeHostUndo: () => {
-          if (!hostUndoOnceRef.current) return false;
-          hostUndoOnceRef.current = false;
-          return true;
-        },
-      });
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [
-    deleteSelectedArea,
-    endEdit,
-    onCommitEdges,
-    onExitDrawArea,
-    onPatchCards,
-    onRedo,
-    onRemoveCards,
-    onUndo,
-    boardBlockId,
+  useCanvasKeys({
     panelId,
-    selectArea,
-    selectCards,
+    boardBlockId,
+    searchOpen,
     viewportRef,
-  ]);
+    editingRef,
+    selectedRef,
+    selectedEdgeRef,
+    cardsRef,
+    edgesRef,
+    liveViewRef,
+    viewportSize,
+    focusApiRef,
+    hostUndoOnceRef,
+    onPatchCards,
+    onRemoveCards,
+    onCommitEdges,
+    onUndo,
+    onRedo,
+    onExitDrawArea,
+    selectCards,
+    selectArea,
+    deleteSelectedArea,
+    setSelectedEdge,
+    endEdit,
+    onViewChange,
+  });
 
   return {
     editingId,
@@ -431,6 +399,8 @@ export function useCanvasBoard({
     resizeArea,
     moveAreaBy,
     applyArrange,
+    applyCardColor,
+    applyUnifySize,
     applyContentHeight,
     startEdit,
     endEdit,

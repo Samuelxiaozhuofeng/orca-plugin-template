@@ -28,6 +28,8 @@ export type CanvasFocusApi = {
   focusCard: (cardBlockId: DbId) => boolean;
   /** Frames every card on the board. False when there is nothing to frame. */
   fitAll: () => boolean;
+  /** Frames the given boxes (selection, or any subset). */
+  fitBoxes: (boxes: readonly WhiteboardCard[]) => boolean;
 };
 
 export function focusView(
@@ -159,8 +161,19 @@ export function applyCanvasFitAll(opts: {
   viewportEl: HTMLElement | null;
   onViewChange: (view: CanvasView) => void;
 }): boolean {
+  return applyCanvasFitBoxes({ ...opts, boxes: opts.cards });
+}
+
+export function applyCanvasFitBoxes(opts: {
+  boxes: readonly Pick<WhiteboardCard, "x" | "y" | "w" | "h">[];
+  viewport: { width: number; height: number };
+  canvas: HTMLElement | null;
+  grid: HTMLElement | null;
+  viewportEl: HTMLElement | null;
+  onViewChange: (view: CanvasView) => void;
+}): boolean {
   const viewport = liveViewportSize(opts.viewportEl) ?? opts.viewport;
-  const next = fitViewForBoxes(opts.cards, viewport);
+  const next = fitViewForBoxes(opts.boxes, viewport);
   if (next == null) return false;
   beginViewAnimation(opts.canvas, opts.grid, opts.viewportEl);
   opts.onViewChange(next);
@@ -207,6 +220,15 @@ export function useCanvasFocusApi(
       fitAll: () =>
         applyCanvasFitAll({
           cards: cardsRef.current,
+          viewport: viewportSize,
+          canvas: canvasRef.current,
+          grid: gridRef.current,
+          viewportEl: viewportRef.current,
+          onViewChange,
+        }),
+      fitBoxes: (boxes) =>
+        applyCanvasFitBoxes({
+          boxes,
           viewport: viewportSize,
           canvas: canvasRef.current,
           grid: gridRef.current,

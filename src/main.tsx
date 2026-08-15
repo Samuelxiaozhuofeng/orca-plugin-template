@@ -44,6 +44,7 @@ import {
   injectWhiteboardStyles,
   removeWhiteboardStyles,
 } from "./whiteboard/styles";
+import { invokeFindCardOnActivePanel } from "./whiteboard/cardSearch";
 import { invokeWrapSelectedOnActivePanel } from "./whiteboard/useCanvasAreas";
 
 let pluginName: string;
@@ -64,6 +65,12 @@ const WRAP_AREA_SHORTCUT = /Mac|iPhone|iPad|iPod/i.test(
 )
   ? "meta+g"
   : "ctrl+g";
+const FIND_CARD_COMMAND = "findCard";
+const FIND_CARD_SHORTCUT = /Mac|iPhone|iPad|iPod/i.test(
+  typeof navigator === "undefined" ? "" : navigator.platform,
+)
+  ? "meta+f"
+  : "ctrl+f";
 
 function commandId(name: string): string {
   return `${pluginName}.${name}`;
@@ -153,6 +160,16 @@ export async function load(_name: string) {
   );
   void assignShortcutIfFree(wrapAreaId, WRAP_AREA_SHORTCUT);
 
+  const findCardId = commandId(FIND_CARD_COMMAND);
+  orca.commands.registerCommand(
+    findCardId,
+    () => {
+      invokeFindCardOnActivePanel();
+    },
+    t("Find cards on this whiteboard"),
+  );
+  void assignShortcutIfFree(findCardId, FIND_CARD_SHORTCUT);
+
   startBlockMarks(pluginName);
 
   orca.blockMenuCommands.registerBlockMenuCommand(
@@ -230,6 +247,7 @@ export async function unload() {
     );
     orca.commands.unregisterCommand(commandId(OPEN_COMMAND));
     orca.commands.unregisterCommand(commandId(WRAP_AREA_COMMAND));
+    orca.commands.unregisterCommand(commandId(FIND_CARD_COMMAND));
     orca.headbar.unregisterHeadbarButton(commandId(OPEN_HEADBAR));
     unregisterPageBoardCommands(pluginName);
   }

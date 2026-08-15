@@ -1,5 +1,12 @@
 import { MIN_SCALE } from "./layout.ts";
-import { contentBounds, fitViewForBoxes, type FitBox } from "./fitView.ts";
+import {
+  contentBounds,
+  fitViewForBoxes,
+  nextZoomScale,
+  scaleViewAround,
+  ZOOM_STEP,
+  type FitBox,
+} from "./fitView.ts";
 
 function check(cond: boolean, msg: string): void {
   if (!cond) throw new Error(msg);
@@ -57,5 +64,13 @@ const point = fitViewForBoxes([box(40, 40, 0, 0)], { width: 800, height: 600 });
 check(point != null, "zero-size box still fits");
 near(point!.scale, 1, "zero-size box stays at 100%");
 near(point!.x, 400 - 40, "zero-size box centred horizontally");
+
+near(nextZoomScale(1, 1), ZOOM_STEP, "toolbar-equivalent zoom in");
+near(nextZoomScale(1, -1), 1 / ZOOM_STEP, "toolbar-equivalent zoom out");
+
+const around = scaleViewAround({ x: 0, y: 0, scale: 1 }, 2, { x: 100, y: 80 });
+near(around.scale, 2, "scale around anchor");
+near(around.x, 100 - 100 * 2, "anchor x stays put");
+near(around.y, 80 - 80 * 2, "anchor y stays put");
 
 console.log("fitView tests passed");

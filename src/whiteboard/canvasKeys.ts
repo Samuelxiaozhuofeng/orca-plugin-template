@@ -1,3 +1,6 @@
+import { colorIdForDigit } from "./cardBatch.ts";
+import { isHostOverlayTarget } from "./hostOverlay.ts";
+
 export function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   if (target.isContentEditable) return true;
@@ -5,7 +8,7 @@ export function isEditableTarget(target: EventTarget | null): boolean {
   if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
   return (
     target.closest(
-      '.owb-card-editor, .owb-dialog, [contenteditable="true"], input, textarea',
+      '.owb-card-editor, .owb-dialog, .owb-card-search, [contenteditable="true"], input, textarea',
     ) != null
   );
 }
@@ -16,11 +19,14 @@ export function isWhiteboardShortcutTarget(
     panelId: string;
     editing: boolean;
     viewport: HTMLElement | null;
+    searchOpen?: boolean;
   },
 ): boolean {
   if (opts.editing) return false;
+  if (opts.searchOpen) return false;
   if (orca.state.activePanel !== opts.panelId) return false;
   if (isEditableTarget(event.target)) return false;
+  if (isHostOverlayTarget(event.target)) return false;
   const panel = opts.viewport?.closest(".owb-panel");
   const active = document.activeElement;
   if (
@@ -41,6 +47,11 @@ export type WhiteboardKeyActions = {
   remove: () => void;
   undo: () => void;
   redo: () => void;
+  find?: () => void;
+  zoomIn?: () => void;
+  zoomOut?: () => void;
+  fit?: () => void;
+  color?: (id: string | undefined) => void;
 };
 
 export type WhiteboardUndoGate = {
@@ -99,9 +110,39 @@ export function handleWhiteboardKey(
       return true;
     }
   }
+  if (event.metaKey || event.ctrlKey || event.altKey) return false;
+
+  if (
+    (event.key === "+" || event.key === "=" || event.code === "NumpadAdd") &&
+    actions.zoomIn != null
+  ) {
+    event.preventDefault();
+    actions.zoomIn();
+    return true;
+  }
+  if (
+    (event.key === "-" || event.code === "NumpadSubtract") &&
+    actions.zoomOut != null
+  ) {
+    event.preventDefault();
+    actions.zoomOut();
+    return true;
+  }
+  if (event.key.toLowerCase() === "f" && actions.fit != null) {
+    event.preventDefault();
+    actions.fit();
+    return true;
+  }
+  if (actions.color != null && /^[0-5]$/.test(event.key)) {
+    const mapped = colorIdForDigit(event.key);
+    if (mapped === null) return false;
+    event.preventDefault();
+    actions.color(mapped);
+    return true;
+  }
+
   const step = ARROWS[event.key];
   if (step == null) return false;
-  if (event.metaKey || event.ctrlKey || event.altKey) return false;
   event.preventDefault();
   const size = event.shiftKey ? 10 : 1;
   actions.nudge(step[0] * size, step[1] * size);

@@ -239,6 +239,14 @@ const zhCN = {
   "No color": "无颜色",
   "Collapse section": "收起区域",
   "Expand section": "展开区域",
+  "Find cards…": "查找卡片…",
+  "Find cards on this whiteboard": "在白板上查找卡片",
+  "Search cards": "搜索卡片",
+  "Type to find cards on this board.": "输入关键词，在这块白板里找卡片。",
+  "No matching cards": "没有匹配的卡片",
+  "Unify size": "统一尺寸",
+  "Match widest": "按最宽的",
+  "Match narrowest": "按最窄的",
 };
 
 export default zhCN;

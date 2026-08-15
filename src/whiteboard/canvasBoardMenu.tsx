@@ -1,6 +1,8 @@
 import type { DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n";
 import { ArrangeMenuItems } from "./ArrangeMenu";
+import { COLOR_PRESETS } from "./CardToolbar";
+import type { UnifySizeMode } from "./cardBatch";
 import type { WhiteboardCard } from "./data";
 import type { ArrangeAction } from "./selection";
 
@@ -24,6 +26,9 @@ export type BoardMenuOptions = {
   onPlaceJournals: () => void;
   onDrawArea: () => void;
   onFitAll: () => void;
+  onFind: () => void;
+  onColor: (color: string | undefined) => void;
+  onUnifySize: (mode: UnifySizeMode) => void;
 };
 
 export function boardMenu(close: () => void, opts: BoardMenuOptions) {
@@ -61,6 +66,11 @@ export function boardMenu(close: () => void, opts: BoardMenuOptions) {
         preIcon="ti ti-rectangle"
         onClick={run(opts.onDrawArea)}
       />
+      <orca.components.MenuText
+        title={t("Find cards…")}
+        preIcon="ti ti-search"
+        onClick={run(opts.onFind)}
+      />
       <orca.components.MenuSeparator />
       <orca.components.MenuText
         title={t("Select all")}
@@ -79,6 +89,30 @@ export function boardMenu(close: () => void, opts: BoardMenuOptions) {
         selectedCount={opts.selected.length}
         onArrange={opts.applyArrange}
       />
+      {arranging ? (
+        <>
+          <orca.components.MenuSeparator />
+          <orca.components.MenuTitle title={t("Card color")} />
+          {COLOR_PRESETS.map((preset) => (
+            <orca.components.MenuText
+              key={preset.id}
+              title={t(preset.label)}
+              onClick={run(() =>
+                opts.onColor(preset.id === "default" ? undefined : preset.id),
+              )}
+            />
+          ))}
+          <orca.components.MenuTitle title={t("Unify size")} />
+          <orca.components.MenuText
+            title={t("Match widest")}
+            onClick={run(() => opts.onUnifySize("widest"))}
+          />
+          <orca.components.MenuText
+            title={t("Match narrowest")}
+            onClick={run(() => opts.onUnifySize("narrowest"))}
+          />
+        </>
+      ) : null}
       <orca.components.MenuSeparator />
       <orca.components.MenuText
         title={t("Zoom to fit")}

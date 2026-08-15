@@ -186,4 +186,148 @@ export const CANVAS_CSS = `
   background: color-mix(in oklab, var(--orca-color-bg-1) 88%, transparent);
   border: 1px solid var(--orca-color-border);
 }
+
+.owb-card-search {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  width: min(360px, calc(100% - 32px));
+  padding: 8px;
+  border-radius: var(--owb-radius-card, 6px);
+  background: var(--orca-color-bg-1);
+  border: 1.5px solid var(--orca-color-border);
+  box-shadow: 3px 3px 0 0 var(--orca-color-border);
+}
+
+.owb-card-search-input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 7px 10px;
+  border: 1.5px solid var(--orca-color-border);
+  border-radius: var(--owb-radius-btn, 4px);
+  background: var(--orca-color-bg-1);
+  color: var(--orca-color-text-1);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.owb-card-search-input:focus {
+  border-color: var(--orca-color-primary-5, #00a896);
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--orca-color-primary-5, #00a896) 25%, transparent);
+}
+
+.owb-card-search-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 260px;
+  margin-top: 6px;
+  overflow: auto;
+}
+
+.owb-card-search-item {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 1.5px solid transparent;
+  border-radius: var(--owb-radius-btn, 4px);
+  background: transparent;
+  color: var(--orca-color-text-1);
+  cursor: pointer;
+  text-align: left;
+}
+
+.owb-card-search-item.is-active,
+.owb-card-search-item:hover {
+  background: var(--orca-color-warning-5, #f4a259);
+  color: #111417;
+  border-color: var(--orca-color-border);
+}
+
+.owb-card-search-title {
+  font-size: 13px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.owb-card-search-snippet {
+  font-size: 11px;
+  font-weight: 500;
+  opacity: 0.75;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.owb-card-search-hint {
+  margin-top: 6px;
+  padding: 4px 6px;
+  font-size: 12px;
+  color: var(--orca-color-text-3);
+}
+
+.owb-selection-bar {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 22;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: var(--owb-radius-card, 6px);
+  background: var(--orca-color-bg-1);
+  border: 1.5px solid var(--orca-color-border);
+  box-shadow: 3px 3px 0 0 var(--orca-color-border);
+}
+
+.owb-selection-bar-count {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--orca-color-text-2);
+  white-space: nowrap;
+}
+
+.owb-selection-bar-colors {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.owb-selection-bar-sep {
+  width: 1px;
+  height: 16px;
+  background: var(--orca-color-border);
+}
+
+.owb-selection-bar-btn {
+  appearance: none;
+  border: 1.5px solid var(--orca-color-border);
+  background: var(--orca-color-bg-1);
+  color: var(--orca-color-text-1);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.3;
+  padding: 4px 8px;
+  border-radius: var(--owb-radius-btn, 4px);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.owb-selection-bar-btn:hover {
+  background: var(--orca-color-warning-5, #f4a259);
+  color: #111417;
+}
 `.trim();

@@ -53,3 +53,27 @@ export function fitViewForBoxes(
     scale,
   };
 }
+
+/** Same step as the toolbar + / − buttons. */
+export const ZOOM_STEP = 1.1;
+
+export function nextZoomScale(scale: number, direction: 1 | -1): number {
+  return clampScale(direction > 0 ? scale * ZOOM_STEP : scale / ZOOM_STEP);
+}
+
+/** Zoom so the given viewport point stays put (keyboard uses the centre). */
+export function scaleViewAround(
+  view: CanvasView,
+  nextScale: number,
+  anchor: { x: number; y: number },
+): CanvasView {
+  const current = view.scale === 0 ? 1 : view.scale;
+  const worldX = (anchor.x - view.x) / current;
+  const worldY = (anchor.y - view.y) / current;
+  const scale = clampScale(nextScale);
+  return {
+    scale,
+    x: anchor.x - worldX * scale,
+    y: anchor.y - worldY * scale,
+  };
+}
