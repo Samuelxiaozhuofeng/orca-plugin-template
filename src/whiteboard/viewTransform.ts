@@ -1,6 +1,5 @@
 import type { DbId } from "../orca.d.ts";
 import {
-  CARD_LOD_SCALE,
   CARD_MOUNT_CAP,
   clampScale,
   MAX_SCALE,
@@ -157,8 +156,9 @@ export function marginScreensForScale(scale: number): number {
   return (scale - MIN_SCALE) / (1 - MIN_SCALE);
 }
 
-export function isLodSimplified(scale: number): boolean {
-  return scale < CARD_LOD_SCALE;
+/** LOD simplify is disabled: every zoom level keeps full card content. */
+export function isLodSimplified(_scale: number): boolean {
+  return false;
 }
 
 export function visibleCards<T extends WhiteboardCard>(

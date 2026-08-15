@@ -298,7 +298,12 @@ export function useCanvasView({
 
   const onWheel = (event: WheelEvent) => {
     const target = event.target as HTMLElement | null;
-    if (target?.closest(".owb-card-body")) return;
+    if (
+      target?.closest(".owb-card.is-editing") &&
+      target.closest(".owb-card-body")
+    ) {
+      return;
+    }
 
     const el = viewportRef.current;
     if (!el) return;

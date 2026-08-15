@@ -42,8 +42,8 @@ check(CARD_MOUNT_CAP === 300, "mount cap is 300");
 
 check(isLodSimplified(1) === false, "100% is full render");
 check(isLodSimplified(CARD_LOD_SCALE) === false, "threshold itself is full");
-check(isLodSimplified(CARD_LOD_SCALE - 0.01) === true, "just below is simplified");
-check(isLodSimplified(MIN_SCALE) === true, "min zoom is simplified");
+check(isLodSimplified(CARD_LOD_SCALE - 0.01) === false, "just below threshold is still full");
+check(isLodSimplified(MIN_SCALE) === false, "min zoom is still full");
 check(isLodSimplified(2) === false, "max zoom is full");
 
 const marginScales = [2, 1, 0.8, 0.6, 0.5, 0.4, 0.3, MIN_SCALE, 0.1];
@@ -60,8 +60,8 @@ check(marginScreensForScale(MIN_SCALE) === 0, "no extra screen at min zoom");
 check(marginScreensForScale(1) === 1, "full pad at 100%");
 check(marginScreensForScale(2) === 1, "pad stays 1 above 100%");
 check(
-  Math.abs(marginScreensForScale(0.625) - 0.5) < 1e-12,
-  "mid zoom interpolates (0.625 → 0.5 screens)",
+  Math.abs(marginScreensForScale(0.55) - 0.5) < 1e-12,
+  "mid zoom interpolates (0.55 → 0.5 screens)",
 );
 
 const justPastAtFull = card(1, viewport.width / 1 + 50);

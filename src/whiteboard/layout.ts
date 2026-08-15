@@ -4,9 +4,9 @@ export const MIN_CARD_WIDTH = 160;
 export const MIN_CARD_HEIGHT = 120;
 export const GRID_GAP = 16;
 export const GRID_ORIGIN = 24;
-export const MIN_SCALE = 0.25;
+export const MIN_SCALE = 0.1;
 export const MAX_SCALE = 2;
-/** Below this zoom, cards paint as a title chip (no hosted block tree). */
+/** Legacy LOD threshold; simplification is disabled, kept for reference. */
 export const CARD_LOD_SCALE = 0.5;
 /** Max Card components mounted at once, even when more sit in the cull window. */
 export const CARD_MOUNT_CAP = 300;
