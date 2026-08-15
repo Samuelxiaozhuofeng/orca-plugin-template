@@ -5,6 +5,7 @@ import {
   isWhiteboardShortcutTarget,
 } from "./canvasKeys";
 import { GRID_GAP, type WhiteboardCard } from "./data";
+import { CARD_MOUNT_CAP } from "./layout";
 import type { DrawDropEmpty } from "./edgeGestures";
 import type { EdgeLayerApi } from "./EdgeLayer";
 import type { WhiteboardEdge } from "./edges";
@@ -21,6 +22,8 @@ import {
 } from "./selection";
 import type { CardPatchEntry, PatchCardsFn } from "./useCanvasPointer";
 import {
+  isLodSimplified,
+  pickMountedCards,
   visibleCards,
   type CanvasView,
 } from "./viewTransform";
@@ -112,10 +115,19 @@ export function useCanvasBoard({
     return ids;
   }, [editingId, selected]);
 
-  const shownCards = useMemo(
-    () => visibleCards(cards, view, viewportSize, pinned),
-    [cards, pinned, view, viewportSize],
-  );
+  const lodSimplified = isLodSimplified(view.scale);
+  const shownPlan = useMemo(() => {
+    const visible = visibleCards(cards, view, viewportSize, pinned);
+    return pickMountedCards(visible, {
+      cap: CARD_MOUNT_CAP,
+      editingId,
+      selectedIds: selected,
+      view,
+      viewport: viewportSize,
+    });
+  }, [cards, editingId, pinned, selected, view, viewportSize]);
+  const shownCards = shownPlan.cards;
+  const hiddenCardCount = shownPlan.hiddenCount;
   const selectedSet = useMemo(() => new Set(selected), [selected]);
 
   const applyContentHeight = useCallback(
@@ -323,6 +335,8 @@ export function useCanvasBoard({
     createBlankAt,
     extractRow,
     shownCards,
+    hiddenCardCount,
+    lodSimplified,
     selectedSet,
   };
 }

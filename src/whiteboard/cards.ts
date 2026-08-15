@@ -1,12 +1,12 @@
 import type { DbId } from "../orca.d.ts";
-import { t } from "../libs/l10n";
-import { emitBoardCardsChanged } from "./boardEvents";
-import { assertBoardWritable, writeProperties } from "./boardWrite";
+import { t } from "../libs/l10n.ts";
+import { emitBoardCardsChanged } from "./boardEvents.ts";
+import { assertBoardWritable, writeProperties } from "./boardWrite.ts";
 import {
   CARD_HEIGHT,
   CARD_WIDTH,
   clampCardSize,
-} from "./layout";
+} from "./layout.ts";
 
 export const CARDS_PROP = "cards";
 export const PROP_TYPE_TEXT = 1;
@@ -83,29 +83,48 @@ export function normalizeCard(value: unknown): WhiteboardCard | null {
 
 export type JsonParseResult<T> =
   | { ok: true; value: T }
-  | { ok: false };
+  | { ok: false; reason: "not-array" }
+  | { ok: false; reason: "bad-items"; dropped: number };
 
-function cardsFromArray(parsed: unknown[]): WhiteboardCard[] {
-  return parsed
-    .map(normalizeCard)
-    .filter((card): card is WhiteboardCard => card != null);
-}
-
-export function tryParseCards(value: unknown): JsonParseResult<WhiteboardCard[]> {
-  if (value == null) return { ok: true, value: [] };
+export function parseStoredArray(
+  value: unknown,
+): { ok: true; items: unknown[] } | { ok: false } {
+  if (value == null) return { ok: true, items: [] };
   if (typeof value === "string") {
     const trimmed = value.trim();
-    if (trimmed === "") return { ok: true, value: [] };
+    if (trimmed === "") return { ok: true, items: [] };
     try {
       const parsed: unknown = JSON.parse(trimmed);
       if (!Array.isArray(parsed)) return { ok: false };
-      return { ok: true, value: cardsFromArray(parsed) };
+      return { ok: true, items: parsed };
     } catch {
       return { ok: false };
     }
   }
-  if (Array.isArray(value)) return { ok: true, value: cardsFromArray(value) };
+  if (Array.isArray(value)) return { ok: true, items: value };
   return { ok: false };
+}
+
+/** Any element that fails normalize makes the result unreadable (protect). */
+export function mapStoredArray<T>(
+  value: unknown,
+  normalize: (item: unknown) => T | null,
+): JsonParseResult<T[]> {
+  const raw = parseStoredArray(value);
+  if (!raw.ok) return { ok: false, reason: "not-array" };
+  const out: T[] = [];
+  let dropped = 0;
+  for (const item of raw.items) {
+    const next = normalize(item);
+    if (next == null) dropped += 1;
+    else out.push(next);
+  }
+  if (dropped > 0) return { ok: false, reason: "bad-items", dropped };
+  return { ok: true, value: out };
+}
+
+export function tryParseCards(value: unknown): JsonParseResult<WhiteboardCard[]> {
+  return mapStoredArray(value, normalizeCard);
 }
 
 export function parseCards(value: unknown): WhiteboardCard[] {

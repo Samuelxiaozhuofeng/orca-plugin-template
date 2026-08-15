@@ -282,6 +282,22 @@ export const CARD_CSS = `
   font-style: italic;
 }
 
+.owb-card.is-simplified {
+  justify-content: center;
+}
+
+.owb-card.is-simplified .owb-card-header {
+  flex: 1 1 auto;
+  min-height: 0;
+  align-items: center;
+  border-bottom: none;
+}
+
+.owb-card.is-simplified .owb-card-journal-badge {
+  position: static;
+  margin: 10px 12px;
+}
+
 .owb-card-excerpt {
   margin: 0;
   line-height: 1.6;

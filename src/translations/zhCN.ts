@@ -167,8 +167,18 @@ const zhCN = {
   "Failed to search notes": "搜索笔记失败",
   "Already on this board": "已在这块白板上",
   "Untitled block": "无标题内容",
-  "This whiteboard's data could not be read. Saving has been stopped so nothing is overwritten.":
-    "这块白板的数据读不出来，已停止保存以免覆盖",
+  "This whiteboard's data could not be read. Saving has been stopped so nothing is overwritten. Changes you make now will not be kept.":
+    "这块白板的数据读不出来，已停止保存以免覆盖，你现在做的改动不会被保留。",
+  "${count} cards could not be read. Saving has been stopped so nothing is overwritten. Changes you make now will not be kept.":
+    "有 ${count} 张卡片读不出来，已停止保存以免覆盖，你现在做的改动不会被保留。",
+  "${count} connections could not be read. Saving has been stopped so nothing is overwritten. Changes you make now will not be kept.":
+    "有 ${count} 条连线读不出来，已停止保存以免覆盖，你现在做的改动不会被保留。",
+  "${cards} cards and ${edges} connections could not be read. Saving has been stopped so nothing is overwritten. Changes you make now will not be kept.":
+    "有 ${cards} 张卡片和 ${edges} 条连线读不出来，已停止保存以免覆盖，你现在做的改动不会被保留。",
+  "Data unreadable": "数据异常",
+  Retry: "重试",
+  "Showing ${shown} of ${visible} cards. Zoom in to see all.":
+    "这个缩放下只画了 ${shown} / ${visible} 张卡片，放大可看全部。",
 };
 
 export default zhCN;

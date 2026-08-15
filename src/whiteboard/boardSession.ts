@@ -4,6 +4,7 @@ import { emitBoardCardsChanged } from "./boardEvents";
 import {
   assertBoardWritable,
   notifyBoardUnreadable,
+  retryLastBoardWrite,
   writeProperties,
 } from "./boardWrite";
 import {
@@ -72,6 +73,14 @@ export function notifyWriteError(
       : kind === "cards"
         ? t("Failed to save card positions")
         : t("Failed to save connections"),
+    {
+      title: t("Retry"),
+      action: () => {
+        void retryLastBoardWrite().catch((retryError: unknown) => {
+          notifyWriteError(kind, retryError);
+        });
+      },
+    },
   );
 }
 

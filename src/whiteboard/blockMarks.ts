@@ -1,4 +1,4 @@
-import type { Block, DbId } from "../orca.d.ts";
+import type { DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n";
 import { onBoardCardsChanged } from "./boardEvents";
 import { fetchWhiteboardBlocks } from "./boards";
@@ -7,163 +7,30 @@ import { readWhiteboardSettings } from "./settings";
 
 export const BLOCK_MARKS_CSS_ROLE = "whiteboard.blockmarks.styles";
 
+/** Presence flag stamped onto host outline rows that already have a card. */
+export const OWB_MARK_ATTR = "data-owb-mark";
+/** Tooltip text for `content: attr(...)`. Set via setAttribute only. */
+export const OWB_MARK_LABEL_ATTR = "data-owb-mark-label";
+
 const DEBOUNCE_MS = 300;
-const SELECTOR_CHUNK = 80;
+const STAMP_THROTTLE_MS = 32;
 
-const { subscribe } = window.Valtio as {
-  subscribe: (proxyObject: object, callback: () => void) => () => void;
-};
+/**
+ * Host DOM contract (undocumented; same selectors the old per-id CSS used):
+ * - Outline / editor rows are `.orca-block[data-id="<numeric DbId>"]`.
+ * - Hover chrome is the child `> .orca-repr > .orca-repr-main`.
+ * - A virtual list may recycle a row by changing `data-id` in place.
+ *
+ * If the host renames these, marks silently disappear — no throw.
+ */
+const HOST_BLOCK_SELECTOR = ".orca-block[data-id]";
+const HOST_HOVER_MAIN = ":has(> .orca-repr > .orca-repr-main:hover)";
 
-let pluginName = "";
-let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-let unsubscribeCards: (() => void) | null = null;
-let unsubscribeSettings: (() => void) | null = null;
-let rebuildSeq = 0;
-let lastEnabled: boolean | undefined;
-
-export function startBlockMarks(name: string): void {
-  stopBlockMarks();
-  pluginName = name;
-  lastEnabled = marksEnabled();
-  unsubscribeCards = onBoardCardsChanged(() => scheduleRebuild());
-  unsubscribeSettings = subscribe(orca.state.plugins, onPluginsChanged);
-  void rebuildBlockMarks();
-}
-
-export function stopBlockMarks(): void {
-  if (debounceTimer != null) {
-    clearTimeout(debounceTimer);
-    debounceTimer = null;
-  }
-  unsubscribeCards?.();
-  unsubscribeCards = null;
-  unsubscribeSettings?.();
-  unsubscribeSettings = null;
-  lastEnabled = undefined;
-  pluginName = "";
-  removeBlockMarkStyles();
-}
-
-function onPluginsChanged(): void {
-  const enabled = marksEnabled();
-  if (enabled === lastEnabled) return;
-  lastEnabled = enabled;
-  if (enabled) {
-    void rebuildBlockMarks();
-    return;
-  }
-  removeBlockMarkStyles();
-}
-
-function scheduleRebuild(): void {
-  if (debounceTimer != null) clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(() => {
-    debounceTimer = null;
-    void rebuildBlockMarks();
-  }, DEBOUNCE_MS);
-}
-
-async function rebuildBlockMarks(): Promise<void> {
-  const seq = ++rebuildSeq;
-  try {
-    if (!marksEnabled()) {
-      removeBlockMarkStyles();
-      return;
-    }
-    const boards = await fetchWhiteboardBlocks();
-    if (seq !== rebuildSeq) return;
-    if (!marksEnabled()) {
-      removeBlockMarkStyles();
-      return;
-    }
-    const css = buildBlockMarkCss(collectCardBoards(boards));
-    if (css === "") {
-      removeBlockMarkStyles();
-      return;
-    }
-    orca.themes.injectCSS(css, BLOCK_MARKS_CSS_ROLE);
-  } catch (err) {
-    console.error("[whiteboard] failed to rebuild block marks", err);
-  }
-}
-
-function removeBlockMarkStyles(): void {
-  orca.themes.removeCSS(BLOCK_MARKS_CSS_ROLE);
-}
-
-function marksEnabled(): boolean {
-  if (!pluginName) return false;
-  return readWhiteboardSettings(
-    orca.state.plugins[pluginName]?.settings as
-      | Record<string, unknown>
-      | undefined,
-  ).markOutlineBlocks;
-}
-
-function collectCardBoards(boards: readonly Block[]): Map<DbId, string[]> {
-  const byBlock = new Map<DbId, string[]>();
-  for (const board of boards) {
-    const name = boardName(board);
-    const seen = new Set<DbId>();
-    for (const card of readCards(board)) {
-      if (seen.has(card.blockId)) continue;
-      seen.add(card.blockId);
-      const names = byBlock.get(card.blockId);
-      if (names) names.push(name);
-      else byBlock.set(card.blockId, [name]);
-    }
-  }
-  return byBlock;
-}
-
-export function cssQuoted(value: string): string {
-  let out = "";
-  for (const ch of value) {
-    const code = ch.codePointAt(0) ?? 0;
-    if (ch === "\\") out += "\\\\";
-    else if (ch === '"') out += '\\"';
-    else if (ch === "\n") out += "\\A ";
-    else if (ch === "\r") out += "\\00000D ";
-    else if (code < 0x20) {
-      out += `\\${code.toString(16).padStart(6, "0")} `;
-    } else {
-      out += ch;
-    }
-  }
-  return `"${out}"`;
-}
-
-function tooltipFor(names: readonly string[]): string {
-  if (names.length === 1) {
-    return t('On the "${name}" whiteboard', { name: names[0] });
-  }
-  return t("On ${count} whiteboards", { count: String(names.length) });
-}
-
-function selectorChunks(ids: readonly DbId[], suffix: string): string[] {
-  const chunks: string[] = [];
-  for (let i = 0; i < ids.length; i += SELECTOR_CHUNK) {
-    chunks.push(
-      ids
-        .slice(i, i + SELECTOR_CHUNK)
-        .map((id) => `.orca-block[data-id="${id}"]${suffix}`)
-        .join(",\n"),
-    );
-  }
-  return chunks;
-}
-
-export function buildBlockMarkCss(byBlock: Map<DbId, string[]>): string {
-  if (byBlock.size === 0) return "";
-  const ids = [...byBlock.keys()].sort((a, b) => a - b);
-  const parts: string[] = [
-    `:root {
+const BLOCK_MARK_CSS = `:root {
   --owb-block-mark-shift: calc(var(--orca-spacing-xl) + 1.8rem);
-}`,
-  ];
+}
 
-  for (const group of selectorChunks(ids, "::after")) {
-    parts.push(`${group} {
+.orca-block[data-owb-mark]::after {
   content: "";
   position: absolute;
   top: 0;
@@ -181,18 +48,14 @@ export function buildBlockMarkCss(byBlock: Map<DbId, string[]>): string {
     center / 6px 1.5px no-repeat;
   pointer-events: none;
   opacity: 0.55;
-}`);
-  }
+}
 
-  const hoverMain = ":has(> .orca-repr > .orca-repr-main:hover)";
-  for (const group of selectorChunks(ids, `${hoverMain}::after`)) {
-    parts.push(`${group} {
+.orca-block[data-owb-mark]${HOST_HOVER_MAIN}::after {
   opacity: 1;
-}`);
-  }
+}
 
-  for (const group of selectorChunks(ids, `${hoverMain}::before`)) {
-    parts.push(`${group} {
+.orca-block[data-owb-mark]${HOST_HOVER_MAIN}::before {
+  content: attr(data-owb-mark-label);
   position: absolute;
   top: 0;
   right: 0;
@@ -210,18 +73,267 @@ export function buildBlockMarkCss(byBlock: Map<DbId, string[]>): string {
   color: var(--orca-color-text-2);
   pointer-events: none;
   z-index: 2;
-}`);
-  }
+}`;
 
-  for (const id of ids) {
-    const names = byBlock.get(id);
-    if (names == null) continue;
-    parts.push(
-      `.orca-block[data-id="${id}"]${hoverMain}::before {
-  content: ${cssQuoted(tooltipFor(names))};
-}`,
-    );
-  }
+type BoardLike = {
+  aliases?: string[];
+  text?: string;
+  properties?: readonly { name: string; value?: unknown }[];
+};
 
-  return parts.join("\n\n");
+let pluginName = "";
+let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+let unsubscribeCards: (() => void) | null = null;
+let unsubscribeSettings: (() => void) | null = null;
+let rebuildSeq = 0;
+let lastEnabled: boolean | undefined;
+
+let cardBoards = new Map<DbId, string[]>();
+let observer: MutationObserver | null = null;
+let stampTimer: ReturnType<typeof setTimeout> | null = null;
+const pendingStamp = new Set<Element>();
+
+export function startBlockMarks(name: string): void {
+  stopBlockMarks();
+  pluginName = name;
+  lastEnabled = marksEnabled();
+  unsubscribeCards = onBoardCardsChanged(() => scheduleRebuild());
+  unsubscribeSettings = subscribePlugins(onPluginsChanged);
+  void rebuildBlockMarks();
+}
+
+export function stopBlockMarks(): void {
+  rebuildSeq += 1;
+  if (debounceTimer != null) {
+    clearTimeout(debounceTimer);
+    debounceTimer = null;
+  }
+  unsubscribeCards?.();
+  unsubscribeCards = null;
+  unsubscribeSettings?.();
+  unsubscribeSettings = null;
+  lastEnabled = undefined;
+  pluginName = "";
+  cardBoards = new Map();
+  teardownMarks();
+}
+
+function subscribePlugins(callback: () => void): () => void {
+  const valtio = (
+    globalThis as {
+      window?: {
+        Valtio?: {
+          subscribe: (proxyObject: object, cb: () => void) => () => void;
+        };
+      };
+    }
+  ).window?.Valtio;
+  if (valtio == null) return () => {};
+  return valtio.subscribe(orca.state.plugins, callback);
+}
+
+function onPluginsChanged(): void {
+  const enabled = marksEnabled();
+  if (enabled === lastEnabled) return;
+  lastEnabled = enabled;
+  if (enabled) {
+    void rebuildBlockMarks();
+    return;
+  }
+  teardownMarks();
+}
+
+function scheduleRebuild(): void {
+  if (debounceTimer != null) clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => {
+    debounceTimer = null;
+    void rebuildBlockMarks();
+  }, DEBOUNCE_MS);
+}
+
+async function rebuildBlockMarks(): Promise<void> {
+  const seq = ++rebuildSeq;
+  try {
+    if (!marksEnabled()) {
+      teardownMarks();
+      return;
+    }
+    const boards = await fetchWhiteboardBlocks();
+    if (seq !== rebuildSeq) return;
+    if (!marksEnabled()) {
+      teardownMarks();
+      return;
+    }
+    cardBoards = collectCardBoards(boards);
+    syncMarksFromTable();
+  } catch (err) {
+    console.error("[whiteboard] failed to rebuild block marks", err);
+  }
+}
+
+function syncMarksFromTable(): void {
+  if (!pluginName || cardBoards.size === 0) {
+    teardownMarks();
+    return;
+  }
+  orca.themes.injectCSS(buildBlockMarkCss(cardBoards), BLOCK_MARKS_CSS_ROLE);
+  startObserver();
+  rescanDom();
+}
+
+function teardownMarks(): void {
+  stopObserver();
+  clearDomMarks();
+  removeBlockMarkStyles();
+}
+
+function removeBlockMarkStyles(): void {
+  orca.themes.removeCSS(BLOCK_MARKS_CSS_ROLE);
+}
+
+function marksEnabled(): boolean {
+  if (!pluginName) return false;
+  return readWhiteboardSettings(
+    orca.state.plugins[pluginName]?.settings as
+      | Record<string, unknown>
+      | undefined,
+  ).markOutlineBlocks;
+}
+
+export function collectCardBoards(
+  boards: readonly BoardLike[],
+): Map<DbId, string[]> {
+  const byBlock = new Map<DbId, string[]>();
+  for (const board of boards) {
+    const name = boardName(board);
+    const seen = new Set<DbId>();
+    for (const card of readCards(board)) {
+      if (seen.has(card.blockId)) continue;
+      seen.add(card.blockId);
+      const names = byBlock.get(card.blockId);
+      if (names) names.push(name);
+      else byBlock.set(card.blockId, [name]);
+    }
+  }
+  return byBlock;
+}
+
+export function markLabelFor(
+  names: readonly string[] | undefined,
+): string | null {
+  if (names == null || names.length === 0) return null;
+  if (names.length === 1) {
+    return t('On the "${name}" whiteboard', { name: names[0] });
+  }
+  return t("On ${count} whiteboards", { count: String(names.length) });
+}
+
+/** Constant-size CSS. Empty table → no injection (same as before). */
+export function buildBlockMarkCss(byBlock: Map<DbId, string[]>): string {
+  if (byBlock.size === 0) return "";
+  return BLOCK_MARK_CSS;
+}
+
+function startObserver(): void {
+  if (observer != null) return;
+  if (typeof MutationObserver === "undefined") return;
+  const root = document.body;
+  if (root == null) return;
+  observer = new MutationObserver(onMutations);
+  // Only childList + data-id: virtual lists recycle rows by rewriting data-id.
+  // Do not watch our own data-owb-* attrs (would loop) or all attributes.
+  observer.observe(root, {
+    subtree: true,
+    childList: true,
+    attributes: true,
+    attributeFilter: ["data-id"],
+  });
+}
+
+function stopObserver(): void {
+  observer?.disconnect();
+  observer = null;
+  if (stampTimer != null) {
+    clearTimeout(stampTimer);
+    stampTimer = null;
+  }
+  pendingStamp.clear();
+}
+
+function onMutations(records: MutationRecord[]): void {
+  for (const rec of records) {
+    if (rec.type === "attributes") {
+      if (rec.target instanceof Element) pendingStamp.add(rec.target);
+      continue;
+    }
+    for (const node of rec.addedNodes) {
+      if (node instanceof Element) pendingStamp.add(node);
+    }
+  }
+  if (stampTimer != null) return;
+  stampTimer = setTimeout(flushPendingStamps, STAMP_THROTTLE_MS);
+}
+
+function flushPendingStamps(): void {
+  stampTimer = null;
+  const batch = [...pendingStamp];
+  pendingStamp.clear();
+  for (const el of batch) stampSubtree(el);
+}
+
+function rescanDom(): void {
+  if (typeof document === "undefined") return;
+  if (document.body != null) stampSubtree(document.body);
+  for (const el of document.querySelectorAll(`[${OWB_MARK_ATTR}]`)) {
+    if (!el.matches(HOST_BLOCK_SELECTOR)) clearMark(el);
+  }
+}
+
+function clearDomMarks(): void {
+  if (typeof document === "undefined") return;
+  for (const el of document.querySelectorAll(
+    `[${OWB_MARK_ATTR}], [${OWB_MARK_LABEL_ATTR}]`,
+  )) {
+    clearMark(el);
+  }
+}
+
+function stampSubtree(root: Element): void {
+  if (root.matches(HOST_BLOCK_SELECTOR)) stampElement(root);
+  // Keystroke / format spans almost never contain a block; bail cheaply.
+  if (root.querySelector(HOST_BLOCK_SELECTOR) == null) return;
+  for (const el of root.querySelectorAll(HOST_BLOCK_SELECTOR)) {
+    stampElement(el);
+  }
+}
+
+function stampElement(el: Element): void {
+  if (!el.classList.contains("orca-block")) {
+    if (el.hasAttribute(OWB_MARK_ATTR) || el.hasAttribute(OWB_MARK_LABEL_ATTR)) {
+      clearMark(el);
+    }
+    return;
+  }
+  const raw = el.getAttribute("data-id");
+  const id = raw == null || raw === "" ? Number.NaN : Number(raw);
+  const label = Number.isFinite(id)
+    ? markLabelFor(cardBoards.get(id as DbId))
+    : null;
+  if (label == null) {
+    clearMark(el);
+    return;
+  }
+  if (
+    el.hasAttribute(OWB_MARK_ATTR) &&
+    el.getAttribute(OWB_MARK_LABEL_ATTR) === label
+  ) {
+    return;
+  }
+  el.setAttribute(OWB_MARK_ATTR, "");
+  el.setAttribute(OWB_MARK_LABEL_ATTR, label);
+}
+
+function clearMark(el: Element): void {
+  el.removeAttribute(OWB_MARK_ATTR);
+  el.removeAttribute(OWB_MARK_LABEL_ATTR);
 }

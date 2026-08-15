@@ -9,6 +9,7 @@ import {
 import { retainBoardHistory } from "./boardHistory";
 import { BoardToolbar } from "./BoardToolbar";
 import { useBoardPersist } from "./useBoardPersist";
+import { formatProtectMessage } from "./boardWrite";
 import { tryReadCards, type WhiteboardCard } from "./cards";
 import { Canvas } from "./Canvas";
 import {
@@ -182,6 +183,11 @@ export default function BoardPanel({ panelId, blockId }: Props) {
 
   return (
     <div className="owb-panel">
+      {protect ? (
+        <div className="owb-protect-banner" role="alert">
+          {formatProtectMessage(cardsRead, edgesRead)}
+        </div>
+      ) : null}
       <Canvas
         panelId={panelId}
         boardBlockId={blockId}

@@ -35,6 +35,7 @@ type Props = {
   card: WhiteboardCard;
   treeRev?: number;
   editing: boolean;
+  simplified?: boolean;
   selected: boolean;
   showResize: boolean;
   selectedCount: number;
@@ -153,6 +154,7 @@ export function Card({
   card,
   treeRev = 0,
   editing,
+  simplified = false,
   selected,
   showResize,
   selectedCount,
@@ -298,6 +300,7 @@ export function Card({
     "owb-card",
     editing ? "is-editing" : "",
     selected ? "is-selected" : "",
+    simplified ? "is-simplified" : "",
     card.color ? `owb-card-theme-${card.color}` : "",
   ]
     .filter(Boolean)
@@ -367,6 +370,14 @@ export function Card({
           data-block-id={card.blockId}
           style={{ left: box.x, top: box.y, width: box.w, height: box.h }}
           onMouseDown={onRootMouseDown}
+          onDoubleClick={(event: React.MouseEvent<HTMLDivElement>) => {
+            if (!simplified || editing) return;
+            const target = event.target as HTMLElement | null;
+            if (target?.closest(".owb-card-handle, .owb-card-floating-toolbar")) {
+              return;
+            }
+            onStartEdit(card.blockId);
+          }}
           onContextMenu={(event) => {
             // Editing: do not intercept. The hosted Orca editor owns
             // contextmenu (and Canvas already skips .owb-card).
@@ -385,26 +396,28 @@ export function Card({
             onStartConnect={onStartConnect}
           />
           <CardTitle card={card} editing={editing} />
-          <div
-            className="owb-card-body"
-            title={editing ? undefined : t("Double-click to edit")}
-            onDoubleClick={() => {
-              if (!editing) onStartEdit(card.blockId);
-            }}
-          >
-            {editing ? (
-              <CardEditor panelId={panelId} blockId={card.blockId} />
-            ) : isEmptyJournal ? (
-              <div className="owb-card-empty">{t("No notes this day")}</div>
-            ) : (
-              <CardBlockTree
-                key={treeRev}
-                panelId={panelId}
-                blockId={card.blockId}
-                promotedKey={promotedKey}
-              />
-            )}
-          </div>
+          {simplified ? null : (
+            <div
+              className="owb-card-body"
+              title={editing ? undefined : t("Double-click to edit")}
+              onDoubleClick={() => {
+                if (!editing) onStartEdit(card.blockId);
+              }}
+            >
+              {editing ? (
+                <CardEditor panelId={panelId} blockId={card.blockId} />
+              ) : isEmptyJournal ? (
+                <div className="owb-card-empty">{t("No notes this day")}</div>
+              ) : (
+                <CardBlockTree
+                  key={treeRev}
+                  panelId={panelId}
+                  blockId={card.blockId}
+                  promotedKey={promotedKey}
+                />
+              )}
+            </div>
+          )}
           {showResize
             ? RESIZE_HANDLES.map((handle) => (
                 <div

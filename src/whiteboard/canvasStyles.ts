@@ -169,4 +169,20 @@ export const CANVAS_CSS = `
   color: var(--orca-color-text-3);
   opacity: 0.65;
 }
+
+.owb-lod-hint {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  z-index: 20;
+  pointer-events: none;
+  max-width: min(380px, calc(100% - 24px));
+  padding: 6px 10px;
+  border-radius: var(--owb-radius-btn, 4px);
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--orca-color-text-2);
+  background: color-mix(in oklab, var(--orca-color-bg-1) 88%, transparent);
+  border: 1px solid var(--orca-color-border);
+}
 `.trim();

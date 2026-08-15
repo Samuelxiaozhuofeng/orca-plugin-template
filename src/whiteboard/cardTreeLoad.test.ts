@@ -53,7 +53,20 @@ check(
 );
 check(
   cardTreeLoadIds([{ blockId: 1 }, { blockId: 2 }]).join(",") === "1,2",
-  "visible cards always load their trees",
+  "visible cards load their trees when not simplified",
+);
+check(
+  cardTreeLoadIds([{ blockId: 1 }, { blockId: 2 }], {
+    simplified: true,
+  }).join(",") === "",
+  "simplified cards do not load trees",
+);
+check(
+  cardTreeLoadIds([{ blockId: 1 }, { blockId: 2 }], {
+    simplified: true,
+    keep: 2,
+  }).join(",") === "2",
+  "editing card still loads while others are simplified",
 );
 check(CARD_TREE_LOAD_MAX_DEPTH === 4, "depth cap");
 check(CARD_TREE_LOAD_MAX_NODES === 80, "node cap");

@@ -131,6 +131,8 @@ export function Canvas({
     createBlankAt,
     extractRow,
     shownCards,
+    hiddenCardCount,
+    lodSimplified,
     selectedSet,
   } = useCanvasBoard({
     panelId,
@@ -277,6 +279,7 @@ export function Canvas({
               panelId={panelId}
               cards={cards}
               shownCards={shownCards}
+              lodSimplified={lodSimplified}
               weekdayGuide={weekdayGuide}
               editingId={editingId}
               selected={selected}
@@ -319,6 +322,17 @@ export function Canvas({
               </div>
             </div>
           )}
+          {hiddenCardCount > 0 ? (
+            <div className="owb-lod-hint" role="status">
+              {t(
+                "Showing ${shown} of ${visible} cards. Zoom in to see all.",
+                {
+                  shown: String(shownCards.length),
+                  visible: String(shownCards.length + hiddenCardCount),
+                },
+              )}
+            </div>
+          ) : null}
         </div>
       {addNoteAt != null ? (
         <AddNoteCard

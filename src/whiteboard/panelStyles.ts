@@ -139,4 +139,21 @@ export const PANEL_CSS = `
   height: 100%;
   color: var(--orca-color-text-3);
 }
+
+.owb-protect-banner {
+  flex: 0 0 auto;
+  z-index: 25;
+  padding: var(--owb-space-2) var(--owb-space-4);
+  background: var(--orca-color-dangerous-5, #d9381e);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  border-bottom: 2px solid var(--orca-color-border);
+}
+
+.owb-block-count-error {
+  color: var(--orca-color-dangerous-5, #d9381e);
+  font-weight: 700;
+}
 `.trim();

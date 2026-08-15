@@ -1,8 +1,8 @@
 import type { DbId } from "../orca.d.ts";
-import { t } from "../libs/l10n";
-import { assertBoardWritable, writeProperties } from "./boardWrite";
-import type { JsonParseResult } from "./cards";
-import { BEND_LIMIT, bendsEqual, parseBend } from "./edgeBend";
+import { t } from "../libs/l10n.ts";
+import { assertBoardWritable, writeProperties } from "./boardWrite.ts";
+import { mapStoredArray, type JsonParseResult } from "./cards.ts";
+import { BEND_LIMIT, bendsEqual, parseBend } from "./edgeBend.ts";
 
 export { BEND_LIMIT, bendsEqual };
 
@@ -114,27 +114,8 @@ export function sanitizeEdges(
   return out;
 }
 
-function edgesFromArray(parsed: unknown[]): WhiteboardEdge[] {
-  return parsed
-    .map(normalizeEdge)
-    .filter((edge): edge is WhiteboardEdge => edge != null);
-}
-
 export function tryParseEdges(value: unknown): JsonParseResult<WhiteboardEdge[]> {
-  if (value == null) return { ok: true, value: [] };
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    if (trimmed === "") return { ok: true, value: [] };
-    try {
-      const parsed: unknown = JSON.parse(trimmed);
-      if (!Array.isArray(parsed)) return { ok: false };
-      return { ok: true, value: edgesFromArray(parsed) };
-    } catch {
-      return { ok: false };
-    }
-  }
-  if (Array.isArray(value)) return { ok: true, value: edgesFromArray(value) };
-  return { ok: false };
+  return mapStoredArray(value, normalizeEdge);
 }
 
 export function parseEdges(value: unknown): WhiteboardEdge[] {

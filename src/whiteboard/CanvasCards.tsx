@@ -16,6 +16,7 @@ type Props = {
   panelId: string;
   cards: WhiteboardCard[];
   shownCards: WhiteboardCard[];
+  lodSimplified: boolean;
   weekdayGuide?: CanvasOrigin | null;
   editingId: DbId | null;
   selected: DbId[];
@@ -41,6 +42,7 @@ export function CanvasCards({
   panelId,
   cards,
   shownCards,
+  lodSimplified,
   weekdayGuide,
   editingId,
   selected,
@@ -60,7 +62,10 @@ export function CanvasCards({
 }: Props) {
   const promotedKey = cardIdsKey(cards);
   const treeRevByRoot = useVisibleCardTrees(
-    cardTreeLoadIds(shownCards),
+    cardTreeLoadIds(shownCards, {
+      simplified: lodSimplified,
+      keep: editingId,
+    }),
     promotedKey,
   );
 
@@ -85,6 +90,7 @@ export function CanvasCards({
           card={card}
           treeRev={treeRevByRoot[card.blockId] ?? 0}
           editing={editingId === card.blockId}
+          simplified={lodSimplified && editingId !== card.blockId}
           selected={selectedSet.has(card.blockId)}
           showResize={
             selected.length === 0 ||

@@ -17,7 +17,7 @@ import {
   flushEdges,
   patchCardsOn,
 } from "./boardPersistQueue";
-import { notifyBoardUnreadable } from "./boardWrite";
+import { clearBoardProtectTold, notifyBoardUnreadable } from "./boardWrite";
 import { type WhiteboardCard } from "./cards";
 import { type WhiteboardEdge } from "./edges";
 
@@ -99,6 +99,7 @@ export function useBoardPersist(
     if (session == null) return;
     session.protect = protect;
     if (protect) notifyBoardUnreadable(blockId);
+    else clearBoardProtectTold(blockId);
   }, [blockId, protect]);
 
   useEffect(() => {

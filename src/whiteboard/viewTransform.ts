@@ -1,10 +1,12 @@
 import type { DbId } from "../orca.d.ts";
 import {
+  CARD_LOD_SCALE,
+  CARD_MOUNT_CAP,
   clampScale,
   MAX_SCALE,
   MIN_SCALE,
-  type WhiteboardCard,
-} from "./data";
+} from "./layout.ts";
+import type { WhiteboardCard } from "./data.ts";
 
 export type CanvasView = { x: number; y: number; scale: number };
 
@@ -145,19 +147,112 @@ function asIdSet(
   return new Set(alwaysInclude);
 }
 
+/**
+ * Prefetch pad in screenfuls. Full pad at 100%+ (panning wants neighbours);
+ * none at MIN_SCALE, where one extra screen would swallow the whole board.
+ */
+export function marginScreensForScale(scale: number): number {
+  if (!(scale > MIN_SCALE)) return 0;
+  if (scale >= 1) return 1;
+  return (scale - MIN_SCALE) / (1 - MIN_SCALE);
+}
+
+export function isLodSimplified(scale: number): boolean {
+  return scale < CARD_LOD_SCALE;
+}
+
 export function visibleCards<T extends WhiteboardCard>(
   cards: T[],
   view: CanvasView,
   viewport: { width: number; height: number },
   alwaysInclude: DbId | Iterable<DbId> | null,
+  marginScreens = marginScreensForScale(view.scale),
 ): T[] {
   if (cards.length === 0) return cards;
   const pinned = asIdSet(alwaysInclude);
   return cards.filter(
     (card) =>
       (pinned != null && pinned.has(card.blockId)) ||
-      cardIntersectsViewport(card, view, viewport),
+      cardIntersectsViewport(card, view, viewport, marginScreens),
   );
+}
+
+export type MountedCards<T> = {
+  cards: T[];
+  hiddenCount: number;
+};
+
+function cardDist2(
+  card: Pick<WhiteboardCard, "x" | "y" | "w" | "h">,
+  cx: number,
+  cy: number,
+): number {
+  const dx = card.x + card.w / 2 - cx;
+  const dy = card.y + card.h / 2 - cy;
+  return dx * dx + dy * dy;
+}
+
+function sortByViewportCenter<T extends WhiteboardCard>(
+  cards: T[],
+  view: CanvasView | undefined,
+  viewport: { width: number; height: number } | undefined,
+): T[] {
+  if (view == null || viewport == null || cards.length < 2) return cards;
+  const scale = view.scale === 0 ? 1 : view.scale;
+  const cx = (viewport.width / 2 - view.x) / scale;
+  const cy = (viewport.height / 2 - view.y) / scale;
+  return cards
+    .map((card, index) => ({ card, index, d: cardDist2(card, cx, cy) }))
+    .sort((a, b) => a.d - b.d || a.index - b.index)
+    .map((item) => item.card);
+}
+
+/**
+ * Cap how many visible cards actually mount. Editing is never dropped;
+ * selected cards fill next; the rest are the nearest to the viewport centre.
+ */
+export function pickMountedCards<T extends WhiteboardCard>(
+  visible: readonly T[],
+  opts: {
+    cap?: number;
+    editingId?: DbId | null;
+    selectedIds?: readonly DbId[];
+    view?: CanvasView;
+    viewport?: { width: number; height: number };
+  } = {},
+): MountedCards<T> {
+  const cap = opts.cap ?? CARD_MOUNT_CAP;
+  const editingId = opts.editingId ?? null;
+  const selected = new Set(opts.selectedIds ?? []);
+  if (visible.length === 0) return { cards: [], hiddenCount: 0 };
+
+  const editing: T[] = [];
+  const preferred: T[] = [];
+  const rest: T[] = [];
+  for (const card of visible) {
+    if (editingId != null && card.blockId === editingId) editing.push(card);
+    else if (selected.has(card.blockId)) preferred.push(card);
+    else rest.push(card);
+  }
+
+  const rankedPreferred = sortByViewportCenter(
+    preferred,
+    opts.view,
+    opts.viewport,
+  );
+  const rankedRest = sortByViewportCenter(rest, opts.view, opts.viewport);
+
+  const cards: T[] = [];
+  for (const card of editing) cards.push(card);
+  for (const card of rankedPreferred) {
+    if (cards.length >= cap) break;
+    cards.push(card);
+  }
+  for (const card of rankedRest) {
+    if (cards.length >= cap) break;
+    cards.push(card);
+  }
+  return { cards, hiddenCount: Math.max(0, visible.length - cards.length) };
 }
 
 export const BLOCK_TREE_MAX_NODES = 2000;

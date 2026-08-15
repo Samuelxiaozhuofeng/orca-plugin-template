@@ -6,6 +6,10 @@ export const GRID_GAP = 16;
 export const GRID_ORIGIN = 24;
 export const MIN_SCALE = 0.25;
 export const MAX_SCALE = 2;
+/** Below this zoom, cards paint as a title chip (no hosted block tree). */
+export const CARD_LOD_SCALE = 0.5;
+/** Max Card components mounted at once, even when more sit in the cull window. */
+export const CARD_MOUNT_CAP = 300;
 export const MAX_RANGE_DAYS = 92;
 export const MIN_GRID_COLUMNS = 1;
 export const MAX_GRID_COLUMNS = 14;

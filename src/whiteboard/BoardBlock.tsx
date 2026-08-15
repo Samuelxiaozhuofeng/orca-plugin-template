@@ -1,6 +1,8 @@
 import type { DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n";
-import { boardName, openBoard, readCards } from "./data";
+import { tryReadCards } from "./cards";
+import { boardName, openBoard } from "./data";
+import { tryReadEdges } from "./edges";
 
 const { useMemo } = window.React;
 const { useSnapshot } = window.Valtio;
@@ -29,7 +31,9 @@ export default function BoardBlock({
   const { blocks } = useSnapshot(orca.state);
   const dataBlockId = mirrorId ?? blockId;
   const block = blocks[dataBlockId];
-  const cards = readCards(block);
+  const cardsRead = tryReadCards(block);
+  const edgesRead = tryReadEdges(block);
+  const protect = !cardsRead.ok || !edgesRead.ok;
 
   const childrenBlocks = useMemo(
     () => (
@@ -67,8 +71,14 @@ export default function BoardBlock({
         <div className="owb-block-card" onClick={onOpen}>
           <i className="ti ti-chalkboard owb-block-icon" />
           <span className="owb-block-title">{boardName(block)}</span>
-          <span className="owb-block-count">
-            {t("${count} cards", { count: String(cards.length) })}
+          <span
+            className={
+              protect ? "owb-block-count owb-block-count-error" : "owb-block-count"
+            }
+          >
+            {protect
+              ? t("Data unreadable")
+              : t("${count} cards", { count: String(cardsRead.value.length) })}
           </span>
           <orca.components.Button variant="soft" onClick={onOpen}>
             {t("Open")}

@@ -1,18 +1,68 @@
 import type { Block, DbId } from "../orca.d.ts";
-import { t } from "../libs/l10n";
+import { t } from "../libs/l10n.ts";
+import { emitBoardCardsChanged } from "./boardEvents.ts";
+import { tryReadCards, type JsonParseResult } from "./cards.ts";
+import { tryReadEdges } from "./edges.ts";
 
 const CARDS_PROP = "cards";
-const EDGES_PROP = "edges";
 
 export const BOARD_UNREADABLE_MSG =
-  "This whiteboard's data could not be read. Saving has been stopped so nothing is overwritten.";
+  "This whiteboard's data could not be read. Saving has been stopped so nothing is overwritten. Changes you make now will not be kept.";
+
+const CARDS_DROPPED_MSG =
+  "${count} cards could not be read. Saving has been stopped so nothing is overwritten. Changes you make now will not be kept.";
+const EDGES_DROPPED_MSG =
+  "${count} connections could not be read. Saving has been stopped so nothing is overwritten. Changes you make now will not be kept.";
+const BOTH_DROPPED_MSG =
+  "${cards} cards and ${edges} connections could not be read. Saving has been stopped so nothing is overwritten. Changes you make now will not be kept.";
 
 const protectTold = new Set<DbId>();
+
+type LastWrite = {
+  blockId: DbId;
+  props: Array<{ name: string; type: number; value: string }>;
+};
+
+let lastWrite: LastWrite | null = null;
+
+export function formatProtectMessage(
+  cardsRead: JsonParseResult<unknown>,
+  edgesRead: JsonParseResult<unknown>,
+): string {
+  const cardsDropped =
+    !cardsRead.ok && cardsRead.reason === "bad-items" ? cardsRead.dropped : 0;
+  const edgesDropped =
+    !edgesRead.ok && edgesRead.reason === "bad-items" ? edgesRead.dropped : 0;
+  if (cardsDropped > 0 && edgesDropped > 0) {
+    return t(BOTH_DROPPED_MSG, {
+      cards: String(cardsDropped),
+      edges: String(edgesDropped),
+    });
+  }
+  if (cardsDropped > 0) {
+    return t(CARDS_DROPPED_MSG, { count: String(cardsDropped) });
+  }
+  if (edgesDropped > 0) {
+    return t(EDGES_DROPPED_MSG, { count: String(edgesDropped) });
+  }
+  return t(BOARD_UNREADABLE_MSG);
+}
 
 export function notifyBoardUnreadable(boardId: DbId): void {
   if (protectTold.has(boardId)) return;
   protectTold.add(boardId);
-  orca.notify("error", t(BOARD_UNREADABLE_MSG));
+  const block = orca.state.blocks[boardId];
+  const cardsRead = tryReadCards(block);
+  const edgesRead = tryReadEdges(block);
+  const message =
+    !cardsRead.ok || !edgesRead.ok
+      ? formatProtectMessage(cardsRead, edgesRead)
+      : t(BOARD_UNREADABLE_MSG);
+  orca.notify("error", message);
+}
+
+export function clearBoardProtectTold(boardId: DbId): void {
+  protectTold.delete(boardId);
 }
 
 /** True when a stored cards/edges property is missing, empty, or a JSON array. */
@@ -28,16 +78,6 @@ export function isJsonArrayProp(value: unknown): boolean {
     }
   }
   return Array.isArray(value);
-}
-
-function propValue(
-  block:
-    | { properties?: readonly { name: string; value?: unknown }[] }
-    | null
-    | undefined,
-  name: string,
-): unknown {
-  return block?.properties?.find((item) => item.name === name)?.value;
 }
 
 export async function loadBoardBlock(blockId: DbId): Promise<Block | null> {
@@ -59,17 +99,26 @@ export function boardPropsReadable(
     | undefined,
 ): boolean {
   if (block == null) return true;
-  return (
-    isJsonArrayProp(propValue(block, CARDS_PROP)) &&
-    isJsonArrayProp(propValue(block, EDGES_PROP))
-  );
+  return tryReadCards(block).ok && tryReadEdges(block).ok;
 }
 
 export async function assertBoardWritable(blockId: DbId): Promise<void> {
   const block = await loadBoardBlock(blockId);
   if (boardPropsReadable(block)) return;
   notifyBoardUnreadable(blockId);
-  throw new Error(t(BOARD_UNREADABLE_MSG));
+  const cardsRead = tryReadCards(block ?? undefined);
+  const edgesRead = tryReadEdges(block ?? undefined);
+  throw new Error(formatProtectMessage(cardsRead, edgesRead));
+}
+
+export async function retryLastBoardWrite(): Promise<void> {
+  const attempt = lastWrite;
+  if (attempt == null) return;
+  await assertBoardWritable(attempt.blockId);
+  await writeProperties(attempt.blockId, attempt.props);
+  if (attempt.props.some((prop) => prop.name === CARDS_PROP)) {
+    emitBoardCardsChanged(attempt.blockId);
+  }
 }
 
 function applyReturnedBlocks(result: unknown): void {
@@ -95,6 +144,7 @@ export async function writeProperties(
   if (props.length === 0) {
     return orca.state.blocks[blockId] ?? null;
   }
+  lastWrite = { blockId, props };
   const result = await orca.invokeBackend("set-properties", [blockId], props);
   applyReturnedBlocks(result);
   const fresh = (await orca.invokeBackend("get-block", blockId)) as
