@@ -31,6 +31,7 @@ type Props = {
     card: WhiteboardCard,
   ) => void;
   onPatchCards: (entries: CardPatchEntry[]) => void;
+  onContentHeight: (blockId: DbId, nextH: number, record: boolean) => void;
   applyArrange: (action: ArrangeAction) => void;
   onMoveFrame: (boxes: Map<DbId, CardBox>) => void;
   edgeApiRef: { current: EdgeLayerApi | null };
@@ -54,6 +55,7 @@ export function CanvasCards({
   endEdit,
   onCardMouseDown,
   onPatchCards,
+  onContentHeight,
   applyArrange,
   onMoveFrame,
   edgeApiRef,
@@ -105,6 +107,7 @@ export function CanvasCards({
           onPatchCard={(blockId, patch) =>
             onPatchCards([{ blockId, patch }])
           }
+          onContentHeight={onContentHeight}
           onArrange={applyArrange}
           onMoveFrame={onMoveFrame}
           onStartConnect={(

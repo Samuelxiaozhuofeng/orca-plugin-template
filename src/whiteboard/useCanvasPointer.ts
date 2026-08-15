@@ -20,6 +20,13 @@ export type CardPatchEntry = {
   patch: { x?: number; y?: number; w?: number; h?: number };
 };
 
+export type PatchCardsOpts = { record?: boolean };
+
+export type PatchCardsFn = (
+  entries: CardPatchEntry[],
+  opts?: PatchCardsOpts,
+) => void;
+
 type Refs = {
   viewport: { current: HTMLDivElement | null };
   canvas: { current: HTMLDivElement | null };
@@ -38,7 +45,7 @@ export function useCanvasPointer(opts: {
   pointerToWorld: (clientX: number, clientY: number) => { x: number; y: number };
   startPan: (startX: number, startY: number) => void;
   setSelected: (next: DbId[]) => void;
-  onPatchCards: (entries: CardPatchEntry[]) => void;
+  onPatchCards: PatchCardsFn;
   onMoveFrame?: (boxes: Map<DbId, CardRect>) => void;
 }): {
   onViewportMouseDown: (event: React.MouseEvent<HTMLDivElement>) => void;

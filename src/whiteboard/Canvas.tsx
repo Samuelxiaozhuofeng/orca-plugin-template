@@ -16,7 +16,11 @@ import type { WhiteboardEdge } from "./edges";
 import { useWhiteboardSettings } from "./settings";
 import { useBoardDrop } from "./useBoardDrop";
 import { useCanvasBoard } from "./useCanvasBoard";
-import { useCanvasPointer, type CardPatchEntry } from "./useCanvasPointer";
+import {
+  useCanvasPointer,
+  type CardPatchEntry,
+  type PatchCardsFn,
+} from "./useCanvasPointer";
 import { useCanvasView } from "./useCanvasView";
 import { type CanvasView } from "./viewTransform";
 
@@ -31,7 +35,7 @@ type Props = {
   view: CanvasView;
   zoomLabelRef: { current: HTMLElement | null };
   onViewChange: (view: CanvasView) => void;
-  onPatchCards: (entries: CardPatchEntry[]) => void;
+  onPatchCards: PatchCardsFn;
   onRemoveCards: (ids: DbId[]) => Promise<boolean>;
   onAddCards: (cards: WhiteboardCard[]) => Promise<boolean>;
   onCommitEdges: (
@@ -113,6 +117,7 @@ export function Canvas({
     selectCards,
     selectEdge,
     applyArrange,
+    applyContentHeight,
     startEdit,
     endEdit,
     closeEdgeDrop,
@@ -293,6 +298,7 @@ export function Canvas({
               endEdit={endEdit}
               onCardMouseDown={onCardMouseDown}
               onPatchCards={onPatchCards}
+              onContentHeight={applyContentHeight}
               applyArrange={applyArrange}
               onMoveFrame={onMoveFrame}
               edgeApiRef={edgeApiRef}

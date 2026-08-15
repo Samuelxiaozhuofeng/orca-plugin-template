@@ -15,7 +15,7 @@ import {
   openCardInSidePanel,
   openCardInThisPanel,
 } from "./CardToolbar";
-import { MIN_CARD_HEIGHT, type WhiteboardCard } from "./data";
+import { type WhiteboardCard } from "./data";
 import type { ArrangeAction } from "./selection";
 import { isHostOverlayTarget } from "./hostOverlay";
 import { useCardBlockView } from "./blockWatch";
@@ -25,6 +25,8 @@ import {
   blockIdFromCardEventTarget,
   isExtractPointerTarget,
 } from "./cardExtractDrag";
+import { FIT_HEIGHT_EPS, measureCardFitHeight } from "./cardFitHeight";
+import { useCardAutoHeight } from "./useCardAutoHeight";
 
 const { useEffect, useLayoutEffect, useRef } = window.React;
 const { useSnapshot } = window.Valtio;
@@ -49,6 +51,7 @@ type Props = {
     blockId: DbId,
     patch: { x?: number; y?: number; w?: number; h?: number; color?: string },
   ) => void;
+  onContentHeight: (blockId: DbId, nextH: number, record: boolean) => void;
   onArrange: (action: ArrangeAction) => void;
   onSelectOnly: (blockId: DbId) => void;
   onStartConnect: (
@@ -63,45 +66,6 @@ type Props = {
 };
 
 type CardBox = { x: number; y: number; w: number; h: number };
-
-/**
- * Full visible body content — the flattened tree, excerpt, or hosted
- * editor. Do not use the first `.orca-block`: child rows are siblings
- * in `.owb-card-block-tree`, so that only measures the parent row.
- */
-function cardFitContentRoot(cardEl: Element): HTMLElement | null {
-  const body = cardEl.querySelector(".owb-card-body");
-  if (body == null) return null;
-  return (
-    (body.querySelector(".owb-card-block-tree") as HTMLElement | null) ??
-    (body.querySelector(".owb-card-excerpt") as HTMLElement | null) ??
-    (body.querySelector(".owb-card-empty") as HTMLElement | null) ??
-    (body.querySelector(".orca-block-editor-blocks") as HTMLElement | null) ??
-    (body.querySelector(".orca-block-editor") as HTMLElement | null) ??
-    (body as HTMLElement)
-  );
-}
-
-function measureCardFitHeight(cardEl: HTMLElement): number {
-  const header = cardEl.querySelector(".owb-card-header") as HTMLElement | null;
-  const body = cardEl.querySelector(".owb-card-body") as HTMLElement | null;
-  const content = cardFitContentRoot(cardEl);
-  if (body == null || content == null) return MIN_CARD_HEIGHT;
-
-  const bodyStyle = getComputedStyle(body);
-  const padY =
-    (parseFloat(bodyStyle.paddingTop) || 0) +
-    (parseFloat(bodyStyle.paddingBottom) || 0);
-  const contentH =
-    content === body
-      ? Math.max(0, content.scrollHeight - padY)
-      : content.scrollHeight;
-  const borderY = Math.max(0, cardEl.offsetHeight - cardEl.clientHeight);
-  return Math.max(
-    MIN_CARD_HEIGHT,
-    Math.ceil((header?.offsetHeight ?? 0) + padY + contentH + borderY),
-  );
-}
 
 /** First visible editable line inside the card editor (hidden chrome skipped). */
 function firstEditableLine(root: HTMLElement): HTMLElement | null {
@@ -201,6 +165,7 @@ export function Card({
   onEndEdit,
   onCardMouseDown,
   onPatchCard,
+  onContentHeight,
   onArrange,
   onSelectOnly,
   onStartConnect,
@@ -219,8 +184,13 @@ export function Card({
     h: card.h,
   });
 
+  const pendingHRef = useRef<number | null>(null);
   if (!cardHasLiveGesture(cardRef.current)) {
-    liveRef.current = { x: card.x, y: card.y, w: card.w, h: card.h };
+    const h = pendingHRef.current ?? card.h;
+    liveRef.current = { x: card.x, y: card.y, w: card.w, h };
+    if (pendingHRef.current != null && card.h === pendingHRef.current) {
+      pendingHRef.current = null;
+    }
   }
 
   const hosted = useCardBlockView(card.blockId, treeRev);
@@ -286,6 +256,7 @@ export function Card({
       pointerToWorld,
       onFrame: onMoveFrame,
       onEnd: (box) => {
+        pendingHRef.current = null;
         liveRef.current = box;
         applyCardBox(el, box);
         if (
@@ -301,14 +272,32 @@ export function Card({
     });
   };
 
+  const heightRef = useRef(card.h);
+  heightRef.current = liveRef.current.h;
+
+  const applyContentHeight = (nextH: number, record: boolean) => {
+    const el = cardRef.current;
+    if (el == null || cardHasLiveGesture(el)) return;
+    if (Math.abs(nextH - liveRef.current.h) < FIT_HEIGHT_EPS) return;
+    pendingHRef.current = nextH;
+    liveRef.current = { ...liveRef.current, h: nextH };
+    heightRef.current = nextH;
+    applyCardBox(el, liveRef.current);
+    onContentHeight(card.blockId, nextH, record);
+  };
+
+  useCardAutoHeight({
+    enabled: editing,
+    cardRef,
+    blockId: card.blockId,
+    heightRef,
+    onHeight: applyContentHeight,
+  });
+
   const fitContentHeight = () => {
     const el = cardRef.current;
-    if (!el) return;
-    const nextH = measureCardFitHeight(el);
-    if (nextH === card.h) return;
-    liveRef.current = { ...liveRef.current, h: nextH };
-    applyCardBox(el, liveRef.current);
-    onPatchCard(card.blockId, { w: card.w, h: nextH });
+    if (el == null) return;
+    applyContentHeight(measureCardFitHeight(el), true);
   };
 
   const className = [

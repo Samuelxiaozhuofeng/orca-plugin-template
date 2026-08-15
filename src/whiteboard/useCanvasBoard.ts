@@ -4,18 +4,23 @@ import {
   handleWhiteboardKey,
   isWhiteboardShortcutTarget,
 } from "./canvasKeys";
-import { type WhiteboardCard } from "./data";
+import { GRID_GAP, type WhiteboardCard } from "./data";
 import type { DrawDropEmpty } from "./edgeGestures";
 import type { EdgeLayerApi } from "./EdgeLayer";
 import type { WhiteboardEdge } from "./edges";
 import { extractBlocksToBoard } from "./cardExtractApply";
 import { readExtractRestore } from "./cardExtractModel";
 import { addBlankCardToBoard } from "./newCard";
+import { applyCardBox, cardHasLiveGesture } from "./cardGestures";
+import {
+  applyFitPatches,
+  planContentHeightPatches,
+} from "./cardFitHeight";
 import {
   arrangeCards,
   type ArrangeAction,
 } from "./selection";
-import type { CardPatchEntry } from "./useCanvasPointer";
+import type { CardPatchEntry, PatchCardsFn } from "./useCanvasPointer";
 import {
   CARD_LOD_SCALE,
   visibleCards,
@@ -38,7 +43,7 @@ type Args = {
   cardsRef: { current: WhiteboardCard[] };
   edgesRef: { current: WhiteboardEdge[] };
   edgeApiRef: { current: EdgeLayerApi | null };
-  onPatchCards: (entries: CardPatchEntry[]) => void;
+  onPatchCards: PatchCardsFn;
   onRemoveCards: (ids: DbId[]) => Promise<boolean>;
   onAddCards: (cards: WhiteboardCard[]) => Promise<boolean>;
   onCommitEdges: (
@@ -117,6 +122,45 @@ export function useCanvasBoard({
   );
   const degraded = view.scale < CARD_LOD_SCALE;
   const selectedSet = useMemo(() => new Set(selected), [selected]);
+
+  const applyContentHeight = useCallback(
+    (blockId: DbId, nextH: number, record: boolean) => {
+      const patches = planContentHeightPatches(
+        cardsRef.current,
+        blockId,
+        nextH,
+        GRID_GAP,
+      );
+      if (patches.length === 0) return;
+      cardsRef.current = applyFitPatches(cardsRef.current, patches);
+      const root = viewportRef.current;
+      if (root != null) {
+        const patched = new Set(patches.map((item) => item.blockId));
+        const boxes = new Map<
+          DbId,
+          { x: number; y: number; w: number; h: number }
+        >();
+        for (const card of cardsRef.current) {
+          boxes.set(card.blockId, {
+            x: card.x,
+            y: card.y,
+            w: card.w,
+            h: card.h,
+          });
+          if (!patched.has(card.blockId)) continue;
+          const el = root.querySelector(
+            `.owb-card[data-block-id="${card.blockId}"]`,
+          );
+          if (el instanceof HTMLElement && !cardHasLiveGesture(el)) {
+            applyCardBox(el, card);
+          }
+        }
+        edgeApiRef.current?.onFrame(boxes);
+      }
+      onPatchCards(patches, { record });
+    },
+    [onPatchCards],
+  );
 
   const applyArrange = useCallback(
     (action: ArrangeAction) => {
@@ -309,6 +353,7 @@ export function useCanvasBoard({
     selectCards,
     selectEdge,
     applyArrange,
+    applyContentHeight,
     startEdit,
     endEdit,
     closeEdgeDrop,

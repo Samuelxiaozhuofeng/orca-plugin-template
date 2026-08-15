@@ -117,8 +117,11 @@ export function useBoardCommands(opts: {
           color?: string;
         };
       }>,
+      opts?: { record?: boolean },
     ) => {
-      if (cardPatchesChange(cardsRef.current, entries)) record();
+      if (opts?.record !== false && cardPatchesChange(cardsRef.current, entries)) {
+        record();
+      }
       patchCards(entries);
     },
     [patchCards, record],
