@@ -3,6 +3,16 @@ import { MIN_CARD_HEIGHT } from "./layout.ts";
 
 export const FIT_HEIGHT_EPS = 2;
 
+/** Vertical (or corner) resize that actually changed height should lock it. */
+export function shouldLockCardHeight(
+  handle: string,
+  originH: number,
+  nextH: number,
+): boolean {
+  if (handle === "e" || handle === "w") return false;
+  return nextH !== originH;
+}
+
 export type FitCard = {
   blockId: DbId;
   x: number;

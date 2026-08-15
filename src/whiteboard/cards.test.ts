@@ -3,10 +3,13 @@ import {
   formatProtectMessage,
 } from "./boardWrite.ts";
 import {
+  normalizeCard,
   parseCards,
+  preparedCards,
   readCards,
   tryParseCards,
   tryReadCards,
+  type WhiteboardCard,
 } from "./cards.ts";
 import {
   parseEdges,
@@ -220,6 +223,93 @@ check(
 check(
   !boardPropsReadable(board("[]", allBadEdges)),
   "all-bad edges protect the board",
+);
+
+// --- height lock: only strict true is kept; old data stays unlocked ---
+
+function hLockOf(value: unknown): unknown {
+  const parsed = tryParseCards([value]);
+  check(isOk(parsed) && parsed.value.length === 1, "hLock fixture parses");
+  if (!isOk(parsed) || parsed.value[0] == null) {
+    throw new Error("hLock fixture parses");
+  }
+  return parsed.value[0].hLock;
+}
+
+check(hLockOf(card(1)) === undefined, "old card without hLock is unlocked");
+check(
+  hLockOf({ ...card(1), hLock: true }) === true,
+  "strict true is locked",
+);
+
+for (const [label, dirty] of [
+  ["string true", "true"],
+  ["number 1", 1],
+  ["null", null],
+  ["false", false],
+  ["object", {}],
+] as const) {
+  check(
+    hLockOf({ ...card(1), hLock: dirty }) === undefined,
+    `dirty hLock ${label} is unlocked`,
+  );
+}
+
+const lockedNorm = normalizeCard({ ...card(1), hLock: true });
+check(lockedNorm?.hLock === true, "normalize keeps strict true");
+const unlockedNorm = normalizeCard(card(1));
+check(
+  unlockedNorm != null && !("hLock" in unlockedNorm),
+  "normalize omits hLock when unlocked",
+);
+const dirtyNorm = normalizeCard({ ...card(1), hLock: "true" });
+check(
+  dirtyNorm != null && !("hLock" in dirtyNorm),
+  "normalize omits non-true hLock",
+);
+
+const lockedStored: WhiteboardCard = {
+  blockId: 1,
+  kind: "block",
+  x: 10,
+  y: 20,
+  w: 240,
+  h: 160,
+  hLock: true,
+};
+const lockedRound = tryParseCards(JSON.stringify(preparedCards([lockedStored])));
+check(
+  isOk(lockedRound) && lockedRound.value[0]?.hLock === true,
+  "preparedCards → JSON → parse keeps hLock",
+);
+
+const unlockedStored: WhiteboardCard = {
+  blockId: 1,
+  kind: "block",
+  x: 10,
+  y: 20,
+  w: 240,
+  h: 160,
+};
+const unlockedJson = JSON.stringify(preparedCards([unlockedStored]));
+check(
+  !unlockedJson.includes("hLock"),
+  "unlocked cards do not write an hLock key",
+);
+
+const journalLocked = normalizeCard({
+  blockId: 4,
+  x: 1,
+  y: 2,
+  w: 240,
+  h: 160,
+  kind: "journal",
+  date: "2026-08-15",
+  hLock: true,
+});
+check(
+  journalLocked?.kind === "journal" && journalLocked.hLock === true,
+  "journal cards keep hLock on normalize",
 );
 
 console.log("cards.test.ts ok");

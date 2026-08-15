@@ -9,6 +9,7 @@ import {
   startResizeCard,
   type ResizeHandle,
 } from "./cardGestures";
+import { useCardClickCaret } from "./cardClickEdit";
 import { CardTitle } from "./CardTitle";
 import {
   CardToolbar,
@@ -26,7 +27,11 @@ import {
   blockIdFromCardEventTarget,
   isExtractPointerTarget,
 } from "./cardExtractDrag";
-import { FIT_HEIGHT_EPS, measureCardFitHeight } from "./cardFitHeight";
+import {
+  FIT_HEIGHT_EPS,
+  measureCardFitHeight,
+  shouldLockCardHeight,
+} from "./cardFitHeight";
 import { CardEditor } from "./CardEditor";
 import { useCardAutoHeight } from "./useCardAutoHeight";
 
@@ -52,7 +57,14 @@ type Props = {
   ) => void;
   onPatchCard: (
     blockId: DbId,
-    patch: { x?: number; y?: number; w?: number; h?: number; color?: string },
+    patch: {
+      x?: number;
+      y?: number;
+      w?: number;
+      h?: number;
+      color?: string;
+      hLock?: true;
+    },
   ) => void;
   onContentHeight: (blockId: DbId, nextH: number, record: boolean) => void;
   onArrange: (action: ArrangeAction) => void;
@@ -105,6 +117,14 @@ export function Card({
     h: card.h,
   });
 
+  const heightLockRef = useRef(card.hLock === true);
+  const pendingHeightLockRef = useRef(false);
+  if (card.hLock === true) {
+    heightLockRef.current = true;
+    pendingHeightLockRef.current = false;
+  } else if (!pendingHeightLockRef.current) {
+    heightLockRef.current = false;
+  }
   const pendingHRef = useRef<number | null>(null);
   if (!cardHasLiveGesture(cardRef.current)) {
     const h = pendingHRef.current ?? card.h;
@@ -188,7 +208,13 @@ export function Card({
         ) {
           return;
         }
-        onPatchCard(card.blockId, box);
+        if (shouldLockCardHeight(handle, card.h, box.h)) {
+          pendingHeightLockRef.current = true;
+          heightLockRef.current = true;
+          onPatchCard(card.blockId, { ...box, hLock: true });
+        } else {
+          onPatchCard(card.blockId, box);
+        }
       },
     });
   };
@@ -209,16 +235,25 @@ export function Card({
 
   useCardAutoHeight({
     enabled: editing,
+    locked: card.hLock === true,
+    lockedRef: heightLockRef,
     cardRef,
     blockId: card.blockId,
     heightRef,
     onHeight: applyContentHeight,
   });
 
+  useCardClickCaret(editing, card.blockId, cardRef);
+
   const fitContentHeight = () => {
     const el = cardRef.current;
     if (el == null) return;
     applyContentHeight(measureCardFitHeight(el), true);
+    if (card.hLock === true || heightLockRef.current) {
+      pendingHeightLockRef.current = false;
+      heightLockRef.current = false;
+      onPatchCard(card.blockId, { hLock: undefined });
+    }
   };
 
   const loadNotice = peekCardLoadNotice(card.blockId, promotedKey);
@@ -343,7 +378,7 @@ export function Card({
           {simplified ? null : (
             <div
               className="owb-card-body"
-              title={editing ? undefined : t("Double-click to edit")}
+              title={editing ? undefined : t("Click to edit")}
               onDoubleClick={() => {
                 if (!editing) onStartEdit(card.blockId);
               }}

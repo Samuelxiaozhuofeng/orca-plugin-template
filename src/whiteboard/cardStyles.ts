@@ -117,7 +117,8 @@ export const CARD_CSS = `
   border: 1.5px solid var(--orca-color-border);
   box-shadow: 2px 2px 0px 0px #701305;
   user-select: none;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: grab;
   transition: background var(--owb-duration) var(--owb-ease),
               box-shadow var(--owb-duration) var(--owb-ease);
 }
@@ -160,6 +161,18 @@ export const CARD_CSS = `
   line-height: 1.6;
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
+}
+
+/* Locked-height + editing: keep the body as the card scroller so the
+   hosted editor cannot grow past the user-set height. */
+.owb-card.is-editing .owb-card-body {
+  overflow: auto;
+  min-height: 0;
+}
+
+.owb-card.is-editing .owb-card-editor {
+  max-height: 100%;
+  min-height: 0;
 }
 
 .owb-card:has(.owb-card-journal-badge) .owb-card-body {

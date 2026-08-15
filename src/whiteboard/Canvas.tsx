@@ -251,6 +251,7 @@ export function Canvas({
     onPatchCards,
     onMoveArea: moveAreaBy,
     onMoveFrame,
+    onStartEdit: startEdit,
   });
 
   return (

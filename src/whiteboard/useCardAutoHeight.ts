@@ -10,6 +10,10 @@ const { useEffect, useRef } = window.React;
 
 type Args = {
   enabled: boolean;
+  /** User-resized height: do not follow content. */
+  locked?: boolean;
+  /** Same flag, readable during a gesture before React re-renders. */
+  lockedRef?: { current: boolean };
   cardRef: { current: HTMLElement | null };
   blockId: DbId;
   heightRef: { current: number };
@@ -24,6 +28,8 @@ type Args = {
  */
 export function useCardAutoHeight({
   enabled,
+  locked = false,
+  lockedRef,
   cardRef,
   blockId,
   heightRef,
@@ -32,31 +38,32 @@ export function useCardAutoHeight({
   const onHeightRef = useRef(onHeight);
   onHeightRef.current = onHeight;
   const wasEnabled = useRef(enabled);
+  const isLocked = () => locked || lockedRef?.current === true;
 
   useEffect(() => {
     const leftEdit = wasEnabled.current && !enabled;
     wasEnabled.current = enabled;
-    if (!leftEdit) return;
+    if (!leftEdit || isLocked()) return;
     const el = cardRef.current;
     if (el == null) return;
     const timer = window.requestAnimationFrame(() => {
-      if (cardHasLiveGesture(el)) return;
+      if (isLocked() || cardHasLiveGesture(el)) return;
       const nextH = measureCardFitHeight(el);
       if (Math.abs(nextH - heightRef.current) < FIT_HEIGHT_EPS) return;
       onHeightRef.current(nextH, false);
     });
     return () => window.cancelAnimationFrame(timer);
-  }, [blockId, cardRef, enabled, heightRef]);
+  }, [blockId, cardRef, enabled, heightRef, locked]);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || locked) return;
     const el = cardRef.current;
     if (el == null) return;
 
     let raf = 0;
     const emit = () => {
       raf = 0;
-      if (cardHasLiveGesture(el)) return;
+      if (isLocked() || cardHasLiveGesture(el)) return;
       const nextH = measureCardFitHeight(el);
       if (Math.abs(nextH - heightRef.current) < FIT_HEIGHT_EPS) return;
       onHeightRef.current(nextH, false);
@@ -99,5 +106,5 @@ export function useCardAutoHeight({
       ro.disconnect();
       mo.disconnect();
     };
-  }, [blockId, cardRef, enabled, heightRef]);
+  }, [blockId, cardRef, enabled, heightRef, locked]);
 }

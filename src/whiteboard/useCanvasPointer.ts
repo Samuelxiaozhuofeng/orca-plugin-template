@@ -11,6 +11,11 @@ import {
   startRightButtonSession,
   swallowNextContextMenu,
 } from "./cardGestures";
+import {
+  isCardBodyClickEdit,
+  requestCardEditCaret,
+  watchPointerClick,
+} from "./cardClickEdit";
 import type { WhiteboardCard } from "./data";
 import { abortEdgeGestures } from "./edgeGestures";
 import { abortMarquees, startMarquee } from "./marquee";
@@ -28,7 +33,14 @@ const { useEffect, useRef } = window.React;
 
 export type CardPatchEntry = {
   blockId: DbId;
-  patch: { x?: number; y?: number; w?: number; h?: number };
+  patch: {
+    x?: number;
+    y?: number;
+    w?: number;
+    h?: number;
+    color?: string;
+    hLock?: true;
+  };
 };
 
 export type PatchCardsOpts = { record?: boolean };
@@ -65,6 +77,7 @@ export function useCanvasPointer(opts: {
   onPatchCards: PatchCardsFn;
   onMoveArea: (id: string, dx: number, dy: number) => void;
   onMoveFrame?: (boxes: Map<DbId, CardRect>) => void;
+  onStartEdit: (blockId: DbId) => void;
 }): {
   onViewportMouseDown: (event: React.MouseEvent<HTMLDivElement>) => void;
   onCardMouseDown: (
@@ -83,6 +96,7 @@ export function useCanvasPointer(opts: {
     onPatchCards,
     onMoveArea,
     onMoveFrame,
+    onStartEdit,
   } = opts;
   const mountedRef = useRef(true);
 
@@ -107,7 +121,40 @@ export function useCanvasPointer(opts: {
     refs.viewport.current?.focus({ preventScroll: true });
   };
 
-  const beginMoveSelection = (startX: number, startY: number) => {
+  const tryClickEdit = (
+    card: WhiteboardCard,
+    down: React.MouseEvent,
+  ): void => {
+    if (
+      !isCardBodyClickEdit({
+        button: down.button,
+        shiftKey: down.shiftKey,
+        altKey: down.altKey,
+        metaKey: down.metaKey,
+        ctrlKey: down.ctrlKey,
+        clientX: down.clientX,
+        clientY: down.clientY,
+        target: down.target,
+        editing: refs.editing.current === card.blockId,
+      })
+    ) {
+      return;
+    }
+    const host = refs.canvas.current?.querySelector(
+      `[data-block-id="${card.blockId}"]`,
+    );
+    if (host instanceof HTMLElement && host.classList.contains("is-simplified")) {
+      return;
+    }
+    requestCardEditCaret(card.blockId, down.clientX, down.clientY);
+    onStartEdit(card.blockId);
+  };
+
+  const beginMoveSelection = (
+    startX: number,
+    startY: number,
+    onClick?: (event: MouseEvent) => void,
+  ) => {
     const canvas = refs.canvas.current;
     if (canvas == null) return;
     const movingIds = new Set(refs.selected.current);
@@ -129,6 +176,7 @@ export function useCanvasPointer(opts: {
       pointerToWorld,
       view: () => refs.liveView.current,
       onFrame: onMoveFrame,
+      onClick,
       onEnd: (moves) => {
         if (!mountedRef.current || moves.length === 0) return;
         onPatchCards(
@@ -328,8 +376,19 @@ export function useCanvasPointer(opts: {
     setSelectedArea(null);
 
     if (!selectCardOnPointer(card, event)) return;
-    if (refs.settings.current.mouseScheme === "rightDrag") return;
-    beginMoveSelection(event.clientX, event.clientY);
+    const onIdleClick = () => {
+      if (!mountedRef.current) return;
+      tryClickEdit(card, event);
+    };
+    if (refs.settings.current.mouseScheme === "rightDrag") {
+      watchPointerClick({
+        startX: event.clientX,
+        startY: event.clientY,
+        onClick: onIdleClick,
+      });
+      return;
+    }
+    beginMoveSelection(event.clientX, event.clientY, onIdleClick);
   };
 
   return { onViewportMouseDown, onCardMouseDown };

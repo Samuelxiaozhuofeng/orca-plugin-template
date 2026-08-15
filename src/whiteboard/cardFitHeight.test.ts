@@ -3,6 +3,7 @@ import {
   applyFitPatches,
   overlapsX,
   planContentHeightPatches,
+  shouldLockCardHeight,
   type FitCard,
 } from "./cardFitHeight.ts";
 
@@ -157,5 +158,25 @@ const applied = applyFitPatches(
   ],
 );
 check(applied[0].h === 300 && applied[1].y === 316, "patches apply in place");
+
+const vertical = ["n", "s", "ne", "nw", "se", "sw"];
+for (const handle of vertical) {
+  check(
+    shouldLockCardHeight(handle, 200, 300) === true,
+    `${handle} locks when height changes`,
+  );
+  check(
+    shouldLockCardHeight(handle, 200, 200) === false,
+    `${handle} does not lock when height is unchanged`,
+  );
+}
+check(
+  shouldLockCardHeight("e", 200, 300) === false,
+  "east handle does not lock even if height changed",
+);
+check(
+  shouldLockCardHeight("w", 200, 180) === false,
+  "west handle does not lock even if height changed",
+);
 
 console.log("cardFitHeight.test.ts ok");

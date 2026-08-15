@@ -20,6 +20,8 @@ export type WhiteboardCard = {
   y: number;
   w: number;
   h: number;
+  /** Set only when the user has manually resized height. */
+  hLock?: true;
 };
 
 function dateIfString(value: unknown): string | undefined {
@@ -28,6 +30,10 @@ function dateIfString(value: unknown): string | undefined {
 
 function colorIfString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function heightLockIfTrue(value: unknown): true | undefined {
+  return value === true ? true : undefined;
 }
 
 function inferKind(
@@ -57,6 +63,7 @@ export function normalizeCard(value: unknown): WhiteboardCard | null {
   );
   const date = dateIfString(card.date);
   const color = colorIfString(card.color);
+  const hLock = heightLockIfTrue(card.hLock);
   const kind = inferKind(card.kind, date);
   if (kind === "journal") {
     return {
@@ -68,6 +75,7 @@ export function normalizeCard(value: unknown): WhiteboardCard | null {
       y: card.y,
       w: size.w,
       h: size.h,
+      ...(hLock === true ? { hLock: true as const } : {}),
     };
   }
   return {
@@ -78,6 +86,7 @@ export function normalizeCard(value: unknown): WhiteboardCard | null {
     y: card.y,
     w: size.w,
     h: size.h,
+    ...(hLock === true ? { hLock: true as const } : {}),
   };
 }
 
@@ -169,7 +178,8 @@ function cardEqual(left: WhiteboardCard, right: WhiteboardCard): boolean {
     left.x === right.x &&
     left.y === right.y &&
     left.w === right.w &&
-    left.h === right.h
+    left.h === right.h &&
+    left.hLock === right.hLock
   );
 }
 

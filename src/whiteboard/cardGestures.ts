@@ -199,6 +199,8 @@ export function startMoveCards(opts: {
   view: () => CanvasView;
   onEnd: (moves: ReadonlyArray<{ blockId: DbId; x: number; y: number }>) => void;
   onFrame?: (boxes: Map<DbId, CardRect>) => void;
+  /** Fires on mouseup when the pointer never crossed the click threshold. */
+  onClick?: (event: MouseEvent) => void;
 }): void {
   const start = opts.pointerToWorld(opts.startX, opts.startY);
   let raf = 0;
@@ -296,7 +298,12 @@ export function startMoveCards(opts: {
     detach();
     if (started) paint(event.clientX, event.clientY, event.altKey);
     finishVisual();
-    if (!started || (lastDx === 0 && lastDy === 0)) {
+    if (!started) {
+      opts.onClick?.(event);
+      opts.onEnd([]);
+      return;
+    }
+    if (lastDx === 0 && lastDy === 0) {
       opts.onEnd([]);
       return;
     }

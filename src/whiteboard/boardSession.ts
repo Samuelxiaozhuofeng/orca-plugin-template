@@ -32,7 +32,7 @@ import {
 } from "./edges.ts";
 
 export type CardBoxPatch = Partial<
-  Pick<WhiteboardCard, "x" | "y" | "w" | "h" | "color">
+  Pick<WhiteboardCard, "x" | "y" | "w" | "h" | "color" | "hLock">
 >;
 
 export type BoardSession = {
