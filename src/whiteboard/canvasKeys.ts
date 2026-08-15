@@ -8,7 +8,7 @@ export function isEditableTarget(target: EventTarget | null): boolean {
   if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
   return (
     target.closest(
-      '.owb-card-editor, .owb-dialog, .owb-card-search, [contenteditable="true"], input, textarea',
+      '.owb-card-editor, .owb-dialog, .owb-card-search, .owb-card-filter, .owb-filter-banner, [contenteditable="true"], input, textarea',
     ) != null
   );
 }

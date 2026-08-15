@@ -5,10 +5,14 @@ import { BoardTitle } from "./BoardTitle";
 import { boardName } from "./data";
 import { nextZoomScale } from "./fitView";
 import { openBoardAsOutline } from "./pageBoardRedirect";
+import { CardFilterPopover } from "./CardFilterPopover";
+import { useCardFilterControls } from "./useCardFilter";
 import {
   DEFAULT_VIEW,
   type CanvasView,
 } from "./viewTransform";
+
+const { useEffect, useRef } = window.React;
 
 type Props = {
   blockId: DbId;
@@ -38,6 +42,25 @@ export function BoardToolbar({
   onFitView,
   setView,
 }: Props) {
+  const filter = useCardFilterControls(blockId);
+  const popoverRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!filter.open) return;
+    const onDown = (event: MouseEvent) => {
+      const root = popoverRef.current;
+      if (
+        root == null ||
+        (event.target instanceof Node && root.contains(event.target))
+      ) {
+        return;
+      }
+      filter.setOpen(false);
+    };
+    window.addEventListener("mousedown", onDown);
+    return () => window.removeEventListener("mousedown", onDown);
+  }, [filter.open, filter.setOpen]);
+
   return (
     <div className="owb-toolbar">
       <BoardTitle blockId={blockId} name={boardName(block)} />
@@ -77,6 +100,19 @@ export function BoardToolbar({
       >
         {t("Place journals…")}
       </button>
+      <div className="owb-toolbar-sep" />
+      <div className="owb-toolbar-filter" ref={popoverRef}>
+        <button
+          type="button"
+          className={`owb-toolbar-btn${filter.active || filter.open ? " is-active" : ""}`}
+          title={t("Filter cards")}
+          aria-pressed={filter.active}
+          onClick={() => filter.setOpen(!filter.open)}
+        >
+          <i className="ti ti-filter" />
+        </button>
+        {filter.open ? <CardFilterPopover controls={filter} /> : null}
+      </div>
       <div className="owb-toolbar-sep" />
       <div className="owb-zoom">
         <button

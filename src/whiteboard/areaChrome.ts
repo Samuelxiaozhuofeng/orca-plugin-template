@@ -113,8 +113,12 @@ export function operableCards<
 >(
   areas: ReadonlyArray<WhiteboardArea>,
   cards: readonly C[],
+  extraHidden?: ReadonlySet<DbId> | null,
 ): C[] {
   const hidden = hiddenCardIdsInCollapsedAreas(areas, cards);
+  if (extraHidden != null) {
+    for (const id of extraHidden) hidden.add(id);
+  }
   if (hidden.size === 0) return cards as C[];
   return cards.filter((card) => !hidden.has(card.blockId));
 }

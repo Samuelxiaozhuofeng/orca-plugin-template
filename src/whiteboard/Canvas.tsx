@@ -1,5 +1,7 @@
 import type { DbId } from "../orca.d.ts";
 import { operableCards, visibleAfterCollapsedAreas } from "./areaChrome";
+import { paintFilterDim } from "./cardFilter";
+import { useCardFilter } from "./useCardFilter";
 import { AreaLayer } from "./AreaLayer";
 import type { WhiteboardArea } from "./areas";
 import { bindPanelCards } from "./useCanvasAreas";
@@ -32,7 +34,7 @@ import { type CanvasView } from "./viewTransform";
 
 export type { CanvasView, CardPatchEntry };
 
-const { useCallback, useRef } = window.React;
+const { useCallback, useLayoutEffect, useRef } = window.React;
 
 type Props = {
   panelId: string;
@@ -106,7 +108,10 @@ export function Canvas({
   const overlay = useCanvasOverlayState(panelId);
   const settings = useWhiteboardSettings();
   const settingsRef = useRef(settings);
-  const interactiveCards = operableCards(areas, cards);
+  const filter = useCardFilter(boardBlockId, cards);
+  const extraHidden = filter.active ? filter.unmatched : null;
+  const viewCards = operableCards(areas, cards);
+  const interactiveCards = operableCards(areas, cards, extraHidden);
   bindPanelCards(panelId, cards);
   cardsRef.current = interactiveCards;
   edgesRef.current = edges;
@@ -168,7 +173,8 @@ export function Canvas({
   } = useCanvasBoard({
     panelId,
     boardBlockId,
-    cards: interactiveCards,
+    cards: viewCards,
+    inoperableIds: extraHidden,
     edges,
     areas,
     view,
@@ -194,8 +200,12 @@ export function Canvas({
     liveViewRef,
     focusApiRef,
     onViewChange,
-    searchOpen: overlay.searchOpen,
+    searchOpen: overlay.searchOpen || filter.open,
   });
+
+  useLayoutEffect(() => {
+    paintFilterDim(canvasRef.current, extraHidden);
+  }, [extraHidden, shownCards, lodSimplified]);
 
   const visible = visibleAfterCollapsedAreas(areas, cards, shownCards, edges);
   const { edges: refEdges, truncated: refEdgesTruncated } = useReferenceEdges(
@@ -265,6 +275,7 @@ export function Canvas({
     overlay,
     boardBlockId,
     cards,
+    viewCards,
     interactiveCards,
     cardsRef,
     selected,
@@ -274,6 +285,11 @@ export function Canvas({
     onCommitEdges,
     applyCardColor,
     applyUnifySize,
+    filterActive: filter.active,
+    filterTags: filter.query.tags,
+    filterMatched: filter.matchedCount,
+    filterTotal: filter.totalCount,
+    onClearFilter: filter.clear,
   };
 
   return (
