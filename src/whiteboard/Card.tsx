@@ -65,6 +65,7 @@ type Props = {
   onMoveFrame?: (boxes: Map<DbId, { x: number; y: number; w: number; h: number }>) => void;
   promotedKey?: string;
   onExtractRow?: (blockId: DbId, sourceCard: WhiteboardCard) => void;
+  onWrapSelected?: () => void;
 };
 
 type CardBox = { x: number; y: number; w: number; h: number };
@@ -176,6 +177,7 @@ export function Card({
   onMoveFrame,
   promotedKey = "",
   onExtractRow,
+  onWrapSelected,
 }: Props) {
   const cardRef = useRef<HTMLDivElement | null>(null);
   const extractRowRef = useRef<DbId | null>(null);
@@ -377,6 +379,15 @@ export function Card({
             selectedCount={selected ? selectedCount : 1}
             onArrange={onArrange}
           />
+          {selected && selectedCount >= 2 && onWrapSelected != null ? (
+            <orca.components.MenuText
+              title={t("Group into section")}
+              onClick={() => {
+                close();
+                onWrapSelected();
+              }}
+            />
+          ) : null}
         </orca.components.Menu>
       )}
     >

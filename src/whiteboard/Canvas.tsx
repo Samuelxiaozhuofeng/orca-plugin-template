@@ -46,8 +46,13 @@ type Props = {
     cardIds?: ReadonlySet<DbId>,
   ) => Promise<boolean>;
   onCommitAreas: (next: WhiteboardArea[]) => Promise<boolean>;
+  onCommitCardsAndAreas: (
+    cards: WhiteboardCard[],
+    areas: WhiteboardArea[],
+  ) => Promise<boolean>;
   drawArea: boolean;
   onExitDrawArea: () => void;
+  onStartDrawArea: () => void;
   onUndo: () => void;
   onRedo: () => void;
   edges: WhiteboardEdge[];
@@ -71,8 +76,10 @@ export function Canvas({
   onAddCards,
   onCommitEdges,
   onCommitAreas,
+  onCommitCardsAndAreas,
   drawArea,
   onExitDrawArea,
+  onStartDrawArea,
   onUndo,
   onRedo,
   edges,
@@ -144,6 +151,7 @@ export function Canvas({
     createAreaAt,
     renameArea,
     resizeArea,
+    moveAreaBy,
     applyArrange,
     applyContentHeight,
     startEdit,
@@ -177,6 +185,7 @@ export function Canvas({
     onAddCards,
     onCommitEdges,
     onCommitAreas,
+    onCommitCardsAndAreas,
     onExitDrawArea,
     onUndo,
     onRedo,
@@ -309,9 +318,12 @@ export function Canvas({
               ghostRef={areaGhostRef}
               canvasRef={canvasRef}
               pointerToWorld={pointerToWorld}
+              cards={cards}
               onSelect={selectArea}
               onRename={renameArea}
               onResize={resizeArea}
+              onMove={moveAreaBy}
+              onMoveFrame={onMoveFrame}
             />
             <EdgeLayer
               panelId={panelId}
@@ -351,6 +363,7 @@ export function Canvas({
               onMoveFrame={onMoveFrame}
               edgeApiRef={edgeApiRef}
               onExtractRow={extractRow}
+              onWrapSelected={wrapSelected}
             />
           </div>
           <div ref={guidesRef} className="owb-guides" />
@@ -397,22 +410,6 @@ export function Canvas({
               ) : null}
             </div>
           ) : null}
-          {selected.length > 0 ? (
-            <div
-              className="owb-area-wrap-bar"
-              onMouseDown={(event: React.MouseEvent<HTMLDivElement>) =>
-                event.stopPropagation()
-              }
-            >
-              <button
-                type="button"
-                className="owb-toolbar-btn"
-                onClick={wrapSelected}
-              >
-                {t("Group into section")}
-              </button>
-            </div>
-          ) : null}
         </div>
       {addNoteAt != null ? (
         <AddNoteCard
@@ -441,6 +438,7 @@ export function Canvas({
             setAddNoteAt(menuPointRef.current);
           },
           onPlaceJournals: () => onPlaceJournalsAt(menuPointRef.current),
+          onDrawArea: onStartDrawArea,
           onFitAll: () => {
             focusApiRef.current?.fitAll();
           },

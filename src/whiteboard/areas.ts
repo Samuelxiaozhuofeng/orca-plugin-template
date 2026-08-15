@@ -186,6 +186,46 @@ export function planAreaFromCards(
   };
 }
 
+/** Wrap-into-section requires two or more cards. */
+export function planWrapAreaFromCards(
+  cards: ReadonlyArray<{ x: number; y: number; w: number; h: number }>,
+): { x: number; y: number; w: number; h: number } | null {
+  if (cards.length < 2) return null;
+  return planAreaFromCards(cards);
+}
+
+export type AreaMovePlan<
+  C extends { x: number; y: number; w: number; h: number },
+> = {
+  areas: WhiteboardArea[];
+  cards: C[];
+};
+
+/**
+ * Snapshot membership against `area` (pre-move), then shift that area and
+ * every contained card by the same delta. Outside cards stay put.
+ */
+export function planAreaMove<
+  C extends { x: number; y: number; w: number; h: number },
+>(
+  area: WhiteboardArea,
+  dx: number,
+  dy: number,
+  cards: readonly C[],
+  areas: readonly WhiteboardArea[],
+): AreaMovePlan<C> {
+  const nextAreas = areas.map((item) =>
+    item.id === area.id ? { ...item, x: item.x + dx, y: item.y + dy } : item,
+  );
+  let moved = false;
+  const nextCards = cards.map((card) => {
+    if (!cardInArea(card, area)) return card;
+    moved = true;
+    return { ...card, x: card.x + dx, y: card.y + dy };
+  });
+  return { areas: nextAreas, cards: moved ? nextCards : (cards as C[]) };
+}
+
 /**
  * Membership is full containment, inclusive of the border.
  * A card that straddles the frame is outside.

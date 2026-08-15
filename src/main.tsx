@@ -36,6 +36,7 @@ import {
   injectWhiteboardStyles,
   removeWhiteboardStyles,
 } from "./whiteboard/styles";
+import { invokeWrapSelectedOnActivePanel } from "./whiteboard/useCanvasAreas";
 
 let pluginName: string;
 let unmountAddToBoard: (() => void) | null = null;
@@ -47,6 +48,12 @@ const LOCATE_COMMAND = "locateBlockOnWhiteboard";
 const OPEN_COMMAND = "openWhiteboard";
 const OPEN_HEADBAR = "openWhiteboardButton";
 const LOCATE_SHORTCUT = "alt+shift+w";
+const WRAP_AREA_COMMAND = "wrapCardsIntoSection";
+const WRAP_AREA_SHORTCUT = /Mac|iPhone|iPad|iPod/i.test(
+  typeof navigator === "undefined" ? "" : navigator.platform,
+)
+  ? "meta+g"
+  : "ctrl+g";
 
 function commandId(name: string): string {
   return `${pluginName}.${name}`;
@@ -126,6 +133,16 @@ export async function load(_name: string) {
   );
   void assignLocateShortcutIfFree(locateId);
 
+  const wrapAreaId = commandId(WRAP_AREA_COMMAND);
+  orca.commands.registerCommand(
+    wrapAreaId,
+    () => {
+      invokeWrapSelectedOnActivePanel();
+    },
+    t("Group into section"),
+  );
+  void assignShortcutIfFree(wrapAreaId, WRAP_AREA_SHORTCUT);
+
   startBlockMarks(pluginName);
 
   orca.blockMenuCommands.registerBlockMenuCommand(
@@ -198,6 +215,7 @@ export async function unload() {
       tagToBoardCommandId(pluginName),
     );
     orca.commands.unregisterCommand(commandId(OPEN_COMMAND));
+    orca.commands.unregisterCommand(commandId(WRAP_AREA_COMMAND));
     orca.headbar.unregisterHeadbarButton(commandId(OPEN_HEADBAR));
   }
   unmountAddToBoard?.();
@@ -210,23 +228,28 @@ export async function unload() {
 }
 
 function assignLocateShortcutIfFree(locateId: string): Promise<void> {
+  return assignShortcutIfFree(locateId, LOCATE_SHORTCUT);
+}
+
+function assignShortcutIfFree(commandId: string, combo: string): Promise<void> {
   const shortcuts = orca.state.shortcuts;
-  if (locateShortcutTaken(shortcuts, locateId)) return Promise.resolve();
-  return orca.shortcuts.assign(LOCATE_SHORTCUT, locateId).catch((err: unknown) => {
-    console.error("[whiteboard] failed to assign locate shortcut", err);
+  if (shortcutTaken(shortcuts, commandId, combo)) return Promise.resolve();
+  return orca.shortcuts.assign(combo, commandId).catch((err: unknown) => {
+    console.error("[whiteboard] failed to assign shortcut", combo, err);
   });
 }
 
-function locateShortcutTaken(
+function shortcutTaken(
   shortcuts: Record<string, string | undefined>,
-  locateId: string,
+  commandId: string,
+  combo: string,
 ): boolean {
-  const bound = shortcuts[LOCATE_SHORTCUT];
+  const bound = shortcuts[combo];
   if (bound != null && bound !== "") return true;
   for (const [key, value] of Object.entries(shortcuts)) {
-    if (key === locateId && value != null && value !== "") return true;
-    if (value === locateId) return true;
-    if (value === LOCATE_SHORTCUT) return true;
+    if (key === commandId && value != null && value !== "") return true;
+    if (value === commandId) return true;
+    if (value === combo) return true;
   }
   return false;
 }

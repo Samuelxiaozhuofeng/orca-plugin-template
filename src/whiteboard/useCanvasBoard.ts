@@ -1,12 +1,6 @@
 import type { DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n";
-import {
-  nextAreaId,
-  planAreaFromCards,
-  removeArea,
-  type WhiteboardArea,
-} from "./areas";
-import { runAsHistoryStep } from "./boardHistory";
+import type { WhiteboardArea } from "./areas";
 import {
   handleWhiteboardKey,
   isWhiteboardShortcutTarget,
@@ -27,6 +21,7 @@ import {
   arrangeCards,
   type ArrangeAction,
 } from "./selection";
+import { useCanvasAreas } from "./useCanvasAreas";
 import type { CardPatchEntry, PatchCardsFn } from "./useCanvasPointer";
 import {
   isLodSimplified,
@@ -62,6 +57,10 @@ type Args = {
     cardIds?: ReadonlySet<DbId>,
   ) => Promise<boolean>;
   onCommitAreas: (next: WhiteboardArea[]) => Promise<boolean>;
+  onCommitCardsAndAreas: (
+    cards: WhiteboardCard[],
+    areas: WhiteboardArea[],
+  ) => Promise<boolean>;
   onExitDrawArea: () => void;
   onUndo: () => void;
   onRedo: () => void;
@@ -89,6 +88,7 @@ export function useCanvasBoard({
   onAddCards,
   onCommitEdges,
   onCommitAreas,
+  onCommitCardsAndAreas,
   onExitDrawArea,
   onUndo,
   onRedo,
@@ -96,51 +96,52 @@ export function useCanvasBoard({
   const [editingId, setEditingId] = useState<DbId | null>(null);
   const [selected, setSelected] = useState<DbId[]>([]);
   const [selectedEdge, setSelectedEdge] = useState<string | null>(null);
-  const [selectedArea, setSelectedArea] = useState<string | null>(null);
   const [edgeDrop, setEdgeDrop] = useState<DrawDropEmpty | null>(null);
   editingRef.current = editingId;
   selectedRef.current = selected;
   selectedEdgeRef.current = selectedEdge;
-  selectedAreaRef.current = selectedArea;
+
+  const clearForArea = useCallback(() => {
+    setSelected([]);
+    setSelectedEdge(null);
+  }, []);
+
+  const {
+    selectedArea,
+    selectArea,
+    wrapSelected,
+    createAreaAt,
+    renameArea,
+    resizeArea,
+    moveAreaBy,
+    deleteSelectedArea,
+  } = useCanvasAreas({
+    panelId,
+    boardBlockId,
+    areas,
+    selectedAreaRef,
+    selectedRef,
+    cardsRef,
+    edgesRef,
+    areasRef,
+    onClearOtherSelection: clearForArea,
+    onCommitAreas,
+    onCommitCardsAndAreas,
+  });
 
   const selectCards = useCallback((ids: DbId[]) => {
     setSelected(ids);
     setSelectedEdge(null);
-    setSelectedArea(null);
-  }, []);
+    selectArea(null);
+  }, [selectArea]);
 
   const selectEdge = useCallback((id: string | null) => {
     setSelectedEdge(id);
     if (id != null) {
       setSelected([]);
-      setSelectedArea(null);
+      selectArea(null);
     }
-  }, []);
-
-  const selectArea = useCallback((id: string | null) => {
-    setSelectedArea(id);
-    if (id != null) {
-      setSelected([]);
-      setSelectedEdge(null);
-    }
-  }, []);
-
-  const snapshotNow = useCallback(() => {
-    return {
-      cards: cardsRef.current.map((card: WhiteboardCard) => ({ ...card })),
-      edges: edgesRef.current.map((edge: WhiteboardEdge) => ({ ...edge })),
-      areas: areasRef.current.map((area: WhiteboardArea) => ({ ...area })),
-    };
-  }, []);
-
-  const commitAreasStep = useCallback(
-    async (next: WhiteboardArea[]): Promise<boolean> => {
-      return runAsHistoryStep(boardBlockId, snapshotNow(), () =>
-        onCommitAreas(next),
-      );
-    },
-    [boardBlockId, onCommitAreas, snapshotNow],
-  );
+  }, [selectArea]);
 
   useEffect(() => {
     const ids = new Set(cards.map((card: WhiteboardCard) => card.blockId));
@@ -156,13 +157,6 @@ export function useCanvasBoard({
       setSelectedEdge(null);
     }
   }, [edges, selectedEdge]);
-
-  useEffect(() => {
-    if (selectedArea == null) return;
-    if (!areas.some((area: WhiteboardArea) => area.id === selectedArea)) {
-      setSelectedArea(null);
-    }
-  }, [areas, selectedArea]);
 
   const pinned = useMemo(() => {
     const ids = new Set(selected);
@@ -242,79 +236,9 @@ export function useCanvasBoard({
   const startEdit = useCallback((blockId: DbId) => {
     setEditingId(blockId);
     setSelectedEdge(null);
-    setSelectedArea(null);
+    selectArea(null);
     setSelected((prev: DbId[]) => (prev.includes(blockId) ? prev : [blockId]));
-  }, []);
-
-  const wrapSelected = useCallback(() => {
-    const ids = new Set<DbId>(selectedRef.current);
-    const picked = cardsRef.current.filter((card: WhiteboardCard) =>
-      ids.has(card.blockId),
-    );
-    const box = planAreaFromCards(picked);
-    if (box == null) return;
-    const current = areasRef.current;
-    const area: WhiteboardArea = {
-      id: nextAreaId(current),
-      name: t("Section"),
-      ...box,
-    };
-    void commitAreasStep([...current, area]).then((ok: boolean) => {
-      if (ok) selectArea(area.id);
-    });
-  }, [commitAreasStep, selectArea]);
-
-  const createAreaAt = useCallback(
-    (box: { x: number; y: number; w: number; h: number }) => {
-      const current = areasRef.current;
-      const area: WhiteboardArea = {
-        id: nextAreaId(current),
-        name: t("Section"),
-        ...box,
-      };
-      void commitAreasStep([...current, area]).then((ok: boolean) => {
-        if (ok) selectArea(area.id);
-      });
-    },
-    [commitAreasStep, selectArea],
-  );
-
-  const renameArea = useCallback(
-    (id: string, raw: string) => {
-      const name = raw.trim() || t("Section");
-      const current = areasRef.current;
-      const target = current.find((area: WhiteboardArea) => area.id === id);
-      if (target == null || target.name === name) return;
-      void commitAreasStep(
-        current.map((area: WhiteboardArea) =>
-          area.id === id ? { ...area, name } : area,
-        ),
-      );
-    },
-    [commitAreasStep],
-  );
-
-  const resizeArea = useCallback(
-    (id: string, box: { x: number; y: number; w: number; h: number }) => {
-      const current = areasRef.current;
-      const target = current.find((area: WhiteboardArea) => area.id === id);
-      if (target == null) return;
-      if (
-        target.x === box.x &&
-        target.y === box.y &&
-        target.w === box.w &&
-        target.h === box.h
-      ) {
-        return;
-      }
-      void commitAreasStep(
-        current.map((area: WhiteboardArea) =>
-          area.id === id ? { ...area, ...box } : area,
-        ),
-      );
-    },
-    [commitAreasStep],
-  );
+  }, [selectArea]);
 
   const endEdit = useCallback(() => setEditingId(null), []);
 
@@ -426,15 +350,7 @@ export function useCanvasBoard({
             });
             return;
           }
-          const areaId = selectedAreaRef.current;
-          if (areaId != null) {
-            void commitAreasStep(removeArea(areasRef.current, areaId)).then(
-              (ok: boolean) => {
-                if (ok) selectArea(null);
-              },
-            );
-            return;
-          }
+          if (deleteSelectedArea()) return;
           const ids = selectedRef.current;
           if (ids.length === 0) return;
           void onRemoveCards(ids).then((ok) => {
@@ -448,7 +364,7 @@ export function useCanvasBoard({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [
-    commitAreasStep,
+    deleteSelectedArea,
     onCommitEdges,
     onExitDrawArea,
     onPatchCards,
@@ -475,6 +391,7 @@ export function useCanvasBoard({
     createAreaAt,
     renameArea,
     resizeArea,
+    moveAreaBy,
     applyArrange,
     applyContentHeight,
     startEdit,

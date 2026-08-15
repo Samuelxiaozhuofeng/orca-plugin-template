@@ -17,7 +17,7 @@ import { isHostOverlayTarget } from "./hostOverlay";
 import type { CanvasView } from "./viewTransform";
 
 const CANVAS_CHROME =
-  ".owb-card, .owb-edge-hit, .owb-edge-editor, .owb-area-title, .owb-area-handle, .owb-area-title-input, .owb-area-wrap-bar";
+  ".owb-card, .owb-edge-hit, .owb-edge-editor, .owb-area-title, .owb-area-handle, .owb-area-title-input";
 
 const { useEffect, useRef } = window.React;
 

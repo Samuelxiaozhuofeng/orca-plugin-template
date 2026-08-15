@@ -22,6 +22,7 @@ export type BoardMenuOptions = {
   onAddFromNote: () => void;
   /** Journal placement dialog, anchored at the right-clicked point. */
   onPlaceJournals: () => void;
+  onDrawArea: () => void;
   onFitAll: () => void;
 };
 
@@ -54,6 +55,11 @@ export function boardMenu(close: () => void, opts: BoardMenuOptions) {
         title={t("Place journals…")}
         preIcon="ti ti-calendar-plus"
         onClick={run(opts.onPlaceJournals)}
+      />
+      <orca.components.MenuText
+        title={t("Draw section")}
+        preIcon="ti ti-rectangle"
+        onClick={run(opts.onDrawArea)}
       />
       <orca.components.MenuSeparator />
       <orca.components.MenuText

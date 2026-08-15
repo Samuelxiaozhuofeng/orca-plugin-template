@@ -36,6 +36,7 @@ type Props = {
   onMoveFrame: (boxes: Map<DbId, CardBox>) => void;
   edgeApiRef: { current: EdgeLayerApi | null };
   onExtractRow: (blockId: DbId, sourceCard: WhiteboardCard) => void;
+  onWrapSelected: () => void;
 };
 
 export function CanvasCards({
@@ -59,6 +60,7 @@ export function CanvasCards({
   onMoveFrame,
   edgeApiRef,
   onExtractRow,
+  onWrapSelected,
 }: Props) {
   const promotedKey = cardIdsKey(cards);
   const cardTrees = useVisibleCardTrees(
@@ -128,6 +130,7 @@ export function CanvasCards({
           }}
           promotedKey={promotedKey}
           onExtractRow={onExtractRow}
+          onWrapSelected={onWrapSelected}
         />
       ))}
     </>

@@ -263,6 +263,46 @@ export async function writeSessionSnapshot(
   emitBoardCardsChanged(id);
 }
 
+/** One `set-properties` for cards + areas. Does not touch the edges property. */
+export async function writeCardsAndAreas(
+  id: DbId,
+  cards: WhiteboardCard[],
+  areas: WhiteboardArea[],
+  areasPresent: boolean,
+): Promise<void> {
+  await assertBoardWritable(id);
+  const storedCards = preparedCards(cards);
+  const storedAreas = preparedAreas(areas);
+  const persistAreas = shouldPersistAreas(storedAreas, areasPresent);
+  const props = [
+    {
+      name: CARDS_PROP,
+      type: PROP_TYPE_TEXT,
+      value: JSON.stringify(storedCards),
+    },
+  ];
+  if (persistAreas) {
+    props.push({
+      name: AREAS_PROP,
+      type: PROP_TYPE_TEXT,
+      value: JSON.stringify(storedAreas),
+    });
+  }
+  const fresh = await writeProperties(id, props);
+  const block = fresh ?? orca.state.blocks[id];
+  const cardsBack = tryReadCards(block);
+  if (!cardsBack.ok || !cardsEqual(cardsBack.value, storedCards)) {
+    throw new Error(t("Whiteboard cards were not saved"));
+  }
+  if (persistAreas) {
+    const areasBack = tryReadAreas(block);
+    if (!areasBack.ok || !areasEqual(areasBack.value, storedAreas)) {
+      throw new Error(t("Whiteboard sections were not saved"));
+    }
+  }
+  emitBoardCardsChanged(id);
+}
+
 export function releaseBoardSession(id: DbId): void {
   const session = sessions.get(id);
   if (session == null) return;

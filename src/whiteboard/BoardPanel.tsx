@@ -61,6 +61,7 @@ export default function BoardPanel({ panelId, blockId }: Props) {
     appendCards,
     commitEdges,
     commitAreas,
+    commitCardsAndAreas,
     commitBoard,
   } = useBoardPersist(
     blockId ?? null,
@@ -86,8 +87,10 @@ export default function BoardPanel({ panelId, blockId }: Props) {
   const focusApiRef = useRef<CanvasFocusApi | null>(null);
   const cardsRef = useRef(cards);
   const edgesRef = useRef(edges);
+  const areasRef = useRef(areas);
   cardsRef.current = cards;
   edgesRef.current = edges;
+  areasRef.current = areas;
 
   useEffect(() => {
     setDrawArea(false);
@@ -108,6 +111,7 @@ export default function BoardPanel({ panelId, blockId }: Props) {
     edges,
     cardsRef,
     edgesRef,
+    areasRef,
     view,
     busy,
     setBusy,
@@ -119,6 +123,8 @@ export default function BoardPanel({ panelId, blockId }: Props) {
       commitCards,
       commitEdges,
       commitBoard,
+      commitAreas,
+      commitCardsAndAreas,
     },
   });
 
@@ -265,8 +271,10 @@ export default function BoardPanel({ panelId, blockId }: Props) {
         areas={areas}
         onCommitEdges={onCommitEdges}
         onCommitAreas={commitAreas}
+        onCommitCardsAndAreas={commitCardsAndAreas}
         drawArea={drawArea}
         onExitDrawArea={() => setDrawArea(false)}
+        onStartDrawArea={() => setDrawArea(true)}
         onUndo={onUndo}
         onRedo={onRedo}
         onViewportWidth={setViewportWidth}
@@ -284,8 +292,6 @@ export default function BoardPanel({ panelId, blockId }: Props) {
         zoomLabelRef={zoomLabelRef}
         onUndo={onUndo}
         onRedo={onRedo}
-        drawArea={drawArea}
-        onToggleDrawArea={() => setDrawArea((on: boolean) => !on)}
         onPlace={() => {
           setPlaceOrigin(null);
           setPlaceOpen(true);

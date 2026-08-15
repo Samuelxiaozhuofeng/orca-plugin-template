@@ -1,8 +1,9 @@
 import type { DbId } from "../orca.d.ts";
-import { type WhiteboardArea } from "./areas";
+import { areasEqual, type WhiteboardArea } from "./areas";
 import { bindHistoryAreas } from "./boardHistory";
 import {
   acquireBoardSession,
+  emitBoardSession,
   ensureBoardSession,
   getBoardSession,
   listBoardSessions,
@@ -14,8 +15,11 @@ import {
   applyEdgeEcho,
 } from "./boardPersistEcho";
 import {
-  commitAreasOn,
   commitBoardOn,
+  commitCardsAndAreasOn,
+} from "./boardPersistCommit";
+import {
+  commitAreasOn,
   commitCardsOn,
   commitEdgesOn,
   flushAreas,
@@ -35,7 +39,9 @@ bindHistoryAreas({
   apply: (boardId, areas) => {
     const session = getBoardSession(boardId);
     if (session == null) return;
-    void commitAreasOn(session, areas);
+    if (areasEqual(session.areas, areas)) return;
+    session.areas = areas;
+    emitBoardSession(session);
   },
 });
 
@@ -64,6 +70,10 @@ export type BoardPersistApi = {
     cardIds?: ReadonlySet<DbId>,
   ) => Promise<boolean>;
   commitAreas: (next: WhiteboardArea[]) => Promise<boolean>;
+  commitCardsAndAreas: (
+    cards: WhiteboardCard[],
+    areas: WhiteboardArea[],
+  ) => Promise<boolean>;
   commitBoard: (
     cards: WhiteboardCard[],
     edges: WhiteboardEdge[],
@@ -221,6 +231,19 @@ export function useBoardPersist(
     [blockId],
   );
 
+  const commitCardsAndAreas = useCallback(
+    async (
+      nextCards: WhiteboardCard[],
+      nextAreas: WhiteboardArea[],
+    ): Promise<boolean> => {
+      if (blockId == null) return false;
+      const session = getBoardSession(blockId);
+      if (session == null) return false;
+      return commitCardsAndAreasOn(session, nextCards, nextAreas);
+    },
+    [blockId],
+  );
+
   const commitBoard = useCallback(
     async (
       nextCards: WhiteboardCard[],
@@ -253,6 +276,7 @@ export function useBoardPersist(
     appendCards,
     commitEdges,
     commitAreas,
+    commitCardsAndAreas,
     commitBoard,
     flush,
   };

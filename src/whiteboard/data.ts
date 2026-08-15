@@ -69,6 +69,8 @@ export {
   normalizeArea,
   parseAreas,
   planAreaFromCards,
+  planAreaMove,
+  planWrapAreaFromCards,
   readAreas,
   removeArea,
   shouldPersistAreas,

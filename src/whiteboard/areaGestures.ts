@@ -1,4 +1,6 @@
-import { MIN_AREA_H, MIN_AREA_W } from "./areas";
+import type { DbId } from "../orca.d.ts";
+import { cardInArea, MIN_AREA_H, MIN_AREA_W, type WhiteboardArea } from "./areas";
+import { applyCardBox } from "./cardGestures";
 import { CLICK_THRESHOLD_PX } from "./marquee";
 import { normalizeRect, type CardRect } from "./selection";
 
@@ -226,6 +228,123 @@ export function startResizeArea(opts: {
     detach();
     applyAreaBox(opts.el, opts.origin);
     opts.el.classList.remove("is-resizing");
+  });
+
+  window.addEventListener("mousemove", onMove);
+  window.addEventListener("mouseup", onUp);
+}
+
+function cardEl(canvas: HTMLElement, blockId: DbId): HTMLElement | null {
+  return canvas.querySelector(`[data-block-id="${blockId}"]`);
+}
+
+/** Drag the title bar: area + contained cards follow. Membership is snapshotted. */
+export function startMoveArea(opts: {
+  startX: number;
+  startY: number;
+  area: WhiteboardArea;
+  areaEl: HTMLElement;
+  canvas: HTMLElement;
+  cards: ReadonlyArray<{ blockId: DbId } & CardRect>;
+  pointerToWorld: (clientX: number, clientY: number) => { x: number; y: number };
+  onClick: () => void;
+  onFrame?: (boxes: Map<DbId, CardRect>) => void;
+  onEnd: (dx: number, dy: number) => void;
+}): void {
+  const start = opts.pointerToWorld(opts.startX, opts.startY);
+  const followers = opts.cards.filter((card) => cardInArea(card, opts.area));
+  let raf = 0;
+  let lastDx = 0;
+  let lastDy = 0;
+  let started = false;
+  let finished = false;
+
+  const paint = (clientX: number, clientY: number) => {
+    raf = 0;
+    if (finished) return;
+    const now = opts.pointerToWorld(clientX, clientY);
+    lastDx = now.x - start.x;
+    lastDy = now.y - start.y;
+    applyAreaBox(opts.areaEl, {
+      x: opts.area.x + lastDx,
+      y: opts.area.y + lastDy,
+      w: opts.area.w,
+      h: opts.area.h,
+    });
+    const boxes = new Map<DbId, CardRect>();
+    for (const card of followers) {
+      const box = {
+        x: card.x + lastDx,
+        y: card.y + lastDy,
+        w: card.w,
+        h: card.h,
+      };
+      applyCardBox(cardEl(opts.canvas, card.blockId), box);
+      boxes.set(card.blockId, box);
+    }
+    opts.onFrame?.(boxes);
+  };
+
+  const detach = () => {
+    window.removeEventListener("mousemove", onMove);
+    window.removeEventListener("mouseup", onUp);
+    if (raf !== 0) window.cancelAnimationFrame(raf);
+    raf = 0;
+  };
+
+  const finishVisual = (restore: boolean) => {
+    opts.areaEl.classList.remove("is-moving");
+    for (const card of followers) {
+      const el = cardEl(opts.canvas, card.blockId);
+      el?.classList.remove("is-dragging");
+      if (restore) applyCardBox(el, card);
+    }
+    if (restore) applyAreaBox(opts.areaEl, opts.area);
+  };
+
+  const onMove = (event: MouseEvent) => {
+    if (finished) return;
+    const distX = event.clientX - opts.startX;
+    const distY = event.clientY - opts.startY;
+    if (
+      !started &&
+      distX * distX + distY * distY < CLICK_THRESHOLD_PX * CLICK_THRESHOLD_PX
+    ) {
+      return;
+    }
+    if (!started) {
+      started = true;
+      opts.areaEl.classList.add("is-moving");
+      for (const card of followers) {
+        cardEl(opts.canvas, card.blockId)?.classList.add("is-dragging");
+      }
+    }
+    if (raf === 0) {
+      raf = window.requestAnimationFrame(() =>
+        paint(event.clientX, event.clientY),
+      );
+    }
+  };
+
+  const onUp = (event: MouseEvent) => {
+    if (finished) return;
+    finished = true;
+    tracked.untrack();
+    detach();
+    if (started) paint(event.clientX, event.clientY);
+    finishVisual(false);
+    if (!started) {
+      opts.onClick();
+      return;
+    }
+    opts.onEnd(lastDx, lastDy);
+  };
+
+  const tracked = trackAreaGesture(opts.canvas, () => {
+    if (finished) return;
+    finished = true;
+    detach();
+    finishVisual(true);
   });
 
   window.addEventListener("mousemove", onMove);

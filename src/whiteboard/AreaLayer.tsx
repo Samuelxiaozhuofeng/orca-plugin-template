@@ -1,10 +1,13 @@
+import type { DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n";
 import type { WhiteboardArea } from "./areas";
 import {
   AREA_CORNERS,
+  startMoveArea,
   startResizeArea,
   type AreaCorner,
 } from "./areaGestures";
+import type { WhiteboardCard } from "./data";
 import { cardIntersectsViewport, type CanvasView } from "./viewTransform";
 
 const { useEffect, useRef, useState } = window.React;
@@ -17,9 +20,12 @@ type Props = {
   ghostRef: { current: HTMLDivElement | null };
   canvasRef: { current: HTMLDivElement | null };
   pointerToWorld: (clientX: number, clientY: number) => { x: number; y: number };
+  cards: readonly WhiteboardCard[];
   onSelect: (id: string | null) => void;
   onRename: (id: string, name: string) => void;
   onResize: (id: string, box: { x: number; y: number; w: number; h: number }) => void;
+  onMove: (id: string, dx: number, dy: number) => void;
+  onMoveFrame?: (boxes: Map<DbId, { x: number; y: number; w: number; h: number }>) => void;
 };
 
 function AreaBox({
@@ -28,22 +34,28 @@ function AreaBox({
   editing,
   canvasRef,
   pointerToWorld,
+  cards,
   onSelect,
   onBeginEdit,
   onCommitName,
   onCancelEdit,
   onResize,
+  onMove,
+  onMoveFrame,
 }: {
   area: WhiteboardArea;
   selected: boolean;
   editing: boolean;
   canvasRef: { current: HTMLDivElement | null };
   pointerToWorld: (clientX: number, clientY: number) => { x: number; y: number };
+  cards: readonly WhiteboardCard[];
   onSelect: (id: string) => void;
   onBeginEdit: (id: string) => void;
   onCommitName: (id: string, name: string) => void;
   onCancelEdit: () => void;
   onResize: (id: string, box: { x: number; y: number; w: number; h: number }) => void;
+  onMove: (id: string, dx: number, dy: number) => void;
+  onMoveFrame?: (boxes: Map<DbId, { x: number; y: number; w: number; h: number }>) => void;
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const skipBlurRef = useRef(false);
@@ -62,12 +74,22 @@ function AreaBox({
     event.preventDefault();
     event.stopPropagation();
     onSelect(area.id);
-  };
-
-  const onTitleClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-    onBeginEdit(area.id);
+    if (editing) return;
+    const canvas = canvasRef.current;
+    const el = event.currentTarget.parentElement;
+    if (canvas == null || el == null) return;
+    startMoveArea({
+      startX: event.clientX,
+      startY: event.clientY,
+      area,
+      areaEl: el,
+      canvas,
+      cards,
+      pointerToWorld,
+      onClick: () => onBeginEdit(area.id),
+      onFrame: onMoveFrame,
+      onEnd: (dx, dy) => onMove(area.id, dx, dy),
+    });
   };
 
   const onHandleMouseDown = (
@@ -102,7 +124,6 @@ function AreaBox({
       <div
         className="owb-area-title"
         onMouseDown={onTitleMouseDown}
-        onClick={onTitleClick}
       >
         {editing ? (
           <input
@@ -159,9 +180,12 @@ export function AreaLayer({
   ghostRef,
   canvasRef,
   pointerToWorld,
+  cards,
   onSelect,
   onRename,
   onResize,
+  onMove,
+  onMoveFrame,
 }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -188,6 +212,7 @@ export function AreaLayer({
           editing={area.id === editingId}
           canvasRef={canvasRef}
           pointerToWorld={pointerToWorld}
+          cards={cards}
           onSelect={onSelect}
           onBeginEdit={setEditingId}
           onCancelEdit={() => setEditingId(null)}
@@ -196,6 +221,8 @@ export function AreaLayer({
             onRename(id, name);
           }}
           onResize={onResize}
+          onMove={onMove}
+          onMoveFrame={onMoveFrame}
         />
       ))}
       <div ref={ghostRef} className="owb-area-ghost" hidden />

@@ -19,7 +19,6 @@ import {
   notifyWriteError,
   refuseIfProtected,
   releaseBoardSession,
-  writeSessionSnapshot,
   type BoardSession,
   type CardBoxPatch,
 } from "./boardSession.ts";
@@ -55,7 +54,7 @@ function flightKey(
   return "areaFlight";
 }
 
-function enqueue<T>(
+export function enqueue<T>(
   session: BoardSession,
   lane: PersistLane,
   run: () => Promise<T>,
@@ -306,122 +305,4 @@ export async function commitAreasOn(
   return flushAreas(session);
 }
 
-export async function commitBoardOn(
-  session: BoardSession,
-  cards: WhiteboardCard[],
-  edges: WhiteboardEdge[],
-): Promise<boolean> {
-  if (refuseIfProtected(session)) return false;
-  if (session.cardTimer !== 0) {
-    window.clearTimeout(session.cardTimer);
-    session.cardTimer = 0;
-  }
-  session.cardPending = null;
-  session.edgePending = null;
-  session.areaPending = null;
-  session.cards = cards;
-  session.edges = sanitizeEdges(edges);
-  session.cardDirty = true;
-  session.edgeDirty = true;
-  session.areaDirty = true;
-  emitBoardSession(session);
-  const id = session.id;
-  const toWriteCards = session.cards;
-  const toWriteEdges = session.edges;
-  const toWriteAreas = session.areas;
-  const areasPresent = session.areasPresent;
-  const ok = await enqueue(session, "card", async () =>
-    enqueue(session, "edge", async () =>
-      enqueue(session, "area", async () => {
-        if (getBoardSession(id) !== session) return true;
-        if (
-          session.cardPending != null ||
-          session.edgePending != null ||
-          session.areaPending != null
-        ) {
-          return true;
-        }
-        const cardSeq = takeLaneSeq(id, "card");
-        const edgeSeq = takeLaneSeq(id, "edge");
-        const areaSeq = takeLaneSeq(id, "area");
-        const cardsGen = laneGen(id, "card");
-        const edgesGen = laneGen(id, "edge");
-        const areasGen = laneGen(id, "area");
-        try {
-          await writeSessionSnapshot(
-            id,
-            toWriteCards,
-            toWriteEdges,
-            toWriteAreas,
-            areasPresent,
-          );
-          if (getBoardSession(id) !== session) return true;
-          if (shouldApplyPersistSeq(cardsGen.applied, cardSeq)) {
-            cardsGen.applied = cardSeq;
-            session.cardBaseline = toWriteCards;
-            session.cardDirty = session.cardPending != null;
-            session.cardAwaitingEcho = !session.cardDirty;
-          }
-          if (shouldApplyPersistSeq(edgesGen.applied, edgeSeq)) {
-            edgesGen.applied = edgeSeq;
-            session.edgeBaseline = toWriteEdges;
-            session.edgeDirty = session.edgePending != null;
-            session.edgeAwaitingEcho = !session.edgeDirty;
-          }
-          if (shouldApplyPersistSeq(areasGen.applied, areaSeq)) {
-            areasGen.applied = areaSeq;
-            if (shouldPersistAreas(toWriteAreas, areasPresent)) {
-              session.areasPresent = true;
-            }
-            session.areaBaseline = toWriteAreas;
-            session.areaDirty = session.areaPending != null;
-            session.areaAwaitingEcho = !session.areaDirty;
-          }
-          return true;
-        } catch (error) {
-          if (getBoardSession(id) === session) {
-            if (session.cardPending == null) {
-              session.cards = session.cardBaseline;
-              session.cardDirty = false;
-              session.cardAwaitingEcho = false;
-            } else {
-              session.cardDirty = true;
-              session.cardAwaitingEcho = false;
-            }
-            if (session.edgePending == null) {
-              session.edges = session.edgeBaseline;
-              session.edgeDirty = false;
-              session.edgeAwaitingEcho = false;
-            } else {
-              session.edgeDirty = true;
-              session.edgeAwaitingEcho = false;
-            }
-            if (session.areaPending == null) {
-              session.areas = session.areaBaseline;
-              session.areaDirty = false;
-              session.areaAwaitingEcho = false;
-            } else {
-              session.areaDirty = true;
-              session.areaAwaitingEcho = false;
-            }
-            emitBoardSession(session);
-            notifyWriteError("cards", error);
-          }
-          return false;
-        }
-      }),
-    ),
-  );
-  let result = ok;
-  if (session.cardPending != null) {
-    result = (await flushCards(session)) && result;
-  }
-  if (session.edgePending != null) {
-    result = (await flushEdges(session)) && result;
-  }
-  if (session.areaPending != null) {
-    result = (await flushAreas(session)) && result;
-  }
-  maybeDisposeBoardSession(id);
-  return result;
-}
+

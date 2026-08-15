@@ -14,6 +14,7 @@ import {
   takeUndo,
   type BoardSnapshot,
 } from "./boardHistory";
+import { areasEqual, type WhiteboardArea } from "./areas";
 import { type WhiteboardCard } from "./cards";
 import {
   cardsEqual,
@@ -51,6 +52,11 @@ type Persist = {
     cards: WhiteboardCard[],
     edges: WhiteboardEdge[],
   ) => Promise<boolean>;
+  commitAreas: (next: WhiteboardArea[]) => Promise<boolean>;
+  commitCardsAndAreas: (
+    cards: WhiteboardCard[],
+    areas: WhiteboardArea[],
+  ) => Promise<boolean>;
 };
 
 export function useBoardCommands(opts: {
@@ -59,6 +65,7 @@ export function useBoardCommands(opts: {
   edges: WhiteboardEdge[];
   cardsRef: { current: WhiteboardCard[] };
   edgesRef: { current: WhiteboardEdge[] };
+  areasRef: { current: WhiteboardArea[] };
   view: CanvasView;
   busy: boolean;
   setBusy: (busy: boolean) => void;
@@ -72,6 +79,7 @@ export function useBoardCommands(opts: {
     edges,
     cardsRef,
     edgesRef,
+    areasRef,
     view,
     busy,
     setBusy,
@@ -79,8 +87,15 @@ export function useBoardCommands(opts: {
     setWeekdayGuide,
     persist,
   } = opts;
-  const { patchCards, appendCards, commitCards, commitEdges, commitBoard } =
-    persist;
+  const {
+    patchCards,
+    appendCards,
+    commitCards,
+    commitEdges,
+    commitBoard,
+    commitAreas,
+    commitCardsAndAreas,
+  } = persist;
   const [historyTick, setHistoryTick] = useState(0);
 
   const bumpHistory = useCallback(() => {
@@ -91,6 +106,7 @@ export function useBoardCommands(opts: {
     return {
       cards: cardsRef.current.map((card: WhiteboardCard) => ({ ...card })),
       edges: edgesRef.current.map((edge: WhiteboardEdge) => ({ ...edge })),
+      areas: areasRef.current.map((area: WhiteboardArea) => ({ ...area })),
     };
   }, []);
 
@@ -180,10 +196,19 @@ export function useBoardCommands(opts: {
   const applySnapshot = useCallback(
     async (next: BoardSnapshot, current: BoardSnapshot): Promise<boolean> => {
       const nextEdges = preserveLinked(next.edges, current.edges);
+      const nextAreas = next.areas ?? current.areas ?? [];
+      const currentAreas = current.areas ?? [];
       const cardsChanged = !cardsEqual(next.cards, current.cards);
       const edgesChanged = !edgesEqual(nextEdges, current.edges);
-      if (cardsChanged || edgesChanged) {
+      const areaChanged = !areasEqual(nextAreas, currentAreas);
+      if (cardsChanged && areaChanged && !edgesChanged) {
+        const ok = await commitCardsAndAreas(next.cards, nextAreas);
+        if (!ok) return false;
+      } else if (cardsChanged || edgesChanged) {
         const ok = await commitBoard(next.cards, nextEdges);
+        if (!ok) return false;
+      } else if (areaChanged) {
+        const ok = await commitAreas(nextAreas);
         if (!ok) return false;
       }
       const removed = current.cards.filter(
@@ -204,7 +229,7 @@ export function useBoardCommands(opts: {
       }
       return true;
     },
-    [blockId, commitBoard],
+    [blockId, commitAreas, commitBoard, commitCardsAndAreas],
   );
 
   const onUndo = useCallback(() => {

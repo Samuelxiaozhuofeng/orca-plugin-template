@@ -20,8 +20,13 @@ export const AREA_CSS = `
   background: color-mix(in oklab, var(--orca-color-primary-5, #00a896) 14%, transparent);
 }
 
-.owb-area.is-resizing {
+.owb-area.is-resizing,
+.owb-area.is-moving {
   transition: none;
+}
+
+.owb-area.is-moving .owb-area-title {
+  cursor: grabbing;
 }
 
 .owb-area-title {
@@ -33,7 +38,7 @@ export const AREA_CSS = `
   display: flex;
   align-items: center;
   pointer-events: auto;
-  cursor: text;
+  cursor: grab;
   font-size: 12px;
   font-weight: 600;
   line-height: 22px;
@@ -53,6 +58,7 @@ export const AREA_CSS = `
   height: 22px;
   margin: 0;
   padding: 0 4px;
+  cursor: text;
   border: 1px solid var(--orca-color-primary-5, #00a896);
   border-radius: 3px;
   background: var(--orca-color-bg-1);
@@ -94,20 +100,5 @@ export const AREA_CSS = `
 .owb-toolbar-btn.is-active {
   background: color-mix(in oklab, var(--orca-color-primary-5, #00a896) 22%, transparent);
   border-color: var(--orca-color-primary-5, #00a896);
-}
-
-.owb-area-wrap-bar {
-  position: absolute;
-  top: 64px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 21;
-  display: flex;
-  gap: var(--owb-space-2, 8px);
-  padding: 4px 6px;
-  border-radius: var(--owb-radius-card, 6px);
-  background: var(--orca-color-bg-1);
-  border: 2px solid var(--orca-color-border);
-  box-shadow: var(--owb-shadow-toolbar);
 }
 `.trim();
