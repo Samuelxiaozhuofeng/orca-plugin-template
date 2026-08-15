@@ -1,7 +1,9 @@
 import type { DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n";
+import { operableCards, visibleAfterCollapsedAreas } from "./areaChrome";
 import { AreaLayer } from "./AreaLayer";
 import type { WhiteboardArea } from "./areas";
+import { bindPanelCards } from "./useCanvasAreas";
 import type { CanvasOrigin, WhiteboardCard } from "./data";
 import {
   tryFocusCardFromRefClick,
@@ -109,7 +111,9 @@ export function Canvas({
   const [addNoteAt, setAddNoteAt] = useState<CanvasOrigin | null>(null);
   const settings = useWhiteboardSettings();
   const settingsRef = useRef(settings);
-  cardsRef.current = cards;
+  const interactiveCards = operableCards(areas, cards);
+  bindPanelCards(panelId, cards);
+  cardsRef.current = interactiveCards;
   edgesRef.current = edges;
   areasRef.current = areas;
   settingsRef.current = settings;
@@ -167,7 +171,7 @@ export function Canvas({
   } = useCanvasBoard({
     panelId,
     boardBlockId,
-    cards,
+    cards: interactiveCards,
     edges,
     areas,
     view,
@@ -192,9 +196,11 @@ export function Canvas({
     onRedo,
   });
 
+  const visible = visibleAfterCollapsedAreas(areas, cards, shownCards, edges);
+
   const { edges: refEdges, truncated: refEdgesTruncated } = useReferenceEdges(
-    shownCards,
-    edges,
+    visible.shownCards,
+    visible.edges,
     settings.showReferenceEdges,
   );
 
@@ -315,6 +321,7 @@ export function Canvas({
           <div ref={gridRef} className="owb-grid" />
           <div ref={canvasRef} className="owb-canvas">
             <AreaLayer
+              panelId={panelId}
               areas={areas}
               selectedId={selectedArea}
               view={view}
@@ -331,8 +338,8 @@ export function Canvas({
             />
             <EdgeLayer
               panelId={panelId}
-              cards={cards}
-              edges={edges}
+              cards={visible.cards}
+              edges={visible.edges}
               refEdges={refEdges}
               viewScale={view.scale}
               selectedId={selectedEdge}
@@ -348,8 +355,8 @@ export function Canvas({
             />
             <CanvasCards
               panelId={panelId}
-              cards={cards}
-              shownCards={shownCards}
+              cards={visible.cards}
+              shownCards={visible.shownCards}
               lodSimplified={lodSimplified}
               weekdayGuide={weekdayGuide}
               editingId={editingId}

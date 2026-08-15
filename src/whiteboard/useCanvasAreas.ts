@@ -1,6 +1,11 @@
 import type { DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n";
 import {
+  mergePreservingHidden,
+  planAreaCollapsed,
+  planAreaColor,
+} from "./areaChrome";
+import {
   nextAreaId,
   planAreaMove,
   planWrapAreaFromCards,
@@ -17,6 +22,33 @@ import type { WhiteboardEdge } from "./edges";
 const { useCallback, useEffect, useState } = window.React;
 
 const wrapByPanel = new Map<string, () => void>();
+
+type AreaChrome = {
+  setColor: (id: string, color: string | undefined) => void;
+  toggleCollapsed: (id: string) => void;
+};
+
+const chromeByPanel = new Map<string, AreaChrome>();
+const fullCardsByPanel = new Map<string, WhiteboardCard[]>();
+
+export function areaChromeFor(panelId: string): AreaChrome | undefined {
+  return chromeByPanel.get(panelId);
+}
+
+/** Full board cards, including members of collapsed sections. */
+export function bindPanelCards(
+  panelId: string,
+  cards: WhiteboardCard[],
+): void {
+  fullCardsByPanel.set(panelId, cards);
+}
+
+function cardsOnBoard(
+  panelId: string,
+  fallback: WhiteboardCard[],
+): WhiteboardCard[] {
+  return fullCardsByPanel.get(panelId) ?? fallback;
+}
 
 export function registerWrapAreaAction(
   panelId: string,
@@ -78,11 +110,13 @@ export function useCanvasAreas({
 
   const snapshotNow = useCallback(() => {
     return {
-      cards: cardsRef.current.map((card: WhiteboardCard) => ({ ...card })),
+      cards: cardsOnBoard(panelId, cardsRef.current).map(
+        (card: WhiteboardCard) => ({ ...card }),
+      ),
       edges: edgesRef.current.map((edge: WhiteboardEdge) => ({ ...edge })),
       areas: areasRef.current.map((area: WhiteboardArea) => ({ ...area })),
     };
-  }, []);
+  }, [panelId]);
 
   const commitAreasStep = useCallback(
     async (next: WhiteboardArea[]): Promise<boolean> => {
@@ -183,14 +217,18 @@ export function useCanvasAreas({
       const current = areasRef.current;
       const target = current.find((area: WhiteboardArea) => area.id === id);
       if (target == null) return;
-      const planned = planAreaMove(target, dx, dy, cardsRef.current, current);
+      const allCards = cardsOnBoard(panelId, cardsRef.current);
+      const planned = planAreaMove(target, dx, dy, allCards, current);
       void runAsHistoryStep(boardBlockId, snapshotNow(), () =>
-        onCommitCardsAndAreas(planned.cards, planned.areas),
+        onCommitCardsAndAreas(
+          mergePreservingHidden(allCards, planned.cards),
+          planned.areas,
+        ),
       ).then((ok: boolean) => {
         if (!ok) discardLastRecord(boardBlockId);
       });
     },
-    [boardBlockId, onCommitCardsAndAreas, snapshotNow],
+    [boardBlockId, onCommitCardsAndAreas, panelId, snapshotNow],
   );
 
   const deleteSelectedArea = useCallback(() => {
@@ -204,6 +242,39 @@ export function useCanvasAreas({
     return true;
   }, [commitAreasStep, selectArea]);
 
+  const setAreaColor = useCallback(
+    (id: string, color: string | undefined) => {
+      const next = planAreaColor(areasRef.current, id, color);
+      if (next == null) return;
+      void commitAreasStep(next);
+    },
+    [commitAreasStep],
+  );
+
+  const toggleAreaCollapsed = useCallback(
+    (id: string) => {
+      const current = areasRef.current;
+      const target = current.find((area: WhiteboardArea) => area.id === id);
+      if (target == null) return;
+      const next = planAreaCollapsed(current, id, target.collapsed !== true);
+      if (next == null) return;
+      void commitAreasStep(next);
+    },
+    [commitAreasStep],
+  );
+
+  chromeByPanel.set(panelId, {
+    setColor: setAreaColor,
+    toggleCollapsed: toggleAreaCollapsed,
+  });
+  useEffect(() => {
+    return () => {
+      const current = chromeByPanel.get(panelId);
+      if (current?.setColor === setAreaColor) chromeByPanel.delete(panelId);
+      fullCardsByPanel.delete(panelId);
+    };
+  }, [panelId, setAreaColor, toggleAreaCollapsed]);
+
   return {
     selectedArea,
     selectArea,
@@ -213,5 +284,7 @@ export function useCanvasAreas({
     resizeArea,
     moveAreaBy,
     deleteSelectedArea,
+    setAreaColor,
+    toggleAreaCollapsed,
   };
 }

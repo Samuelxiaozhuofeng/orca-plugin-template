@@ -44,15 +44,26 @@ export const AREA_CSS = `
   cursor: grabbing;
 }
 
+.owb-area.is-collapsed {
+  background: transparent;
+  box-shadow: none;
+  pointer-events: none;
+}
+
+.owb-area.is-collapsed .owb-area-title {
+  pointer-events: auto;
+}
+
 .owb-area-title {
   position: absolute;
   left: 0;
   bottom: 100%;
   max-width: 100%;
   margin: 0 0 6px;
-  padding: 2px 8px;
+  padding: 2px 4px 2px 2px;
   display: flex;
   align-items: center;
+  gap: 2px;
   pointer-events: auto;
   cursor: grab;
   transform: scale(var(--owb-area-inv));
@@ -62,12 +73,40 @@ export const AREA_CSS = `
   line-height: 18px;
   color: var(--orca-color-text-2);
   user-select: none;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
   border-radius: 6px;
   border: 1px solid color-mix(in oklab, var(--owb-area-ink) 28%, transparent);
   background: color-mix(in oklab, var(--orca-color-bg-1) 82%, transparent);
+}
+
+.owb-area-title-text {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.owb-area-collapse,
+.owb-area-color {
+  appearance: none;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.owb-area-collapse:hover,
+.owb-area-color:hover {
+  background: color-mix(in oklab, var(--owb-area-ink) 18%, transparent);
 }
 
 .owb-area.is-selected .owb-area-title {
@@ -76,7 +115,8 @@ export const AREA_CSS = `
 }
 
 .owb-area-title-input {
-  width: 100%;
+  flex: 1;
+  width: auto;
   min-width: 72px;
   height: 20px;
   margin: 0;
