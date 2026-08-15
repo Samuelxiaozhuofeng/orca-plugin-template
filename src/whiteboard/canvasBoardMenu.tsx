@@ -4,6 +4,12 @@ import { ArrangeMenuItems } from "./ArrangeMenu";
 import type { WhiteboardCard } from "./data";
 import type { ArrangeAction } from "./selection";
 
+const { useRef } = window.React;
+
+function pointRect(x: number, y: number): DOMRect {
+  return new DOMRect(x, y, 1, 1);
+}
+
 export type BoardMenuOptions = {
   selected: readonly DbId[];
   cards: readonly WhiteboardCard[];
@@ -74,5 +80,34 @@ export function boardMenu(close: () => void, opts: BoardMenuOptions) {
         onClick={run(opts.onFitAll)}
       />
     </orca.components.Menu>
+  );
+}
+
+/** Anchors at the click, not the viewport box (that puts the menu off-screen). */
+export function BoardContextMenu({
+  at,
+  onClose,
+  opts,
+}: {
+  at: { x: number; y: number } | null;
+  onClose: () => void;
+  opts: BoardMenuOptions;
+}) {
+  const bodyRef = useRef(document.body);
+  if (at == null) return null;
+  return (
+    <orca.components.Popup
+      key={`${at.x},${at.y}`}
+      visible
+      rect={pointRect(at.x, at.y)}
+      container={bodyRef}
+      allowBeyondContainer
+      escapeToClose
+      defaultPlacement="bottom"
+      alignment="left"
+      onClose={onClose}
+    >
+      {boardMenu(onClose, opts)}
+    </orca.components.Popup>
   );
 }

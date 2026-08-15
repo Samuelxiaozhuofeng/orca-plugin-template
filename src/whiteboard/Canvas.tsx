@@ -7,7 +7,7 @@ import {
   type CanvasFocusApi,
 } from "./cardFocus";
 import { AddNoteCard } from "./AddNoteCard";
-import { boardMenu } from "./canvasBoardMenu";
+import { BoardContextMenu } from "./canvasBoardMenu";
 import { CanvasCards } from "./CanvasCards";
 import { EdgeDropMenu } from "./EdgeDropMenu";
 import { EdgeLayer, type EdgeLayerApi } from "./EdgeLayer";
@@ -82,8 +82,11 @@ export function Canvas({
   const marqueeRef = useRef<HTMLDivElement | null>(null);
   const guidesRef = useRef<HTMLDivElement | null>(null);
   const edgeApiRef = useRef<EdgeLayerApi | null>(null);
-  const bodyRef = useRef(document.body);
   const menuPointRef = useRef<CanvasOrigin>({ x: 0, y: 0 });
+  const [boardMenuAt, setBoardMenuAt] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
   const [addNoteAt, setAddNoteAt] = useState<CanvasOrigin | null>(null);
   const settings = useWhiteboardSettings();
   const settingsRef = useRef(settings);
@@ -206,27 +209,8 @@ export function Canvas({
   });
 
   return (
-    <orca.components.ContextMenu
-      container={bodyRef}
-      allowBeyondContainer
-      menu={(close: () => void) =>
-        boardMenu(close, {
-          selected,
-          cards,
-          cardsRef,
-          selectCards,
-          applyArrange,
-          onNewCard: () => void createBlankAt(menuPointRef.current, true),
-          onAddFromNote: () => setAddNoteAt(menuPointRef.current),
-          onPlaceJournals: () => onPlaceJournalsAt(menuPointRef.current),
-          onFitAll: () => {
-            focusApiRef.current?.fitAll();
-          },
-        })
-      }
-    >
-      {(open) => (
-        <div
+    <>
+      <div
           ref={viewportRef}
           className={dropActive ? "owb-viewport is-drop-target" : "owb-viewport"}
           data-mouse-scheme={settings.mouseScheme}
@@ -268,10 +252,11 @@ export function Canvas({
           onContextMenu={(event) => {
             const target = event.target as HTMLElement | null;
             if (target?.closest(".owb-card, .owb-edge-hit, .owb-edge-editor")) return;
-            // Anything the menu creates lands where the user right-clicked,
-            // so capture the world point before the menu takes over.
+            event.preventDefault();
+            event.stopPropagation();
+            // Anything the menu creates lands where the user right-clicked.
             menuPointRef.current = pointerToWorld(event.clientX, event.clientY);
-            open(event);
+            setBoardMenuAt({ x: event.clientX, y: event.clientY });
           }}
         >
           <div ref={gridRef} className="owb-grid" />
@@ -354,7 +339,23 @@ export function Canvas({
             </div>
           )}
         </div>
-      )}
-    </orca.components.ContextMenu>
+      <BoardContextMenu
+        at={boardMenuAt}
+        onClose={() => setBoardMenuAt(null)}
+        opts={{
+          selected,
+          cards,
+          cardsRef,
+          selectCards,
+          applyArrange,
+          onNewCard: () => void createBlankAt(menuPointRef.current, true),
+          onAddFromNote: () => setAddNoteAt(menuPointRef.current),
+          onPlaceJournals: () => onPlaceJournalsAt(menuPointRef.current),
+          onFitAll: () => {
+            focusApiRef.current?.fitAll();
+          },
+        }}
+      />
+    </>
   );
 }
