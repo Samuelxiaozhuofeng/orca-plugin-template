@@ -52,17 +52,8 @@ check(
   "only incomplete roots",
 );
 check(
-  cardTreeLoadIds([{ blockId: 1 }, { blockId: 2 }], false, null).join(",") ===
-    "1,2",
-  "full zoom loads visible cards",
-);
-check(
-  cardTreeLoadIds([{ blockId: 1 }], true, null).length === 0,
-  "excerpt zoom loads none",
-);
-check(
-  cardTreeLoadIds([{ blockId: 1 }, { blockId: 2 }], true, 2).join(",") === "2",
-  "excerpt zoom still loads the card being edited",
+  cardTreeLoadIds([{ blockId: 1 }, { blockId: 2 }]).join(",") === "1,2",
+  "visible cards always load their trees",
 );
 check(CARD_TREE_LOAD_MAX_DEPTH === 4, "depth cap");
 check(CARD_TREE_LOAD_MAX_NODES === 80, "node cap");

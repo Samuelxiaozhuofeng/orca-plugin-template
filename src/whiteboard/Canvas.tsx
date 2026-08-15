@@ -134,7 +134,6 @@ export function Canvas({
     extractRow,
     restoreExtracted,
     shownCards,
-    degraded,
     selectedSet,
   } = useCanvasBoard({
     panelId,
@@ -283,7 +282,6 @@ export function Canvas({
               cards={cards}
               shownCards={shownCards}
               weekdayGuide={weekdayGuide}
-              degraded={degraded}
               editingId={editingId}
               selected={selected}
               selectedSet={selectedSet}

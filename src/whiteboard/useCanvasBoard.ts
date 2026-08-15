@@ -22,7 +22,6 @@ import {
 } from "./selection";
 import type { CardPatchEntry, PatchCardsFn } from "./useCanvasPointer";
 import {
-  CARD_LOD_SCALE,
   visibleCards,
   type CanvasView,
 } from "./viewTransform";
@@ -120,7 +119,6 @@ export function useCanvasBoard({
     () => visibleCards(cards, view, viewportSize, pinned),
     [cards, pinned, view, viewportSize],
   );
-  const degraded = view.scale < CARD_LOD_SCALE;
   const selectedSet = useMemo(() => new Set(selected), [selected]);
 
   const applyContentHeight = useCallback(
@@ -361,7 +359,6 @@ export function useCanvasBoard({
     extractRow,
     restoreExtracted,
     shownCards,
-    degraded,
     selectedSet,
   };
 }

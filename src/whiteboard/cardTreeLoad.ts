@@ -139,20 +139,11 @@ async function fetchAndCacheBlocks(ids: readonly DbId[]): Promise<number> {
   return cached;
 }
 
-/** Visible cards at full zoom; the card being edited even when zoomed out. */
+/** Visible cards — always load the full tree, at any zoom. */
 export function cardTreeLoadIds(
   shown: readonly { blockId: DbId }[],
-  degraded: boolean,
-  editingId: DbId | null,
 ): DbId[] {
-  if (!degraded) return shown.map((card) => card.blockId);
-  if (
-    editingId != null &&
-    shown.some((card) => card.blockId === editingId)
-  ) {
-    return [editingId];
-  }
-  return [];
+  return shown.map((card) => card.blockId);
 }
 
 /** Fill missing nodes under `roots`, one batched get-blocks per level. */

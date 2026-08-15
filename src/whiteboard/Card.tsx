@@ -34,7 +34,6 @@ const { useSnapshot } = window.Valtio;
 type Props = {
   panelId: string;
   card: WhiteboardCard;
-  degraded: boolean;
   treeRev?: number;
   editing: boolean;
   selected: boolean;
@@ -154,7 +153,6 @@ function CardEditor({
 export function Card({
   panelId,
   card,
-  degraded,
   treeRev = 0,
   editing,
   selected,
@@ -199,7 +197,6 @@ export function Card({
     hosted.exists &&
     !(typeof hosted.text === "string" && hosted.text.trim().length > 0) &&
     hosted.childCount === 0;
-  const excerpt = hosted.excerpt;
 
   useLayoutEffect(() => {
     const el = cardRef.current;
@@ -412,8 +409,6 @@ export function Card({
               <CardEditor panelId={panelId} blockId={card.blockId} />
             ) : isEmptyJournal ? (
               <div className="owb-card-empty">{t("No notes this day")}</div>
-            ) : degraded ? (
-              <div className="owb-card-excerpt">{excerpt}</div>
             ) : (
               <CardBlockTree
                 key={treeRev}

@@ -10,7 +10,6 @@ export type CanvasView = { x: number; y: number; scale: number };
 
 export const DEFAULT_VIEW: CanvasView = { x: 0, y: 0, scale: 1 };
 export const VIEW_GRID_SIZE = 24;
-export const CARD_LOD_SCALE = 0.6;
 export const WHEEL_COMMIT_MS = 160;
 
 /**
