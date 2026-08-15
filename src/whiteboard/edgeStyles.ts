@@ -17,9 +17,29 @@ export const EDGE_CSS = `
   z-index: 0;
 }
 
+.owb-edge {
+  --owb-edge-ink: var(--orca-color-border);
+}
+
+.owb-edge.is-linked,
+.owb-edge.is-selected,
+.owb-edge:hover:not(.is-selected) {
+  --owb-edge-ink: var(--orca-color-primary-5, #00a896);
+}
+
+.owb-edge.owb-edge-color-blue { --owb-edge-ink: rgb(47, 128, 237); }
+.owb-edge.owb-edge-color-green { --owb-edge-ink: rgb(34, 197, 94); }
+.owb-edge.owb-edge-color-yellow { --owb-edge-ink: rgb(234, 179, 8); }
+.owb-edge.owb-edge-color-coral { --owb-edge-ink: rgb(244, 63, 94); }
+.owb-edge.owb-edge-color-purple { --owb-edge-ink: rgb(168, 85, 247); }
+
+.owb-edge.is-ref {
+  --owb-edge-ink: var(--orca-color-text-3);
+}
+
 .owb-edge-visible {
   fill: none;
-  stroke: var(--orca-color-border);
+  stroke: var(--owb-edge-ink);
   stroke-width: 2.5;
   stroke-linecap: round;
   vector-effect: non-scaling-stroke;
@@ -39,24 +59,25 @@ export const EDGE_CSS = `
 }
 
 .owb-edge:hover:not(.is-selected) .owb-edge-visible {
-  stroke: var(--orca-color-primary-5, #00a896);
   stroke-width: 3;
 }
 
 .owb-edge.is-linked:not(.is-selected) .owb-edge-visible {
-  stroke: var(--orca-color-primary-5, #00a896);
   stroke-width: 2.5;
 }
 
 .owb-edge.is-selected .owb-edge-visible {
-  stroke: var(--orca-color-primary-5, #00a896);
   stroke-width: 3;
 }
 
 .owb-edge.is-ref .owb-edge-visible {
-  stroke: var(--orca-color-text-3);
   stroke-width: 1.5;
   stroke-dasharray: 5 5;
+  stroke-opacity: 0.55;
+}
+
+.owb-edge.is-dashed:not(.is-ref) .owb-edge-visible {
+  stroke-dasharray: 10 6;
 }
 
 .owb-edge-ghost {

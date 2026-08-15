@@ -1,5 +1,11 @@
 import { t } from "../libs/l10n";
-import type { EdgeArrow, WhiteboardEdge } from "./edges";
+import { COLOR_PRESETS } from "./CardToolbar";
+import {
+  planEdgeColor,
+  planEdgeStyle,
+  type EdgeArrow,
+  type WhiteboardEdge,
+} from "./edges";
 import { linkEdgeToNote } from "./linkEdge";
 
 type Props = {
@@ -25,6 +31,20 @@ export function EdgeMenuItems({
         item.id === edge.id ? { ...item, arrow } : item,
       ),
     );
+  };
+
+  const setColor = (color: string | undefined) => {
+    close();
+    const next = planEdgeColor(edges, edge.id, color);
+    if (next == null) return;
+    void onCommit(next);
+  };
+
+  const setStyle = (style: string | undefined) => {
+    close();
+    const next = planEdgeStyle(edges, edge.id, style);
+    if (next == null) return;
+    void onCommit(next);
   };
 
   const createReference = async () => {
@@ -79,6 +99,31 @@ export function EdgeMenuItems({
         title={t("No arrows")}
         preIcon={edge.arrow === "none" ? "ti ti-check" : undefined}
         onClick={() => setArrow("none")}
+      />
+      <orca.components.MenuSeparator />
+      <orca.components.MenuTitle title={t("Line color")} />
+      {COLOR_PRESETS.map((preset) => {
+        const next = preset.id === "default" ? undefined : preset.id;
+        const active = (edge.color ?? "default") === preset.id;
+        return (
+          <orca.components.MenuText
+            key={preset.id}
+            title={t(preset.label)}
+            preIcon={active ? "ti ti-check" : undefined}
+            onClick={() => setColor(next)}
+          />
+        );
+      })}
+      <orca.components.MenuTitle title={t("Line style")} />
+      <orca.components.MenuText
+        title={t("Solid line")}
+        preIcon={edge.style == null ? "ti ti-check" : undefined}
+        onClick={() => setStyle(undefined)}
+      />
+      <orca.components.MenuText
+        title={t("Dashed line")}
+        preIcon={edge.style === "dashed" ? "ti ti-check" : undefined}
+        onClick={() => setStyle("dashed")}
       />
       <orca.components.MenuSeparator />
       <orca.components.MenuText

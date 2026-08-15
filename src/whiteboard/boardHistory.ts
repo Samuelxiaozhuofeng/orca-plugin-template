@@ -221,6 +221,8 @@ export function edgesMatchIgnoringLinked(
       item.arrow !== other.arrow ||
       item.fromSide !== other.fromSide ||
       item.toSide !== other.toSide ||
+      item.color !== other.color ||
+      item.style !== other.style ||
       !bendsEqual(item.bend, other.bend)
     ) {
       return false;

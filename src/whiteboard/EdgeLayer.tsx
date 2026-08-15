@@ -216,9 +216,9 @@ export function EdgeLayer({
     return curveForBoxes(from, to, edge.fromSide, edge.toSide, edge.bend);
   };
 
-  const markersFor = (kind: "plain" | "ref" | "sel", arrow: EdgeArrow) => {
-    const end = arrow === "end" || arrow === "both" ? `url(#${ns}-e-${kind})` : undefined;
-    const start = arrow === "both" ? `url(#${ns}-s-${kind})` : undefined;
+  const markersFor = (arrow: EdgeArrow) => {
+    const end = arrow === "end" || arrow === "both" ? `url(#${ns}-e)` : undefined;
+    const start = arrow === "both" ? `url(#${ns}-s)` : undefined;
     return { markerEnd: end, markerStart: start };
   };
 
@@ -274,12 +274,8 @@ export function EdgeLayer({
       <div className="owb-edge-layer">
           <svg className="owb-edges" aria-hidden>
             <defs>
-              <ArrowMark id={`${ns}-e-plain`} fill="var(--orca-color-text-2)" scale={scale} />
-              <ArrowMark id={`${ns}-s-plain`} fill="var(--orca-color-text-2)" scale={scale} start />
-              <ArrowMark id={`${ns}-e-ref`} fill="var(--orca-color-text-3)" scale={scale} />
-              <ArrowMark id={`${ns}-s-ref`} fill="var(--orca-color-text-3)" scale={scale} start />
-              <ArrowMark id={`${ns}-e-sel`} fill="var(--orca-color-primary-5)" scale={scale} />
-              <ArrowMark id={`${ns}-s-sel`} fill="var(--orca-color-primary-5)" scale={scale} start />
+              <ArrowMark id={`${ns}-e`} fill="context-stroke" scale={scale} />
+              <ArrowMark id={`${ns}-s`} fill="context-stroke" scale={scale} start />
             </defs>
             {refEdges.map((edge) => {
               const curve = curveOf(edge);
@@ -290,7 +286,7 @@ export function EdgeLayer({
                     ref={bindEl(elsRef.current, edge.id, "visible")}
                     className="owb-edge-visible"
                     d={curve.d}
-                    {...markersFor("ref", "end")}
+                    {...markersFor("end")}
                   />
                 </g>
               );
@@ -299,11 +295,12 @@ export function EdgeLayer({
               const curve = curveOf(edge);
               if (curve == null) return null;
               const selected = selectedId === edge.id;
-              const tone = selected || edge.linked ? "sel" : "plain";
               const className = [
                 "owb-edge",
                 selected ? "is-selected" : "",
                 edge.linked ? "is-linked" : "",
+                edge.color ? `owb-edge-color-${edge.color}` : "",
+                edge.style === "dashed" ? "is-dashed" : "",
               ]
                 .filter(Boolean)
                 .join(" ");
@@ -317,7 +314,7 @@ export function EdgeLayer({
                     ref={bindEl(elsRef.current, edge.id, "visible")}
                     className="owb-edge-visible"
                     d={curve.d}
-                    {...markersFor(tone, edge.arrow)}
+                    {...markersFor(edge.arrow)}
                   />
                   <path
                     ref={bindEl(elsRef.current, edge.id, "hit")}

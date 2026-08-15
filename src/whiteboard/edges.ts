@@ -27,10 +27,40 @@ export type WhiteboardEdge = {
   bend?: EdgeBend;
   /** True after this line was written into the notes as a real reference. */
   linked?: true;
+  /** Present only when the user picked a colour. Omitted = default ink. */
+  color?: EdgeColorId;
+  /** Present only when dashed. Omitted = solid. */
+  style?: EdgeStyleId;
 };
 
 const ARROWS = new Set<EdgeArrow>(["end", "both", "none"]);
 const SIDES = new Set<Side>(["t", "r", "b", "l"]);
+
+/** Same five ids as `COLOR_PRESETS` in CardToolbar (default = no field). */
+export const EDGE_COLOR_IDS = [
+  "blue",
+  "green",
+  "yellow",
+  "coral",
+  "purple",
+] as const;
+
+export type EdgeColorId = (typeof EDGE_COLOR_IDS)[number];
+export type EdgeStyleId = "dashed";
+
+const EDGE_COLOR_SET: ReadonlySet<string> = new Set(EDGE_COLOR_IDS);
+
+/** Unknown / empty / "default" → no colour. Never fails the parent edge. */
+export function edgeColorIfValid(value: unknown): EdgeColorId | undefined {
+  return typeof value === "string" && EDGE_COLOR_SET.has(value)
+    ? (value as EdgeColorId)
+    : undefined;
+}
+
+/** Only `"dashed"` is stored. `"solid"` / junk → omitted. Never fails the edge. */
+export function edgeStyleIfValid(value: unknown): EdgeStyleId | undefined {
+  return value === "dashed" ? "dashed" : undefined;
+}
 
 function asDbId(value: unknown): DbId | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -94,6 +124,10 @@ export function normalizeEdge(value: unknown): WhiteboardEdge | null {
   const bend = parseBend(raw.bend);
   if (bend != null) edge.bend = bend;
   if (raw.linked === true) edge.linked = true;
+  const color = edgeColorIfValid(raw.color);
+  if (color != null) edge.color = color;
+  const style = edgeStyleIfValid(raw.style);
+  if (style != null) edge.style = style;
   return edge;
 }
 
@@ -162,6 +196,8 @@ function edgeEqual(left: WhiteboardEdge, right: WhiteboardEdge): boolean {
     left.fromSide === right.fromSide &&
     left.toSide === right.toSide &&
     left.linked === right.linked &&
+    left.color === right.color &&
+    left.style === right.style &&
     bendsEqual(left.bend, right.bend)
   );
 }
@@ -208,4 +244,44 @@ export async function writeEdges(
     });
     throw new Error(t("Whiteboard connections were not saved"));
   }
+}
+
+export function planEdgeColor(
+  edges: readonly WhiteboardEdge[],
+  id: string,
+  color: string | undefined,
+): WhiteboardEdge[] | null {
+  const target = edges.find((edge) => edge.id === id);
+  if (target == null) return null;
+  const nextColor = edgeColorIfValid(color);
+  if (target.color === nextColor) return null;
+  return edges.map((edge) => {
+    if (edge.id !== id) return edge;
+    if (nextColor == null) {
+      const next = { ...edge };
+      delete next.color;
+      return next;
+    }
+    return { ...edge, color: nextColor };
+  });
+}
+
+export function planEdgeStyle(
+  edges: readonly WhiteboardEdge[],
+  id: string,
+  style: string | undefined,
+): WhiteboardEdge[] | null {
+  const target = edges.find((edge) => edge.id === id);
+  if (target == null) return null;
+  const nextStyle = edgeStyleIfValid(style);
+  if (target.style === nextStyle) return null;
+  return edges.map((edge) => {
+    if (edge.id !== id) return edge;
+    if (nextStyle == null) {
+      const next = { ...edge };
+      delete next.style;
+      return next;
+    }
+    return { ...edge, style: nextStyle };
+  });
 }
