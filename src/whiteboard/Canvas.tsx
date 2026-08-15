@@ -121,6 +121,10 @@ export function Canvas({
     edgeApiRef.current?.onFrame(boxes);
   }, []);
 
+  const onFocusCard = useCallback((cardBlockId: DbId) => {
+    focusApiRef.current?.focusCard(cardBlockId);
+  }, []);
+
   const {
     viewportRef,
     canvasRef,
@@ -413,6 +417,7 @@ export function Canvas({
             edgeApiRef={edgeApiRef}
             onExtractRow={extractRow}
             onWrapSelected={wrapSelected}
+            onFocusCard={onFocusCard}
           />
         </div>
         <div ref={guidesRef} className="owb-guides" />

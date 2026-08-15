@@ -1,25 +1,36 @@
 import type { DbId } from "../orca.d.ts";
-import { t } from "../libs/l10n";
 import { onBoardCardsChanged } from "./boardEvents";
 import {
   ensureBlocksLoaded,
   fetchWhiteboardBlocks,
   rememberInlineBoardId,
 } from "./boards";
-import { boardName, readCards } from "./data";
+import { boardName, PANEL_TYPE, readCards } from "./data";
 import {
   applyBoardCardIndex,
   boardCardIndexFrom,
+  collectCardBoards,
   type BoardCardIndex,
+  type CardBoardRef,
 } from "./blockMarkIndex";
+import {
+  currentBoardIdFromPanel,
+  outlineMarkLabel,
+} from "./blockMarkLabel";
 import { rememberPageBoardInCache } from "./pageBoardListCache";
 import {
+  asBlockId,
   isPageWhiteboardBlock,
   isWhiteboardBlock,
 } from "./pageBoardPlan";
 import { readWhiteboardSettings } from "./settings";
 
-export { applyBoardCardIndex, type BoardCardIndex } from "./blockMarkIndex";
+export { applyBoardCardIndex, collectCardBoards, type BoardCardIndex } from "./blockMarkIndex";
+export {
+  markLabelFor,
+  outlineMarkLabel,
+  type CardBoardRef,
+} from "./blockMarkLabel";
 
 export const BLOCK_MARKS_CSS_ROLE = "whiteboard.blockmarks.styles";
 
@@ -70,7 +81,7 @@ const BLOCK_MARK_CSS = `:root {
   opacity: 1;
 }
 
-.orca-block[data-owb-mark]${HOST_HOVER_MAIN}::before {
+.orca-block[data-owb-mark][${OWB_MARK_LABEL_ATTR}]${HOST_HOVER_MAIN}::before {
   content: attr(data-owb-mark-label);
   position: absolute;
   top: 0;
@@ -91,21 +102,17 @@ const BLOCK_MARK_CSS = `:root {
   z-index: 2;
 }`;
 
-type BoardLike = {
-  aliases?: string[];
-  text?: string;
-  properties?: readonly { name: string; value?: unknown }[];
-};
-
 let pluginName = "";
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 let unsubscribeCards: (() => void) | null = null;
 let unsubscribeSettings: (() => void) | null = null;
+let unsubscribeNav: (() => void) | null = null;
 let rebuildSeq = 0;
 let lastEnabled: boolean | undefined;
 
-let cardBoards = new Map<DbId, string[]>();
+let cardBoards = new Map<DbId, CardBoardRef[]>();
 let lastByBoard = new Map<DbId, BoardCardIndex>();
+let currentBoardId: DbId | null = null;
 const pendingBoardIds = new Set<DbId>();
 let observer: MutationObserver | null = null;
 let stampTimer: ReturnType<typeof setTimeout> | null = null;
@@ -120,6 +127,8 @@ export function startBlockMarks(name: string): void {
     scheduleBoardFlush();
   });
   unsubscribeSettings = subscribePlugins(onPluginsChanged);
+  unsubscribeNav = subscribeNav(onNavChanged);
+  currentBoardId = readCurrentBoardId();
   void rebuildBlockMarks();
 }
 
@@ -133,16 +142,21 @@ export function stopBlockMarks(): void {
   unsubscribeCards = null;
   unsubscribeSettings?.();
   unsubscribeSettings = null;
+  unsubscribeNav?.();
+  unsubscribeNav = null;
   lastEnabled = undefined;
   pluginName = "";
   cardBoards = new Map();
   lastByBoard = new Map();
+  currentBoardId = null;
   pendingBoardIds.clear();
   teardownMarks();
 }
 
-function subscribePlugins(callback: () => void): () => void {
-  const valtio = (
+function valtioSubscribe():
+  | ((proxyObject: object, cb: () => void) => () => void)
+  | undefined {
+  return (
     globalThis as {
       window?: {
         Valtio?: {
@@ -150,9 +164,61 @@ function subscribePlugins(callback: () => void): () => void {
         };
       };
     }
-  ).window?.Valtio;
-  if (valtio == null) return () => {};
-  return valtio.subscribe(orca.state.plugins, callback);
+  ).window?.Valtio?.subscribe;
+}
+
+function subscribePlugins(callback: () => void): () => void {
+  const subscribe = valtioSubscribe();
+  if (subscribe == null) return () => {};
+  return subscribe(orca.state.plugins, callback);
+}
+
+function subscribeNav(callback: () => void): () => void {
+  const subscribe = valtioSubscribe();
+  if (subscribe == null) return () => {};
+  const unsubs: Array<() => void> = [];
+  try {
+    unsubs.push(subscribe(orca.state.panels, callback));
+  } catch {
+    // Panels tree unavailable; still try the root state below.
+  }
+  try {
+    unsubs.push(subscribe(orca.state, callback));
+  } catch {
+    // No live panel updates: labels stay visible (degrade).
+  }
+  return () => {
+    for (const unsub of unsubs) unsub();
+  };
+}
+
+function readCurrentBoardId(): DbId | null {
+  try {
+    const panelId = orca.state?.activePanel;
+    if (typeof panelId !== "string" || panelId === "") return null;
+    const find = orca.nav?.findViewPanel;
+    if (typeof find !== "function") return null;
+    const panel = find(panelId, orca.state.panels);
+    const rootId = asBlockId(panel?.viewArgs?.blockId);
+    const isBoard =
+      panel?.view === "block" &&
+      rootId != null &&
+      isWhiteboardBlock(orca.state.blocks?.[rootId]);
+    return currentBoardIdFromPanel(panel, {
+      panelType: PANEL_TYPE,
+      isWhiteboardView: isBoard,
+    });
+  } catch {
+    return null;
+  }
+}
+
+function onNavChanged(): void {
+  const next = readCurrentBoardId();
+  if (next === currentBoardId) return;
+  currentBoardId = next;
+  if (!marksEnabled() || cardBoards.size === 0) return;
+  rescanDom();
 }
 
 function onPluginsChanged(): void {
@@ -212,7 +278,7 @@ async function applyLiveBoard(boardId: DbId): Promise<DbId[]> {
   }
   if (isPageWhiteboardBlock(block)) rememberPageBoardInCache(boardId);
   else rememberInlineBoardId(boardId);
-  const next = boardCardIndexFrom(boardName(block), readCards(block));
+  const next = boardCardIndexFrom(boardId, boardName(block), readCards(block));
   if (
     prev != null &&
     prev.name === next.name &&
@@ -267,7 +333,7 @@ async function rebuildBlockMarks(): Promise<void> {
       if (typeof board.id !== "number") continue;
       lastByBoard.set(
         board.id,
-        boardCardIndexFrom(boardName(board), readCards(board)),
+        boardCardIndexFrom(board.id, boardName(board), readCards(board)),
       );
     }
     cardBoards = collectCardBoards(boards);
@@ -306,36 +372,8 @@ function marksEnabled(): boolean {
   ).markOutlineBlocks;
 }
 
-export function collectCardBoards(
-  boards: readonly BoardLike[],
-): Map<DbId, string[]> {
-  const byBlock = new Map<DbId, string[]>();
-  for (const board of boards) {
-    const name = boardName(board);
-    const seen = new Set<DbId>();
-    for (const card of readCards(board)) {
-      if (seen.has(card.blockId)) continue;
-      seen.add(card.blockId);
-      const names = byBlock.get(card.blockId);
-      if (names) names.push(name);
-      else byBlock.set(card.blockId, [name]);
-    }
-  }
-  return byBlock;
-}
-
-export function markLabelFor(
-  names: readonly string[] | undefined,
-): string | null {
-  if (names == null || names.length === 0) return null;
-  if (names.length === 1) {
-    return t('On the "${name}" whiteboard', { name: names[0] });
-  }
-  return t("On ${count} whiteboards", { count: String(names.length) });
-}
-
 /** Constant-size CSS. Empty table → no injection (same as before). */
-export function buildBlockMarkCss(byBlock: Map<DbId, string[]>): string {
+export function buildBlockMarkCss(byBlock: { size: number }): string {
   if (byBlock.size === 0) return "";
   return BLOCK_MARK_CSS;
 }
@@ -422,21 +460,24 @@ function stampElement(el: Element): void {
   }
   const raw = el.getAttribute("data-id");
   const id = raw == null || raw === "" ? Number.NaN : Number(raw);
-  const label = Number.isFinite(id)
-    ? markLabelFor(cardBoards.get(id as DbId))
-    : null;
-  if (label == null) {
+  const boards = Number.isFinite(id)
+    ? cardBoards.get(id as DbId)
+    : undefined;
+  if (boards == null || boards.length === 0) {
     clearMark(el);
     return;
   }
+  const label = outlineMarkLabel(boards, currentBoardId);
+  const prevLabel = el.getAttribute(OWB_MARK_LABEL_ATTR);
   if (
     el.hasAttribute(OWB_MARK_ATTR) &&
-    el.getAttribute(OWB_MARK_LABEL_ATTR) === label
+    (label == null ? prevLabel == null : prevLabel === label)
   ) {
     return;
   }
   el.setAttribute(OWB_MARK_ATTR, "");
-  el.setAttribute(OWB_MARK_LABEL_ATTR, label);
+  if (label == null) el.removeAttribute(OWB_MARK_LABEL_ATTR);
+  else el.setAttribute(OWB_MARK_LABEL_ATTR, label);
 }
 
 function clearMark(el: Element): void {

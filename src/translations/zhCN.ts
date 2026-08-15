@@ -105,6 +105,8 @@ const zhCN = {
   "Open in side panel": "在侧边面板打开",
   "Open in this panel": "在当前面板打开",
   "Locate on whiteboard": "在白板上定位",
+  "Source card": "来源卡片",
+  "Back to the card it came from": "回到它被拖出来的那张卡片",
   'On the "${name}" whiteboard': "在「${name}」白板上",
   "On ${count} whiteboards": "在 ${count} 块白板上",
   "Mark outline blocks already on a whiteboard": "在大纲里标记已上白板的块",

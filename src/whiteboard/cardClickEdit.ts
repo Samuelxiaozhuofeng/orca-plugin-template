@@ -2,6 +2,8 @@ import type { DbId } from "../orca.d.ts";
 import { cardBlockIdFromInlineRefTarget } from "./cardFocus";
 import { isExtractPointerTarget } from "./cardExtractDrag";
 import { isOnCardScrollbar } from "./cardGestures";
+import { CARD_ROW_FOCUS_CLASS } from "./cardRowOnBoard";
+import { CARD_BACK_CLASS } from "./cardParentOnBoard";
 import { CLICK_THRESHOLD_PX } from "./marquee";
 
 const { useEffect } = window.React;
@@ -9,7 +11,7 @@ const { useEffect } = window.React;
 const CARET_MAX_FRAMES = 20;
 
 const CLICK_EDIT_BLOCK =
-  ".owb-card-header, .owb-card-journal-badge, .owb-card-handle, .owb-card-floating-toolbar, .owb-card-load-error";
+  `.owb-card-header, .owb-card-journal-badge, .owb-card-handle, .owb-card-floating-toolbar, .owb-card-load-error, .${CARD_ROW_FOCUS_CLASS}, .${CARD_BACK_CLASS}`;
 
 export type CardClickEditInput = {
   button: number;

@@ -21,6 +21,13 @@ import type { ArrangeAction } from "./selection";
 import { isHostOverlayTarget } from "./hostOverlay";
 import { useCardBlockView } from "./blockWatch";
 import { CardBlockTree } from "./CardBlockTree";
+import { CARD_ROW_FOCUS_CLASS } from "./cardRowOnBoard";
+import {
+  CARD_BACK_CLASS,
+  findParentCardOnBoard,
+  flashCardRow,
+} from "./cardParentOnBoard";
+import { parseIdKey } from "./cardExtract";
 import { CardLoadNotice } from "./CardLoadNotice";
 import { peekCardLoadNotice } from "./cardTreeLoad";
 import {
@@ -76,6 +83,7 @@ type Props = {
   ) => void;
   onMoveFrame?: (boxes: Map<DbId, { x: number; y: number; w: number; h: number }>) => void;
   promotedKey?: string;
+  onFocusCard?: (blockId: DbId) => void;
   onExtractRow?: (blockId: DbId, sourceCard: WhiteboardCard) => void;
   onWrapSelected?: () => void;
 };
@@ -104,6 +112,7 @@ export function Card({
   onStartConnect,
   onMoveFrame,
   promotedKey = "",
+  onFocusCard,
   onExtractRow,
   onWrapSelected,
 }: Props) {
@@ -135,6 +144,12 @@ export function Card({
   }
 
   const hosted = useCardBlockView(card.blockId, treeRev);
+  /** Set when this card was extracted from another card on this board. */
+  const parentCardId = findParentCardOnBoard(
+    card.blockId,
+    parseIdKey(promotedKey),
+    (id) => orca.state.blocks[id],
+  );
   const isEmptyJournal =
     card.kind === "journal" &&
     hosted.exists &&
@@ -172,6 +187,7 @@ export function Card({
     if (target?.closest(".owb-card-load-error")) return;
     if (isExtractPointerTarget(target)) return;
     if (target?.closest(".owb-card-floating-toolbar")) return;
+    if (target?.closest(`.${CARD_ROW_FOCUS_CLASS}, .${CARD_BACK_CLASS}`)) return;
     if (editing && target?.closest(".owb-card-body")) return;
     if (isOnCardScrollbar(event.target, event.clientX, event.clientY)) return;
     onCardMouseDown(event, card);
@@ -362,7 +378,11 @@ export function Card({
           onDoubleClick={(event: React.MouseEvent<HTMLDivElement>) => {
             if (!simplified || editing) return;
             const target = event.target as HTMLElement | null;
-            if (target?.closest(".owb-card-handle, .owb-card-floating-toolbar")) {
+            if (
+              target?.closest(
+                `.owb-card-handle, .owb-card-floating-toolbar, .${CARD_ROW_FOCUS_CLASS}, .${CARD_BACK_CLASS}`,
+              )
+            ) {
               return;
             }
             if (noteGone) {
@@ -389,12 +409,40 @@ export function Card({
             onStartConnect={onStartConnect}
           />
           <CardTitle card={card} editing={editing} />
+          {parentCardId != null ? (
+            <button
+              type="button"
+              className={CARD_BACK_CLASS}
+              title={t("Back to the card it came from")}
+              onMouseDown={(event: React.MouseEvent) => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
+              onDoubleClick={(event: React.MouseEvent) => event.stopPropagation()}
+              onClick={(event: React.MouseEvent) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onFocusCard?.(parentCardId);
+                flashCardRow(parentCardId, card.blockId);
+              }}
+            >
+              <i className="ti ti-corner-left-up" />
+              {t("Source card")}
+            </button>
+          ) : null}
           {simplified ? null : (
             <div
               className="owb-card-body"
               title={editing ? undefined : t("Click to edit")}
-              onDoubleClick={() => {
+              onDoubleClick={(event) => {
                 if (editing) return;
+                if (
+                  (event.target as HTMLElement | null)?.closest(
+                    `.${CARD_ROW_FOCUS_CLASS}`,
+                  )
+                ) {
+                  return;
+                }
                 if (noteGone) {
                   orca.notify("info", t("This note is gone"));
                   return;
@@ -420,6 +468,7 @@ export function Card({
                   panelId={panelId}
                   blockId={card.blockId}
                   promotedKey={promotedKey}
+                  onFocusCard={onFocusCard}
                 />
               )}
               {shownNotice != null && !fillLoadError ? (
