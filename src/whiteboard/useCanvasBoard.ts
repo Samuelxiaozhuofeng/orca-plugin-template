@@ -281,6 +281,7 @@ export function useCanvasBoard({
   }, []);
 
   const startEdit = useCallback((blockId: DbId) => {
+    edgeApiRef.current?.hideToolbar();
     const apply = () => {
       setEditingId(blockId);
       setSelectedEdge(null);

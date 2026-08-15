@@ -33,6 +33,7 @@ export type EdgeLayerApi = {
   ) => void;
   onFrame: (boxes: Map<DbId, CardBox>) => void;
   clearGhost: () => void;
+  hideToolbar: () => void;
 };
 
 export type AnyEdge = {
@@ -81,6 +82,7 @@ export function useEdgeLayerApi(opts: {
   onSelect: (id: string | null) => void;
   onCommit: (next: WhiteboardEdge[]) => Promise<boolean>;
   onDropEmpty: (drop: DrawDropEmpty) => void;
+  hideToolbar: () => void;
 }) {
   const {
     cards,
@@ -92,6 +94,7 @@ export function useEdgeLayerApi(opts: {
     onSelect,
     onCommit,
     onDropEmpty,
+    hideToolbar,
   } = opts;
   const ghostRef = useRef<SVGPathElement | null>(null);
   const snapRef = useRef<SVGCircleElement | null>(null);
@@ -102,6 +105,7 @@ export function useEdgeLayerApi(opts: {
   const refsRef = useRef<ReferenceEdge[]>(refEdges);
   const commitRef = useRef(onCommit);
   const selectRef = useRef(onSelect);
+  const hideToolbarRef = useRef(hideToolbar);
   const dismissDrawRef = useRef<(() => void) | null>(null);
   const dropEmptyRef = useRef(onDropEmpty);
   dropEmptyRef.current = onDropEmpty;
@@ -110,6 +114,7 @@ export function useEdgeLayerApi(opts: {
   refsRef.current = refEdges;
   commitRef.current = onCommit;
   selectRef.current = onSelect;
+  hideToolbarRef.current = hideToolbar;
 
   const boxMap = () => {
     const map = new Map<DbId, CardBox>();
@@ -289,6 +294,7 @@ export function useEdgeLayerApi(opts: {
         dismissDrawRef.current?.();
         dismissDrawRef.current = null;
       },
+      hideToolbar: () => hideToolbarRef.current(),
     };
     return () => {
       dismissDrawRef.current?.();

@@ -243,6 +243,10 @@ export function Canvas({
     selectCards,
   });
 
+  const dismissEdgeToolbar = useCallback(() => {
+    edgeApiRef.current?.hideToolbar();
+  }, []);
+
   const { onViewportMouseDown, onCardMouseDown } = useCanvasPointer({
     refs: {
       viewport: viewportRef,
@@ -269,6 +273,7 @@ export function Canvas({
     onMoveArea: moveAreaBy,
     onMoveFrame,
     onStartEdit: startEdit,
+    onDismissEdgeToolbar: dismissEdgeToolbar,
   });
 
   const overlayProps = {
@@ -310,7 +315,7 @@ export function Canvas({
           const target = event.target as HTMLElement | null;
           if (
             target?.closest(
-              ".owb-card, .owb-edge-hit, .owb-edge-editor, .owb-edge-label, .owb-edge-link-badge, .owb-area-title, .owb-area-handle",
+              ".owb-card, .owb-edge-hit, .owb-edge-editor, .owb-edge-label, .owb-edge-link-badge, .owb-edge-toolbar, .owb-area-title, .owb-area-handle",
             )
           ) {
             return;
@@ -340,7 +345,7 @@ export function Canvas({
           const target = event.target as HTMLElement | null;
           if (
             target?.closest(
-              ".owb-card, .owb-edge-hit, .owb-edge-editor, .owb-area-title, .owb-area-handle",
+              ".owb-card, .owb-edge-hit, .owb-edge-editor, .owb-edge-toolbar, .owb-area-title, .owb-area-handle",
             )
           ) {
             return;
@@ -377,6 +382,7 @@ export function Canvas({
             edges={visible.edges}
             refEdges={refEdges}
             viewScale={view.scale}
+            viewToken={`${view.x}:${view.y}:${view.scale}`}
             selectedId={selectedEdge}
             canvasRef={canvasRef}
             pointerToWorld={pointerToWorld}

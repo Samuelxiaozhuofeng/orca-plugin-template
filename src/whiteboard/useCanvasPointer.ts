@@ -31,7 +31,7 @@ import { isHostOverlayTarget } from "./hostOverlay";
 import type { CanvasView } from "./viewTransform";
 
 const CANVAS_CHROME =
-  ".owb-card, .owb-edge-hit, .owb-edge-editor, .owb-area-title, .owb-area-handle, .owb-area-title-input, .owb-card-search, .owb-card-filter, .owb-filter-banner, .owb-selection-bar";
+  ".owb-card, .owb-edge-hit, .owb-edge-editor, .owb-edge-toolbar, .owb-area-title, .owb-area-handle, .owb-area-title-input, .owb-card-search, .owb-card-filter, .owb-filter-banner, .owb-selection-bar";
 
 const { useEffect, useRef } = window.React;
 
@@ -82,6 +82,7 @@ export function useCanvasPointer(opts: {
   onMoveArea: (id: string, dx: number, dy: number) => void;
   onMoveFrame?: (boxes: Map<DbId, CardRect>) => void;
   onStartEdit: (blockId: DbId) => void;
+  onDismissEdgeToolbar?: () => void;
 }): {
   onViewportMouseDown: (event: React.MouseEvent<HTMLDivElement>) => void;
   onCardMouseDown: (
@@ -101,7 +102,9 @@ export function useCanvasPointer(opts: {
     onMoveArea,
     onMoveFrame,
     onStartEdit,
+    onDismissEdgeToolbar,
   } = opts;
+  const dismissEdgeToolbar = () => onDismissEdgeToolbar?.();
   const mountedRef = useRef(true);
   const abortCanvasRef = useRef<HTMLElement | null>(null);
   const abortViewportRef = useRef<HTMLElement | null>(null);
@@ -164,6 +167,7 @@ export function useCanvasPointer(opts: {
     startY: number,
     onClick?: (event: MouseEvent) => void,
   ) => {
+    dismissEdgeToolbar();
     const canvas = refs.canvas.current;
     if (canvas == null) return;
     const movingIds = new Set(refs.selected.current);
@@ -252,6 +256,7 @@ export function useCanvasPointer(opts: {
       if (event.button === 2) {
         swallowNextContextMenu(refs.canvas.current ?? refs.viewport.current);
       }
+      dismissEdgeToolbar();
       startPan(event.clientX, event.clientY);
       return;
     }
@@ -265,7 +270,10 @@ export function useCanvasPointer(opts: {
         startX: event.clientX,
         startY: event.clientY,
         root: refs.canvas.current ?? refs.viewport.current,
-        onDrag: () => startPan(event.clientX, event.clientY),
+        onDrag: () => {
+          dismissEdgeToolbar();
+          startPan(event.clientX, event.clientY);
+        },
         onIdleRelease: () => {
           if (!mountedRef.current) return;
           fireAppContextMenu(event.clientX, event.clientY, event.target);
@@ -326,6 +334,7 @@ export function useCanvasPointer(opts: {
       return;
     }
     setSelectedArea(null);
+    dismissEdgeToolbar();
     startMarquee({
       startX: event.clientX,
       startY: event.clientY,
@@ -370,6 +379,7 @@ export function useCanvasPointer(opts: {
       if (event.button === 2) {
         swallowNextContextMenu(refs.canvas.current ?? refs.viewport.current);
       }
+      dismissEdgeToolbar();
       startPan(event.clientX, event.clientY);
       return;
     }

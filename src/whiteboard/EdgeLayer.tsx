@@ -2,6 +2,8 @@ import type { WhiteboardCard } from "./data";
 import { curveForBoxes, type EdgeCurve } from "./edgeGeometry";
 import type { DrawDropEmpty, EdgeEls } from "./edgeGestures";
 import { EdgeLabelLayer, EdgeMenuPopup } from "./EdgeOverlay";
+import { EdgeToolbar } from "./EdgeToolbar";
+import { nextEdgeToolbarOpen } from "./edgeToolbarLayout";
 import {
   type EdgeArrow,
   type WhiteboardEdge,
@@ -17,7 +19,7 @@ import {
 
 export type { EdgeLayerApi };
 
-const { useRef, useState } = window.React;
+const { useCallback, useEffect, useRef, useState } = window.React;
 
 type Props = {
   panelId: string;
@@ -25,6 +27,7 @@ type Props = {
   edges: WhiteboardEdge[];
   refEdges: ReferenceEdge[];
   viewScale: number;
+  viewToken: string;
   selectedId: string | null;
   canvasRef: { current: HTMLDivElement | null };
   pointerToWorld: (clientX: number, clientY: number) => { x: number; y: number };
@@ -165,6 +168,7 @@ export function EdgeLayer({
   edges,
   refEdges,
   viewScale,
+  viewToken,
   selectedId,
   canvasRef,
   pointerToWorld,
@@ -178,7 +182,11 @@ export function EdgeLayer({
   const [menuAt, setMenuAt] = useState<
     { edgeId: string; x: number; y: number } | null
   >(null);
+  const [toolbarAt, setToolbarAt] = useState<
+    { edgeId: string; x: number; y: number } | null
+  >(null);
   const skipBlurRef = useRef(false);
+  const hideToolbar = useCallback(() => setToolbarAt(null), []);
   const {
     ghostRef,
     snapRef,
@@ -199,7 +207,15 @@ export function EdgeLayer({
     onSelect,
     onCommit,
     onDropEmpty,
+    hideToolbar,
   });
+
+  useEffect(() => {
+    setToolbarAt((prev: { edgeId: string; x: number; y: number } | null) => {
+      if (prev == null || selectedId === prev.edgeId) return prev;
+      return null;
+    });
+  }, [selectedId]);
 
   const ns = markerNs(panelId);
   const scale = viewScale === 0 ? 1 : viewScale;
@@ -223,6 +239,7 @@ export function EdgeLayer({
   };
 
   const beginEdit = (id: string) => {
+    hideToolbar();
     skipBlurRef.current = false;
     setEditingId(id);
     onSelect(id);
@@ -255,6 +272,35 @@ export function EdgeLayer({
   const menuEdge =
     menuAt == null ? null : edges.find((item) => item.id === menuAt.edgeId);
   const closeMenu = () => setMenuAt(null);
+  const toolbarEdge =
+    toolbarAt == null
+      ? null
+      : edges.find((item) => item.id === toolbarAt.edgeId) ?? null;
+
+  const hideOnEdgePress = () => {
+    if (!nextEdgeToolbarOpen({ kind: "edge-press" })) hideToolbar();
+  };
+
+  const onHitMouseDown = (edgeId: string, event: React.MouseEvent) => {
+    if (event.button !== 0) {
+      hideOnEdgePress();
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    focusViewport();
+    const open = nextEdgeToolbarOpen({
+      kind: "select",
+      prevId: selectedId,
+      nextId: edgeId,
+    });
+    onSelect(edgeId);
+    if (open) {
+      setToolbarAt({ edgeId, x: event.clientX, y: event.clientY });
+    } else {
+      hideToolbar();
+    }
+  };
 
   const editing = editingId == null
     ? null
@@ -271,6 +317,17 @@ export function EdgeLayer({
         onSelect={onSelect}
         onClose={closeMenu}
       />
+      {toolbarEdge != null && toolbarAt != null ? (
+        <EdgeToolbar
+          edge={toolbarEdge}
+          edges={edges}
+          anchor={toolbarAt}
+          canvasRef={canvasRef}
+          viewToken={viewToken}
+          onCommit={onCommit}
+          onDismiss={hideToolbar}
+        />
+      ) : null}
       <div className="owb-edge-layer">
           <svg className="owb-edges" aria-hidden>
             <defs>
@@ -321,11 +378,7 @@ export function EdgeLayer({
                     className="owb-edge-hit"
                     d={curve.d}
                     onMouseDown={(event: React.MouseEvent) => {
-                      if (event.button !== 0) return;
-                      event.preventDefault();
-                      event.stopPropagation();
-                      focusViewport();
-                      onSelect(edge.id);
+                      onHitMouseDown(edge.id, event);
                     }}
                     onDoubleClick={(event: React.MouseEvent) => {
                       event.preventDefault();
@@ -335,6 +388,7 @@ export function EdgeLayer({
                     onContextMenu={(event: React.MouseEvent) => {
                       event.preventDefault();
                       event.stopPropagation();
+                      hideOnEdgePress();
                       onSelect(edge.id);
                       setMenuAt({
                         edgeId: edge.id,
@@ -352,6 +406,7 @@ export function EdgeLayer({
                       midR={midR}
                       ctrlR={ctrlR}
                       onEndpointDown={(which, event) => {
+                        hideOnEdgePress();
                         focusViewport();
                         beginEndpointDrag(
                           edge.id,
@@ -361,6 +416,7 @@ export function EdgeLayer({
                         );
                       }}
                       onBendDown={(which, event) => {
+                        hideOnEdgePress();
                         focusViewport();
                         beginBendDrag(
                           edge.id,

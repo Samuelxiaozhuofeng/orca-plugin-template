@@ -149,6 +149,7 @@ const zhCN = {
   "No arrows": "无箭头",
   "Line color": "连线颜色",
   "Line style": "线型",
+  "Connection style": "连线样式",
   "Solid line": "实线",
   "Dashed line": "虚线",
   Delete: "删除",

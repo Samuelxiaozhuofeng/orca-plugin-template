@@ -27,11 +27,11 @@ export const EDGE_CSS = `
   --owb-edge-ink: var(--orca-color-primary-5, #00a896);
 }
 
-.owb-edge.owb-edge-color-blue { --owb-edge-ink: rgb(47, 128, 237); }
-.owb-edge.owb-edge-color-green { --owb-edge-ink: rgb(34, 197, 94); }
-.owb-edge.owb-edge-color-yellow { --owb-edge-ink: rgb(234, 179, 8); }
-.owb-edge.owb-edge-color-coral { --owb-edge-ink: rgb(244, 63, 94); }
-.owb-edge.owb-edge-color-purple { --owb-edge-ink: rgb(168, 85, 247); }
+.owb-edge-color-blue { --owb-edge-ink: rgb(47, 128, 237); }
+.owb-edge-color-green { --owb-edge-ink: rgb(34, 197, 94); }
+.owb-edge-color-yellow { --owb-edge-ink: rgb(234, 179, 8); }
+.owb-edge-color-coral { --owb-edge-ink: rgb(244, 63, 94); }
+.owb-edge-color-purple { --owb-edge-ink: rgb(168, 85, 247); }
 
 .owb-edge.is-ref {
   --owb-edge-ink: var(--orca-color-text-3);
@@ -200,5 +200,92 @@ export const EDGE_CSS = `
 
 .owb-canvas.is-editing-edge {
   cursor: grabbing;
+}
+
+.owb-edge-toolbar {
+  position: absolute;
+  z-index: 36;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border-radius: var(--owb-radius-card, 6px);
+  border: 1.5px solid var(--orca-color-border);
+  background: var(--orca-color-bg-1);
+  color: var(--orca-color-text-1);
+  box-shadow: 3px 3px 0 0 var(--orca-color-border);
+  pointer-events: auto;
+}
+
+.owb-edge-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.owb-edge-toolbar-sep {
+  width: 1px;
+  height: 16px;
+  background: var(--orca-color-border);
+}
+
+.owb-edge-toolbar-dot {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--orca-color-border);
+  background: var(--owb-edge-ink, var(--orca-color-border));
+  cursor: pointer;
+}
+
+.owb-edge-toolbar-dot.is-default {
+  background: var(--orca-color-bg-1);
+  background-image: linear-gradient(
+    to top right,
+    transparent 46%,
+    var(--orca-color-text-3) 47%,
+    var(--orca-color-text-3) 53%,
+    transparent 54%
+  );
+}
+
+.owb-edge-toolbar-dot:hover {
+  transform: scale(1.15);
+}
+
+.owb-edge-toolbar-dot.is-active {
+  box-shadow: 0 0 0 2px var(--orca-color-primary-5, #00a896);
+}
+
+.owb-edge-toolbar-btn {
+  appearance: none;
+  box-sizing: border-box;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid transparent;
+  border-radius: var(--owb-radius-btn, 4px);
+  background: transparent;
+  color: var(--orca-color-text-1);
+  cursor: pointer;
+}
+
+.owb-edge-toolbar-btn i {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.owb-edge-toolbar-btn:hover {
+  background: var(--orca-color-bg-2);
+}
+
+.owb-edge-toolbar-btn.is-active {
+  border-color: var(--orca-color-primary-5, #00a896);
+  background: color-mix(in oklab, var(--orca-color-primary-5) 16%, transparent);
 }
 `.trim();
