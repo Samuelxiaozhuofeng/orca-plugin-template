@@ -135,6 +135,7 @@ export function Canvas({
     onViewChange,
     onViewportWidth,
     isEditing: () => editingRef.current != null,
+    controlsMode: settings.mouseScheme,
   });
 
   const {

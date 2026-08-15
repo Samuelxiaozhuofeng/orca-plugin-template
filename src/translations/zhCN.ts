@@ -79,13 +79,13 @@ const zhCN = {
   "Failed to add blocks to the board": "无法把块放到白板上",
   Untitled: "未命名",
   "Select all": "全选",
-  "Mouse controls": "鼠标操作方式",
-  "How left and right mouse buttons move cards and pan the canvas.":
-    "选择用左键还是右键来移动卡片和平移画布。",
-  "Standard: left-drag cards, space/middle-drag to pan":
-    "标准：左键拖动卡片，空格/中键平移画布",
-  "Right-drag: right-drag cards to move, right-drag blank to pan":
-    "右键拖动：右键拖卡片移动，右键拖空白平移画布",
+  Controls: "操作模式",
+  "Mouse mode zooms with the wheel and pans with a right-drag. Trackpad mode pans with two fingers and zooms with a pinch.":
+    "鼠标模式用滚轮缩放、右键拖动平移；触控板模式用双指滑动平移、捏合缩放。",
+  "Mouse: scroll to zoom, right-drag to pan":
+    "鼠标模式：滚轮缩放，右键拖动平移",
+  "Trackpad: two-finger pan, pinch to zoom":
+    "触控板模式：双指滑动平移，捏合缩放",
   "Show alignment guides": "显示对齐参考线",
   "Draw alignment lines while dragging. Snapping stays on either way.":
     "拖动卡片时画出对齐线。关掉后吸附仍然有效。",

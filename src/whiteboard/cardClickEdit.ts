@@ -123,6 +123,25 @@ function rangeFromPoint(clientX: number, clientY: number): Range | null {
   return null;
 }
 
+function caretAlreadyAtPoint(
+  clientX: number,
+  clientY: number,
+  root: HTMLElement,
+): boolean {
+  const sel = window.getSelection();
+  if (sel == null || sel.rangeCount !== 1) return false;
+  const current = sel.getRangeAt(0);
+  if (!current.collapsed) return false;
+  if (!root.contains(current.startContainer)) return false;
+  if (!nodeIsEditable(current.startContainer)) return false;
+  const expected = rangeFromPoint(clientX, clientY);
+  if (expected == null) return false;
+  return (
+    current.startContainer === expected.startContainer &&
+    current.startOffset === expected.startOffset
+  );
+}
+
 function tryPlaceCaretAtPoint(
   clientX: number,
   clientY: number,
@@ -130,6 +149,7 @@ function tryPlaceCaretAtPoint(
 ): boolean {
   try {
     if (root == null) return false;
+    if (caretAlreadyAtPoint(clientX, clientY, root)) return true;
     const range = rangeFromPoint(clientX, clientY);
     if (range == null) return false;
     if (!root.contains(range.startContainer)) return false;

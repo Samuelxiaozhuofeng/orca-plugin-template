@@ -1,14 +1,16 @@
 import type { PluginSettingsSchema } from "../orca.d.ts";
 import { t } from "../libs/l10n";
+import {
+  controlsModeFromSettings,
+  type ControlsMode,
+} from "./controlsMode";
 
-const { useSnapshot } = window.Valtio;
-
-export type MouseScheme = "standard" | "rightDrag";
+export type { ControlsMode };
 
 export const DEFAULT_BOARD_TAG = "whiteboard";
 
 export type WhiteboardSettings = {
-  mouseScheme: MouseScheme;
+  mouseScheme: ControlsMode;
   showAlignGuides: boolean;
   showReferenceEdges: boolean;
   markOutlineBlocks: boolean;
@@ -18,7 +20,7 @@ export type WhiteboardSettings = {
 };
 
 const DEFAULTS: WhiteboardSettings = {
-  mouseScheme: "standard",
+  mouseScheme: "mouse",
   showAlignGuides: false,
   showReferenceEdges: true,
   markOutlineBlocks: true,
@@ -26,6 +28,8 @@ const DEFAULTS: WhiteboardSettings = {
   boardTag: DEFAULT_BOARD_TAG,
   openWhiteboardPagesAsCanvas: true,
 };
+
+export { migrateControlsMode } from "./controlsMode";
 
 let pluginName = "";
 
@@ -40,22 +44,20 @@ export function whiteboardPluginName(): string {
 export function whiteboardSettingsSchema(): PluginSettingsSchema {
   return {
     mouseScheme: {
-      label: t("Mouse controls"),
+      label: t("Controls"),
       description: t(
-        "How left and right mouse buttons move cards and pan the canvas.",
+        "Mouse mode zooms with the wheel and pans with a right-drag. Trackpad mode pans with two fingers and zooms with a pinch.",
       ),
       type: "singleChoice",
       defaultValue: DEFAULTS.mouseScheme,
       choices: [
         {
-          label: t("Standard: left-drag cards, space/middle-drag to pan"),
-          value: "standard",
+          label: t("Mouse: scroll to zoom, right-drag to pan"),
+          value: "mouse",
         },
         {
-          label: t(
-            "Right-drag: right-drag cards to move, right-drag blank to pan",
-          ),
-          value: "rightDrag",
+          label: t("Trackpad: two-finger pan, pinch to zoom"),
+          value: "trackpad",
         },
       ],
     },
@@ -112,7 +114,7 @@ export function readWhiteboardSettings(
   raw: Record<string, unknown> | undefined,
 ): WhiteboardSettings {
   return {
-    mouseScheme: raw?.mouseScheme === "rightDrag" ? "rightDrag" : "standard",
+    mouseScheme: controlsModeFromSettings(raw),
     showAlignGuides: raw?.showAlignGuides === true,
     showReferenceEdges: raw?.showReferenceEdges !== false,
     markOutlineBlocks: raw?.markOutlineBlocks !== false,
@@ -130,6 +132,7 @@ export function currentWhiteboardSettings(): WhiteboardSettings {
 }
 
 export function useWhiteboardSettings(): WhiteboardSettings {
+  const { useSnapshot } = window.Valtio;
   const { plugins } = useSnapshot(orca.state);
   if (!pluginName) return DEFAULTS;
   return readWhiteboardSettings(

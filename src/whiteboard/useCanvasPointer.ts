@@ -22,6 +22,10 @@ import { abortMarquees, startMarquee } from "./marquee";
 import { toggleId } from "./selection";
 import type { CardRect } from "./selection";
 import type { WhiteboardSettings } from "./settings";
+import {
+  cardPointerZone,
+  routeCardPointer,
+} from "./cardPointerRoute";
 import { isEditableTarget } from "./canvasKeys";
 import { isHostOverlayTarget } from "./hostOverlay";
 import type { CanvasView } from "./viewTransform";
@@ -249,7 +253,7 @@ export function useCanvasPointer(opts: {
     if (
       event.button === 2 &&
       blank &&
-      refs.settings.current.mouseScheme === "rightDrag"
+      refs.settings.current.mouseScheme === "mouse"
     ) {
       event.preventDefault();
       startRightButtonSession({
@@ -342,7 +346,21 @@ export function useCanvasPointer(opts: {
     event: React.MouseEvent<HTMLDivElement>,
     card: WhiteboardCard,
   ) => {
-    if (event.button === 1 || refs.spaceHeld.current) {
+    const route = routeCardPointer({
+      button: event.button,
+      shiftKey: event.shiftKey,
+      altKey: event.altKey,
+      metaKey: event.metaKey,
+      ctrlKey: event.ctrlKey,
+      spaceHeld: refs.spaceHeld.current,
+      controlsMode: refs.settings.current.mouseScheme,
+      editing: refs.editing.current === card.blockId,
+      zone: cardPointerZone(event.target),
+    });
+
+    if (route.kind === "ignore") return;
+
+    if (route.kind === "pan") {
       event.preventDefault();
       if (event.button === 2) {
         swallowNextContextMenu(refs.canvas.current ?? refs.viewport.current);
@@ -350,7 +368,8 @@ export function useCanvasPointer(opts: {
       startPan(event.clientX, event.clientY);
       return;
     }
-    if (event.button === 2 && refs.settings.current.mouseScheme === "rightDrag") {
+
+    if (route.kind === "rightCard") {
       event.preventDefault();
       event.stopPropagation();
       focusViewport();
@@ -369,25 +388,30 @@ export function useCanvasPointer(opts: {
       });
       return;
     }
-    if (event.button !== 0) return;
+
+    if (route.kind === "textSelect") {
+      watchPointerClick({
+        startX: event.clientX,
+        startY: event.clientY,
+        onClick: () => {
+          if (!mountedRef.current) return;
+          tryClickEdit(card, event);
+        },
+      });
+      return;
+    }
+
     event.preventDefault();
     event.stopPropagation();
     focusViewport();
     setSelectedArea(null);
-
     if (!selectCardOnPointer(card, event)) return;
-    const onIdleClick = () => {
-      if (!mountedRef.current) return;
-      tryClickEdit(card, event);
-    };
-    if (refs.settings.current.mouseScheme === "rightDrag") {
-      watchPointerClick({
-        startX: event.clientX,
-        startY: event.clientY,
-        onClick: onIdleClick,
-      });
-      return;
-    }
+    const onIdleClick = route.enterEditOnClick
+      ? () => {
+          if (!mountedRef.current) return;
+          tryClickEdit(card, event);
+        }
+      : undefined;
     beginMoveSelection(event.clientX, event.clientY, onIdleClick);
   };
 

@@ -9,6 +9,7 @@ import {
   type CanvasView,
 } from "./viewTransform";
 import { isEditableTarget } from "./canvasKeys";
+import type { ControlsMode } from "./settings";
 
 const { useCallback, useEffect, useLayoutEffect, useRef, useState } =
   window.React;
@@ -29,6 +30,7 @@ type Opts = {
   onViewChange: (view: CanvasView) => void;
   onViewportWidth: (width: number) => void;
   isEditing: () => boolean;
+  controlsMode: ControlsMode;
 };
 
 export function useCanvasView({
@@ -38,6 +40,7 @@ export function useCanvasView({
   onViewChange,
   onViewportWidth,
   isEditing,
+  controlsMode,
 }: Opts) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLDivElement | null>(null);
@@ -48,6 +51,8 @@ export function useCanvasView({
   onViewChangeRef.current = onViewChange;
   const isEditingRef = useRef(isEditing);
   isEditingRef.current = isEditing;
+  const controlsModeRef = useRef(controlsMode);
+  controlsModeRef.current = controlsMode;
   const spaceHeldRef = useRef(false);
   const [viewportSize, setViewportSize] = useState({
     width: 800,
@@ -303,7 +308,11 @@ export function useCanvasView({
     runtime.gesture = "wheel";
     const current = liveViewRef.current;
 
-    if (event.ctrlKey || event.metaKey) {
+    const zoomWheel =
+      event.ctrlKey ||
+      event.metaKey ||
+      controlsModeRef.current === "mouse";
+    if (zoomWheel) {
       const rect = el.getBoundingClientRect();
       const mouseX = event.clientX - rect.left;
       const mouseY = event.clientY - rect.top;

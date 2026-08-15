@@ -1,6 +1,13 @@
 export const CARD_CSS = `
-.owb-viewport[data-mouse-scheme="rightDrag"] .owb-card:not(.is-editing):not(.is-dragging) {
+.owb-viewport[data-mouse-scheme="mouse"] .owb-card:not(.is-editing):not(.is-dragging) {
   cursor: default;
+  user-select: auto;
+}
+
+.owb-viewport[data-mouse-scheme="mouse"] .owb-card:not(.is-editing) .owb-card-body {
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
 }
 
 .owb-card {
