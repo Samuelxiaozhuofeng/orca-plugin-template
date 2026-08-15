@@ -112,12 +112,22 @@ check(
 
 const family = {
   50: { parent: null },
+  51: { parent: 50 },
+  52: { parent: 51 },
+  60: { parent: null },
+  61: { parent: 60 },
+  62: { parent: 61 },
   1: { parent: 50 },
   2: { parent: 1 },
   3: { parent: 2 },
   7: { parent: boardId },
   8: { parent: 8 },
+  80: { parent: null },
+  90: { parent: 50 },
+  98: { parent: 97 },
 };
+const onBoard = new Set<number>([1, 60, 7, 90]);
+const noneOnBoard = new Set<number>();
 check(
   hasAncestorInIds(3, new Set([1, 3]), family) === true,
   "grandchild has ancestor in the same drop",
@@ -137,70 +147,202 @@ check(
 
 check(
   shouldExtractMove({
-    blockId: 7,
-    boardBlockId: boardId,
-    dragIds: new Set([7]),
-    block: family[7],
-    blocks: family,
-  }) === false,
-  "already under the whiteboard is not moved again",
-);
-check(
-  shouldExtractMove({
     blockId: 2,
     boardBlockId: boardId,
     dragIds: new Set([2]),
+    cardIds: onBoard,
     block: family[2],
     blocks: family,
   }) === true,
-  "card still in a note is extracted even if no ancestor card is on the board",
+  "T1: child of a card already on the board is moved",
 );
 check(
   shouldExtractMove({
-    blockId: 3,
+    blockId: 51,
     boardBlockId: boardId,
-    dragIds: new Set([1, 3]),
-    block: family[3],
+    dragIds: new Set([51]),
+    cardIds: onBoard,
+    block: family[51],
     blocks: family,
   }) === false,
-  "descendant dropped with an ancestor is not moved",
+  "T2: line from a note that is not a card on this board is not moved",
 );
 check(
   shouldExtractMove({
-    blockId: 1,
+    blockId: 61,
     boardBlockId: boardId,
-    dragIds: new Set([1, 3]),
-    block: family[1],
+    dragIds: new Set([61]),
+    cardIds: onBoard,
+    block: family[61],
     blocks: family,
   }) === true,
-  "parent in a parent+child drop is still extracted",
+  "T3: line from a journal that is itself a card on this board is moved",
+);
+check(
+  shouldExtractMove({
+    blockId: 80,
+    boardBlockId: boardId,
+    dragIds: new Set([80]),
+    cardIds: onBoard,
+    block: family[80],
+    blocks: family,
+  }) === false,
+  "T4: page root is placed without a move",
 );
 check(
   shouldExtractMove({
     blockId: 50,
     boardBlockId: boardId,
     dragIds: new Set([50]),
+    cardIds: onBoard,
     block: family[50],
     blocks: family,
   }) === false,
-  "page root is placed without a move",
+  "T4: journal root with no parent is placed without a move",
+);
+check(
+  shouldExtractMove({
+    blockId: 90,
+    boardBlockId: boardId,
+    dragIds: new Set([90]),
+    cardIds: onBoard,
+    block: family[90],
+    blocks: family,
+  }) === false,
+  "T5: already-a-card whose body still lives in an off-board note is not moved",
+);
+check(
+  shouldExtractMove({
+    blockId: 2,
+    boardBlockId: boardId,
+    dragIds: new Set([2]),
+    cardIds: noneOnBoard,
+    block: family[2],
+    blocks: family,
+  }) === false,
+  "T5: card still in a note is not moved when no ancestor card is on the board",
+);
+check(
+  shouldExtractMove({
+    blockId: 7,
+    boardBlockId: boardId,
+    dragIds: new Set([7]),
+    cardIds: onBoard,
+    sourceCardId: 1,
+    block: family[7],
+    blocks: family,
+  }) === false,
+  "T6: already under the whiteboard is not moved again",
+);
+check(
+  shouldExtractMove({
+    blockId: 3,
+    boardBlockId: boardId,
+    dragIds: new Set([2, 3]),
+    cardIds: onBoard,
+    block: family[3],
+    blocks: family,
+  }) === false,
+  "T7: descendant dropped with an ancestor is not moved",
+);
+check(
+  shouldExtractMove({
+    blockId: 2,
+    boardBlockId: boardId,
+    dragIds: new Set([2, 3]),
+    cardIds: onBoard,
+    block: family[2],
+    blocks: family,
+  }) === true,
+  "T7: parent in a parent+child drop is still moved when it has a board ancestor",
+);
+check(
+  shouldExtractMove({
+    blockId: 1,
+    boardBlockId: boardId,
+    dragIds: new Set([1, 3]),
+    cardIds: noneOnBoard,
+    block: family[1],
+    blocks: family,
+  }) === false,
+  "parent in a parent+child drop is not moved without a board ancestor",
+);
+check(
+  shouldExtractMove({
+    blockId: 98,
+    boardBlockId: boardId,
+    dragIds: new Set([98]),
+    cardIds: onBoard,
+    sourceCardId: 1,
+    block: family[98],
+    blocks: family,
+  }) === true,
+  "extractRow sourceCardId on the board is a cache-miss fallback to move",
+);
+check(
+  shouldExtractMove({
+    blockId: 98,
+    boardBlockId: boardId,
+    dragIds: new Set([98]),
+    cardIds: onBoard,
+    sourceCardId: 999,
+    block: family[98],
+    blocks: family,
+  }) === false,
+  "sourceCardId that is not a card on this board does not force a move",
+);
+check(
+  shouldExtractMove({
+    blockId: 90,
+    boardBlockId: boardId,
+    dragIds: new Set([90]),
+    cardIds: onBoard,
+    sourceCardId: 90,
+    block: family[90],
+    blocks: family,
+  }) === false,
+  "sourceCardId equal to the block itself does not count as a board ancestor",
 );
 
 check(
-  planExtractMoves([1, 3], boardId, family).join(",") === "1",
-  "parent+child drop only moves the parent",
+  planExtractMoves([2], boardId, family, onBoard).join(",") === "2",
+  "T1: lone child of an on-board card is moved",
 );
 check(
-  planExtractMoves([2], boardId, family).join(",") === "2",
-  "lone nested block still in a note is moved",
+  planExtractMoves([51], boardId, family, onBoard).length === 0,
+  "T2: line from an off-board note is not moved",
 );
 check(
-  planExtractMoves([7], boardId, family).length === 0,
-  "already extracted card is not moved",
+  planExtractMoves([61], boardId, family, onBoard).join(",") === "61",
+  "T3: line from an on-board journal card is moved",
 );
 check(
-  planExtractMoves([50], boardId, family).length === 0,
-  "page root is not moved",
+  planExtractMoves([80], boardId, family, onBoard).length === 0,
+  "T4: page root is not moved",
+);
+check(
+  planExtractMoves([90], boardId, family, onBoard).length === 0,
+  "T5: already-a-card still living in an off-board note is not moved",
+);
+check(
+  planExtractMoves([2], boardId, family, noneOnBoard).length === 0,
+  "T5: nested block is not moved when no ancestor card is on the board",
+);
+check(
+  planExtractMoves([7], boardId, family, onBoard).length === 0,
+  "T6: already extracted card is not moved",
+);
+check(
+  planExtractMoves([2, 3], boardId, family, onBoard).join(",") === "2",
+  "T7: parent+child drop only moves the parent that has a board ancestor",
+);
+check(
+  planExtractMoves([1, 3], boardId, family, noneOnBoard).length === 0,
+  "parent+child drop moves nothing without a board ancestor",
+);
+check(
+  planExtractMoves([98], boardId, family, onBoard, 1).join(",") === "98",
+  "planExtractMoves uses sourceCardId fallback when ancestor walk misses",
 );
 
 check(

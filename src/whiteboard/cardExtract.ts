@@ -152,6 +152,8 @@ export function shouldExtractMove(opts: {
   blockId: DbId;
   boardBlockId: DbId;
   dragIds: ReadonlySet<DbId>;
+  cardIds: ReadonlySet<DbId>;
+  sourceCardId?: DbId | null;
   block: { parent?: DbId | null } | null | undefined;
   blocks: { [id: number]: { parent?: DbId | null } | undefined };
 }): boolean {
@@ -159,13 +161,23 @@ export function shouldExtractMove(opts: {
   if (!hasExtractOrigin(opts.block)) return false;
   if (isParentBoardBlock(opts.block, opts.boardBlockId)) return false;
   if (hasAncestorInIds(opts.blockId, opts.dragIds, opts.blocks)) return false;
-  return true;
+  if (findOwningCardId(opts.blockId, opts.cardIds, opts.blocks) != null) {
+    return true;
+  }
+  // Right-click extract passes the source card; use it if the ancestor walk missed cache.
+  return (
+    opts.sourceCardId != null &&
+    opts.cardIds.has(opts.sourceCardId) &&
+    opts.sourceCardId !== opts.blockId
+  );
 }
 
 export function planExtractMoves(
   ids: readonly DbId[],
   boardBlockId: DbId,
   blocks: { [id: number]: { parent?: DbId | null } | undefined },
+  cardIds: ReadonlySet<DbId>,
+  sourceCardId?: DbId | null,
 ): DbId[] {
   const dragIds = new Set(ids);
   const moving: DbId[] = [];
@@ -175,6 +187,8 @@ export function planExtractMoves(
         blockId: id,
         boardBlockId,
         dragIds,
+        cardIds,
+        sourceCardId,
         block: blocks[id],
         blocks,
       })

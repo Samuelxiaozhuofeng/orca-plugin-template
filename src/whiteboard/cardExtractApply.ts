@@ -88,10 +88,13 @@ export async function extractBlocksToBoard(opts: {
   });
 
   await ensureParentChainCached(opts.ids);
+  const cardIds = new Set(opts.existing.map((card) => card.blockId));
   const movingIds = planExtractMoves(
     opts.ids,
     opts.boardBlockId,
     orca.state.blocks,
+    cardIds,
+    opts.sourceCardId,
   );
   if (result.incoming.length === 0 && movingIds.length === 0) {
     orca.notify("info", dropMessage(result));
@@ -103,7 +106,6 @@ export async function extractBlocksToBoard(opts: {
     return [];
   }
 
-  const cardIds = new Set(opts.existing.map((card) => card.blockId));
   const incomingIds = new Set(result.incoming.map((card) => card.blockId));
   const edgeTargets = [
     ...result.incoming,
