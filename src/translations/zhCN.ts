@@ -68,6 +68,7 @@ const zhCN = {
   "Move back to source card": "放回原卡片",
   "Drag to extract as a card": "拖到画布空白处，提取为独立卡片",
   "Failed to extract this block from the note": "无法把这块从笔记里抽出来",
+  "Pulled out of the source card": "已从原卡片抽出",
   "Failed to move this card back to the source card":
     "无法把这张卡片放回原来的卡片",
   "Could not undo the note change for this action":

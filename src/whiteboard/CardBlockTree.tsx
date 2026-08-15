@@ -3,6 +3,7 @@ import { t } from "../libs/l10n";
 import { useWatchedValue } from "./blockWatch";
 import {
   EXTRACT_BULLET_CLASS,
+  stampExtractDragIfChild,
   startExtractBulletDrag,
 } from "./cardExtractDrag";
 import { isExtractableDepth, parseIdKey } from "./cardExtract";
@@ -60,6 +61,9 @@ export function CardBlockTree({
         if (target?.closest(`.${EXTRACT_BULLET_CLASS}`)) {
           event.stopPropagation();
         }
+      }}
+      onDragStartCapture={(event) => {
+        stampExtractDragIfChild(event, blockId);
       }}
     >
       {plan.map((node) => (

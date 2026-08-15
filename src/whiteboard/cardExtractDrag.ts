@@ -12,11 +12,20 @@ export function writeExtractDragData(
   blockId: DbId,
 ): void {
   dataTransfer.effectAllowed = "copy";
-  dataTransfer.setData(orcaBlockMime(), orcaBlocksPayload([blockId]));
-  dataTransfer.setData(
-    EXTRACT_MIME,
-    encodeExtractPayload({ source: sourceCardId, block: blockId }),
-  );
+  const extract = { source: sourceCardId, block: blockId };
+  dataTransfer.setData(orcaBlockMime(), orcaBlocksPayload([blockId], extract));
+  dataTransfer.setData(EXTRACT_MIME, encodeExtractPayload(extract));
+}
+
+export function stampExtractDragIfChild(
+  event: React.DragEvent,
+  sourceCardId: DbId,
+): void {
+  const dataTransfer = event.dataTransfer;
+  if (dataTransfer == null) return;
+  const blockId = blockIdFromCardEventTarget(event.target);
+  if (blockId == null || blockId === sourceCardId) return;
+  writeExtractDragData(dataTransfer, sourceCardId, blockId);
 }
 
 export const EXTRACT_BULLET_CLASS = "owb-extract-bullet";

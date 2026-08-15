@@ -8,11 +8,13 @@ import { planCardBlockTree } from "./cardTreePlan.ts";
 import {
   cardIdsKey,
   encodeExtractPayload,
+  findOwningCardId,
   findVacantCardPosition,
   isExtractableDepth,
   orcaBlocksPayload,
   parseExtractPayload,
   parseIdKey,
+  parseOwbExtract,
   planExtractEdge,
   rectsOverlap,
 } from "./cardExtract.ts";
@@ -50,6 +52,37 @@ check(parseExtractPayload("") == null, "empty extract payload");
 check(parseExtractPayload("{") == null, "broken extract payload");
 check(parseExtractPayload(JSON.stringify({ source: "x" })) == null, "bad ids");
 check(orcaBlocksPayload([7, 8]) === JSON.stringify({ blocks: [7, 8] }), "orca payload");
+check(
+  orcaBlocksPayload([7], { source: 1, block: 7 }) ===
+    JSON.stringify({ blocks: [7], owbExtract: { source: 1, block: 7 } }),
+  "orca extract payload",
+);
+check(
+  JSON.stringify(parseOwbExtract(orcaBlocksPayload([7], { source: 1, block: 7 }))) ===
+    JSON.stringify({ source: 1, block: 7 }),
+  "owbExtract roundtrip",
+);
+check(parseOwbExtract(orcaBlocksPayload([7])) == null, "plain orca payload is not extract");
+check(parseOwbExtract("") == null, "empty owbExtract");
+check(parseOwbExtract("{") == null, "broken owbExtract");
+
+const owners = {
+  1: { parent: null },
+  2: { parent: 1 },
+  3: { parent: 2 },
+  4: { parent: 99 },
+  5: { parent: 6 },
+  6: { parent: 5 },
+};
+const cardIds = new Set([1]);
+check(findOwningCardId(3, cardIds, owners) === 1, "nested child owns to card");
+check(findOwningCardId(2, cardIds, owners) === 1, "direct child owns to card");
+check(findOwningCardId(1, cardIds, owners) == null, "card itself has no owner");
+check(findOwningCardId(4, cardIds, owners) == null, "outside tree has no owner");
+check(
+  findOwningCardId(5, new Set([1]), owners) == null,
+  "cycle without a card stops",
+);
 
 check(
   planCardBlockTree(1, tree)

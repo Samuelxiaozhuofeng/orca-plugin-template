@@ -56,22 +56,73 @@ export function parseExtractPayload(raw: string): ExtractPayload | null {
   return { source, block };
 }
 
+function orcaPayloadFromTransfer(
+  dataTransfer: DataTransfer,
+): ExtractPayload | null {
+  for (const type of Array.from(dataTransfer.types)) {
+    if (!type.startsWith("orca/")) continue;
+    const extracted = parseOwbExtract(dataTransfer.getData(type));
+    if (extracted != null) return extracted;
+  }
+  return null;
+}
+
 export function isExtractDrag(
   dataTransfer: DataTransfer | null | undefined,
 ): boolean {
   if (dataTransfer == null) return false;
-  return Array.from(dataTransfer.types).includes(EXTRACT_MIME);
+  if (Array.from(dataTransfer.types).includes(EXTRACT_MIME)) return true;
+  return orcaPayloadFromTransfer(dataTransfer) != null;
 }
 
 export function parseExtractSource(
   dataTransfer: DataTransfer | null | undefined,
 ): DbId | null {
   if (dataTransfer == null) return null;
-  return parseExtractPayload(dataTransfer.getData(EXTRACT_MIME))?.source ?? null;
+  return (
+    parseExtractPayload(dataTransfer.getData(EXTRACT_MIME))?.source ??
+    orcaPayloadFromTransfer(dataTransfer)?.source ??
+    null
+  );
 }
 
-export function orcaBlocksPayload(ids: readonly DbId[]): string {
-  return JSON.stringify({ blocks: [...ids] });
+export function orcaBlocksPayload(
+  ids: readonly DbId[],
+  extract?: ExtractPayload,
+): string {
+  if (extract == null) return JSON.stringify({ blocks: [...ids] });
+  return JSON.stringify({ blocks: [...ids], owbExtract: extract });
+}
+
+export function parseOwbExtract(raw: string): ExtractPayload | null {
+  if (!raw) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (parsed == null || typeof parsed !== "object") return null;
+  const extract = (parsed as { owbExtract?: unknown }).owbExtract;
+  if (extract == null || typeof extract !== "object") return null;
+  return parseExtractPayload(JSON.stringify(extract));
+}
+
+/** Nearest ancestor that is already a card on this board. */
+export function findOwningCardId(
+  blockId: DbId,
+  cardIds: ReadonlySet<DbId>,
+  blocks: { [id: number]: { parent?: DbId | null } | undefined },
+): DbId | null {
+  let parentId = blocks[blockId]?.parent ?? null;
+  const seen = new Set<DbId>([blockId]);
+  while (typeof parentId === "number" && Number.isFinite(parentId)) {
+    if (seen.has(parentId)) break;
+    seen.add(parentId);
+    if (cardIds.has(parentId)) return parentId;
+    parentId = blocks[parentId]?.parent ?? null;
+  }
+  return null;
 }
 
 export function rectsOverlap(a: CardRectLike, b: CardRectLike): boolean {

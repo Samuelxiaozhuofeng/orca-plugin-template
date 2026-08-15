@@ -1,13 +1,8 @@
 import type { DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n";
-import { isExtractDrag } from "./cardExtract";
-import { completeExtractDrop } from "./cardExtractApply";
+import { completeCanvasDrop } from "./cardExtractApply";
 import type { WhiteboardCard } from "./data";
-import {
-  completeBoardDrop,
-  isLeavingDragTarget,
-  isOrcaBlockDrag,
-} from "./dropBlocks";
+import { isLeavingDragTarget, isOrcaBlockDrag } from "./dropBlocks";
 import type { WhiteboardEdge } from "./edges";
 
 const { useCallback, useState } = window.React;
@@ -71,24 +66,15 @@ export function useBoardDrop(opts: {
       event.preventDefault();
       setDropActive(false);
       const at = pointerToWorld(event.clientX, event.clientY);
-      const dataTransfer = event.dataTransfer;
-      const drop = isExtractDrag(dataTransfer)
-        ? completeExtractDrop({
-            dataTransfer,
-            at,
-            existing: cardsRef.current,
-            existingEdges: edgesRef.current,
-            boardBlockId,
-            addCards: onAddCards,
-            commitEdges: onCommitEdges,
-          })
-        : completeBoardDrop({
-            dataTransfer,
-            at,
-            existing: cardsRef.current,
-            boardBlockId,
-            addCards: onAddCards,
-          });
+      const drop = completeCanvasDrop({
+        dataTransfer: event.dataTransfer,
+        at,
+        existing: cardsRef.current,
+        existingEdges: edgesRef.current,
+        boardBlockId,
+        addCards: onAddCards,
+        commitEdges: onCommitEdges,
+      });
       void drop.catch((error: unknown) => {
         console.error("[whiteboard] failed to drop blocks", error);
         orca.notify(

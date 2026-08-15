@@ -3,7 +3,9 @@ import { t } from "../libs/l10n";
 import { discardLastRecord, runAsHistoryStep } from "./boardHistory";
 import type { WhiteboardCard } from "./cards";
 import {
+  findOwningCardId,
   findVacantCardPosition,
+  isExtractDrag,
   parseExtractSource,
   planExtractEdge,
 } from "./cardExtract";
@@ -11,11 +13,15 @@ import { type ExtractRestoreInfo } from "./cardExtractModel";
 import { moveBlockOutAsExtract } from "./cardExtractMove";
 import { makeExtractNoteAction } from "./cardExtractRestore";
 import {
+  completeBoardDrop,
   dropMessage,
   parseDroppedBlockIds,
   placeDroppedBlocks,
 } from "./dropBlocks";
 import type { WhiteboardEdge } from "./edges";
+import { fetchBlock } from "./newCard";
+
+const ANCESTOR_WALK_MAX = 40;
 
 export async function extractBlocksToBoard(opts: {
   ids: readonly DbId[];
@@ -42,15 +48,31 @@ export async function extractBlocksToBoard(opts: {
     boardBlockId: opts.boardBlockId,
   });
 
-  if (result.added === 0) {
+  const cardIds = new Set(opts.existing.map((card) => card.blockId));
+  const alreadyNested: DbId[] = [];
+  for (const id of opts.ids) {
+    if (result.incoming.some((card) => card.blockId === id)) continue;
+    if (!cardIds.has(id)) continue;
+    const owner = await loadOwningCardId(id, cardIds);
+    if (owner != null) alreadyNested.push(id);
+  }
+
+  const movingIds = [
+    ...result.incoming.map((card) => card.blockId),
+    ...alreadyNested,
+  ];
+  if (movingIds.length === 0) {
     orca.notify("info", dropMessage(result));
     return [];
   }
 
+  const edgeTargets = [...result.incoming, ...alreadyNested.map((blockId) => ({
+    blockId,
+  }))];
   const edgesToAdd: WhiteboardEdge[] = [];
   if (opts.sourceCardId != null) {
     let planned: WhiteboardEdge[] = [...opts.existingEdges];
-    for (const card of result.incoming) {
+    for (const card of edgeTargets) {
       const edge = planExtractEdge(opts.sourceCardId, card.blockId, planned);
       if (edge == null) continue;
       edgesToAdd.push(edge);
@@ -66,20 +88,24 @@ export async function extractBlocksToBoard(opts: {
     { cards: [...opts.existing], edges: [...opts.existingEdges] },
     async () => {
       try {
-        for (const card of result.incoming) {
+        for (const blockId of movingIds) {
+          const sourceCardId =
+            opts.sourceCardId ?? (await loadOwningCardId(blockId, cardIds));
           infos.push(
             await moveBlockOutAsExtract({
-              blockId: card.blockId,
-              sourceCardId: opts.sourceCardId,
+              blockId,
+              sourceCardId,
               boardBlockId: opts.boardBlockId,
             }),
           );
         }
-        const saved = await opts.addCards(result.incoming);
-        if (!saved) {
-          await note.undo();
-          discardLastRecord(opts.boardBlockId);
-          return false;
+        if (result.incoming.length > 0) {
+          const saved = await opts.addCards(result.incoming);
+          if (!saved) {
+            await note.undo();
+            discardLastRecord(opts.boardBlockId);
+            return false;
+          }
         }
         if (edgesToAdd.length > 0) {
           const ok = await opts.commitEdges([
@@ -108,8 +134,59 @@ export async function extractBlocksToBoard(opts: {
   );
 
   if (!savedIncoming) return [];
-  orca.notify("success", dropMessage(result));
+  orca.notify(
+    "success",
+    result.added > 0
+      ? dropMessage(result)
+      : t("Pulled out of the source card"),
+  );
   return result.incoming;
+}
+
+async function loadOwningCardId(
+  blockId: DbId,
+  cardIds: ReadonlySet<DbId>,
+): Promise<DbId | null> {
+  const cached = findOwningCardId(blockId, cardIds, orca.state.blocks);
+  if (cached != null) return cached;
+  let currentId: DbId | null = blockId;
+  const seen = new Set<DbId>();
+  for (let i = 0; i < ANCESTOR_WALK_MAX; i++) {
+    if (currentId == null || seen.has(currentId)) break;
+    seen.add(currentId);
+    let block = orca.state.blocks[currentId] as
+      | { parent?: DbId | null }
+      | undefined;
+    if (block == null) {
+      try {
+        block = await fetchBlock(currentId);
+      } catch {
+        break;
+      }
+    }
+    const parent =
+      typeof block.parent === "number" && Number.isFinite(block.parent)
+        ? block.parent
+        : null;
+    if (parent == null) break;
+    if (cardIds.has(parent)) return parent;
+    currentId = parent;
+  }
+  return findOwningCardId(blockId, cardIds, orca.state.blocks);
+}
+
+export async function resolveExtractSource(
+  ids: readonly DbId[],
+  cards: readonly { blockId: DbId }[],
+  hinted: DbId | null,
+): Promise<DbId | null> {
+  const cardIds = new Set(cards.map((card) => card.blockId));
+  if (hinted != null && cardIds.has(hinted)) return hinted;
+  for (const id of ids) {
+    const found = await loadOwningCardId(id, cardIds);
+    if (found != null) return found;
+  }
+  return null;
 }
 
 export async function completeExtractDrop(opts: {
@@ -123,9 +200,11 @@ export async function completeExtractDrop(opts: {
 }): Promise<WhiteboardCard[]> {
   const ids = parseDroppedBlockIds(opts.dataTransfer);
   if (ids.length === 0) return [];
+  const hinted = parseExtractSource(opts.dataTransfer);
+  const sourceCardId = await resolveExtractSource(ids, opts.existing, hinted);
   return extractBlocksToBoard({
     ids,
-    sourceCardId: parseExtractSource(opts.dataTransfer),
+    sourceCardId,
     at: opts.at,
     existing: opts.existing,
     existingEdges: opts.existingEdges,
@@ -133,4 +212,34 @@ export async function completeExtractDrop(opts: {
     addCards: opts.addCards,
     commitEdges: opts.commitEdges,
   });
+}
+
+export async function completeCanvasDrop(opts: {
+  dataTransfer: DataTransfer | null;
+  at: { x: number; y: number };
+  existing: readonly WhiteboardCard[];
+  existingEdges: readonly WhiteboardEdge[];
+  boardBlockId: DbId;
+  addCards: (cards: WhiteboardCard[]) => Promise<boolean>;
+  commitEdges: (next: WhiteboardEdge[]) => Promise<boolean>;
+}): Promise<WhiteboardCard[]> {
+  const ids = parseDroppedBlockIds(opts.dataTransfer);
+  if (ids.length === 0) return [];
+  const hinted = parseExtractSource(opts.dataTransfer);
+  const sourceCardId = await resolveExtractSource(ids, opts.existing, hinted);
+  if (
+    sourceCardId != null ||
+    hinted != null ||
+    isExtractDrag(opts.dataTransfer)
+  ) {
+    return completeExtractDrop(opts);
+  }
+  await completeBoardDrop({
+    dataTransfer: opts.dataTransfer,
+    at: opts.at,
+    existing: opts.existing,
+    boardBlockId: opts.boardBlockId,
+    addCards: opts.addCards,
+  });
+  return [];
 }
