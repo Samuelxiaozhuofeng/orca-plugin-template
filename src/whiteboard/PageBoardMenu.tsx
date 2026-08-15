@@ -1,14 +1,19 @@
 import type { DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n";
 import {
-  createWhiteboardPage,
   isWhiteboardBlock,
   resolveTargetBlockId,
   turnBackIntoOutline,
   turnIntoWhiteboard,
 } from "./pageBoard";
+import {
+  aliasExists,
+  createWhiteboardPage,
+  pickFreeAliasName,
+} from "./pageBoardCreate";
+import { isBlankPageName, normalizePageName } from "./pageBoardPlan";
 
-const { useEffect, useState } = window.React;
+const { useEffect, useRef, useState } = window.React;
 
 const INSERT_PAGE = "insertWhiteboardPage";
 const INSERT_PAGE_SLASH = "insertWhiteboardPageSlash";
@@ -85,18 +90,147 @@ export function TurnBackIntoOutlineMenuItem(props: {
   );
 }
 
-type ConfirmReq = { blockId: DbId };
+type ConfirmReq = { kind: "turnBack"; blockId: DbId };
+type NameReq = { kind: "namePage"; defaultName: string };
+type HostReq = ConfirmReq | NameReq;
 
-let hostListener: ((req: ConfirmReq | null) => void) | null = null;
-let queued: ConfirmReq | null = null;
+let hostListener: ((req: HostReq) => void) | null = null;
+let queued: HostReq | null = null;
+let pendingNameResolve: ((name: string | null) => void) | null = null;
+
+function settlePageName(name: string | null): void {
+  const resolve = pendingNameResolve;
+  pendingNameResolve = null;
+  resolve?.(name);
+}
 
 function requestTurnBackConfirm(blockId: DbId): void {
-  const req = { blockId };
+  const req: ConfirmReq = { kind: "turnBack", blockId };
   if (hostListener != null) {
     hostListener(req);
     return;
   }
   queued = req;
+}
+
+export function requestWhiteboardPageName(
+  defaultName: string,
+): Promise<string | null> {
+  return new Promise((resolve) => {
+    settlePageName(null);
+    pendingNameResolve = resolve;
+    const req: NameReq = { kind: "namePage", defaultName };
+    if (hostListener != null) {
+      hostListener(req);
+      return;
+    }
+    queued = req;
+  });
+}
+
+function isComposingKey(event: React.KeyboardEvent): boolean {
+  return event.nativeEvent.isComposing || event.keyCode === 229;
+}
+
+function NamePageDialog(props: {
+  defaultName: string;
+  onClose: () => void;
+  onConfirm: (name: string) => void;
+}): React.ReactNode {
+  const [name, setName] = useState(props.defaultName);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = wrapRef.current?.querySelector("input");
+    if (el == null) return;
+    el.focus();
+    el.select();
+  }, []);
+
+  const usable = !isBlankPageName(name);
+
+  const submit = async () => {
+    const trimmed = normalizePageName(name);
+    if (trimmed === "" || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      if (await aliasExists(trimmed)) {
+        setError(
+          t("A page with this name already exists. Choose another name."),
+        );
+        return;
+      }
+      props.onConfirm(trimmed);
+    } catch (err: unknown) {
+      console.warn("[whiteboard] alias probe failed", err);
+      props.onConfirm(trimmed);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <orca.components.ModalOverlay
+      visible
+      canClose={!busy}
+      onClose={props.onClose}
+    >
+      <div
+        className="owb-dialog"
+        role="dialog"
+        onMouseDown={(event: React.MouseEvent) => event.stopPropagation()}
+        onKeyDown={(event: React.KeyboardEvent) => {
+          if (isComposingKey(event)) return;
+          if (event.key === "Enter") {
+            event.preventDefault();
+            event.stopPropagation();
+            void submit();
+          }
+        }}
+      >
+        <div className="owb-dialog-title">{t("New whiteboard page")}</div>
+        <div className="owb-dialog-section">
+          <div className="owb-dialog-label">{t("Whiteboard name")}</div>
+          <div ref={wrapRef}>
+            <orca.components.CompositionInput
+              className="owb-board-search"
+              value={name}
+              autoFocus
+              autoComplete="off"
+              disabled={busy}
+              aria-label={t("Whiteboard name")}
+              onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                setName(event.target.value);
+                if (error != null) setError(null);
+              }}
+            />
+          </div>
+          {error != null ? (
+            <div className="owb-dialog-warn">{error}</div>
+          ) : null}
+        </div>
+        <div className="owb-dialog-actions">
+          <orca.components.Button
+            variant="outline"
+            disabled={busy}
+            onClick={props.onClose}
+          >
+            {t("Cancel")}
+          </orca.components.Button>
+          <orca.components.Button
+            variant="solid"
+            disabled={busy || !usable}
+            onClick={() => void submit()}
+          >
+            {busy ? t("Creating…") : t("Create")}
+          </orca.components.Button>
+        </div>
+      </div>
+    </orca.components.ModalOverlay>
+  );
 }
 
 function TurnBackConfirmDialog(props: {
@@ -148,7 +282,7 @@ function TurnBackConfirmDialog(props: {
 }
 
 function PageBoardHost(): React.ReactNode {
-  const [req, setReq] = useState<ConfirmReq | null>(null);
+  const [req, setReq] = useState<HostReq | null>(null);
 
   useEffect(() => {
     hostListener = (next) => setReq(next);
@@ -158,12 +292,31 @@ function PageBoardHost(): React.ReactNode {
     }
     return () => {
       hostListener = null;
+      settlePageName(null);
     };
   }, []);
 
   if (req == null) return null;
+  if (req.kind === "namePage") {
+    return (
+      <NamePageDialog
+        defaultName={req.defaultName}
+        onClose={() => {
+          settlePageName(null);
+          setReq(null);
+        }}
+        onConfirm={(name) => {
+          settlePageName(name);
+          setReq(null);
+        }}
+      />
+    );
+  }
   return (
-    <TurnBackConfirmDialog blockId={req.blockId} onClose={() => setReq(null)} />
+    <TurnBackConfirmDialog
+      blockId={req.blockId}
+      onClose={() => setReq(null)}
+    />
   );
 }
 
@@ -184,7 +337,15 @@ export function registerPageBoardCommands(pluginName: string): void {
   orca.commands.registerEditorCommand(
     insertId,
     async ([panelId, _rootBlockId, cursor]) => {
-      await createWhiteboardPage(panelId, cursor);
+      let defaultName = t("Untitled whiteboard");
+      try {
+        defaultName = await pickFreeAliasName(defaultName);
+      } catch (err: unknown) {
+        console.warn("[whiteboard] alias probe failed", err);
+      }
+      const name = await requestWhiteboardPageName(defaultName);
+      if (name == null) return null;
+      await createWhiteboardPage(panelId, cursor, name);
       return null;
     },
     () => {},

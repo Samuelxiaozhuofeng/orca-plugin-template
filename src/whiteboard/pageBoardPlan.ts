@@ -29,6 +29,40 @@ export function numberedAlias(base: string, index: number): string {
   return index <= 1 ? base : `${base} ${index}`;
 }
 
+export function normalizePageName(raw: string): string {
+  return raw.trim();
+}
+
+export function isBlankPageName(raw: string): boolean {
+  return normalizePageName(raw) === "";
+}
+
+/** Exact match after trim. User-chosen names are not auto-numbered. */
+export function isPageAliasTaken(
+  name: string,
+  existing: ReadonlySet<string>,
+): boolean {
+  return existing.has(normalizePageName(name));
+}
+
+/**
+ * System default names may carry a suffix (`Name`, `Name 2`, …).
+ * Returns null when every attempt is already taken.
+ */
+export function nextFreeNumberedAlias(
+  base: string,
+  existing: ReadonlySet<string>,
+  maxAttempts: number,
+): string | null {
+  const stem = normalizePageName(base) || base;
+  if (maxAttempts <= 0) return null;
+  for (let i = 1; i <= maxAttempts; i++) {
+    const candidate = numberedAlias(stem, i);
+    if (!existing.has(candidate)) return candidate;
+  }
+  return null;
+}
+
 export function reprType(block: BlockPropsLike): string | null {
   const repr = block?.properties?.find((item) => item.name === REPR_PROP)?.value;
   if (repr == null || typeof repr !== "object") return null;

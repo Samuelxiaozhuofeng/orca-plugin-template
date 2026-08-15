@@ -2,6 +2,10 @@ const zhCN = {
   "New whiteboard": "新建白板",
   "New whiteboard page": "新建白板页面",
   "Untitled whiteboard": "未命名白板",
+  "A page with this name already exists. Choose another name.":
+    "已有同名页面，换一个名字",
+  Create: "创建",
+  "Creating…": "正在创建…",
   "Turn into whiteboard": "转成白板",
   "Turn back into outline": "转回大纲",
   "This is already a whiteboard": "这已经是一块白板",
@@ -14,6 +18,8 @@ const zhCN = {
     "无法把这块白板转回大纲",
   "Created the whiteboard but could not make it a page. You can add a page alias yourself.":
     "白板已经建好，但没能做成页面。你可以自己给它加一个页面别名。",
+  "Created the whiteboard but could not add a reference on the current block.":
+    "白板已经建好，但没能在当前块上加上引用入口。",
   "Turn this whiteboard back into an outline? The canvas layout stays on this block, so you can turn it into a whiteboard again later.":
     "把这块白板转回大纲？画布布局会留在这个块上，之后还可以再转回白板。",
   "Open as outline": "以大纲打开",

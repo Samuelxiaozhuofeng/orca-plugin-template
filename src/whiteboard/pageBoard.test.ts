@@ -19,6 +19,10 @@ import {
   isPageWhiteboardBlock,
   isTruthyFlagValue,
   isWhiteboardBlock,
+  isBlankPageName,
+  isPageAliasTaken,
+  nextFreeNumberedAlias,
+  normalizePageName,
   numberedAlias,
   PAGE_BOARD_COLUMNS,
   PAGE_BOARD_ID_CACHE_TTL_MS,
@@ -46,6 +50,43 @@ check(
 check(
   numberedAlias("Untitled whiteboard", 10) === "Untitled whiteboard 10",
   "double-digit suffix",
+);
+
+check(normalizePageName("  hello  ") === "hello", "page name is trimmed");
+check(normalizePageName("") === "", "empty name stays empty");
+check(isBlankPageName("   ") === true, "whitespace-only name is blank");
+check(isBlankPageName("白板") === false, "non-empty name is usable");
+check(
+  isPageAliasTaken("Foo", new Set(["Foo"])) === true,
+  "exact alias is taken",
+);
+check(
+  isPageAliasTaken(" Foo ", new Set(["Foo"])) === true,
+  "taken check trims first",
+);
+check(
+  isPageAliasTaken("foo", new Set(["Foo"])) === false,
+  "alias match is case-sensitive",
+);
+check(
+  isPageAliasTaken("Bar", new Set(["Foo"])) === false,
+  "unused alias is free",
+);
+check(
+  nextFreeNumberedAlias("未命名白板", new Set(), 99) === "未命名白板",
+  "first default name has no suffix",
+);
+check(
+  nextFreeNumberedAlias(
+    "未命名白板",
+    new Set(["未命名白板", "未命名白板 2"]),
+    99,
+  ) === "未命名白板 3",
+  "default name skips taken numbered aliases",
+);
+check(
+  nextFreeNumberedAlias("X", new Set(["X", "X 2"]), 2) === null,
+  "exhausted numbered attempts return null",
 );
 
 {

@@ -1,18 +1,14 @@
-import type { Block, CursorData, DbId } from "../orca.d.ts";
+import type { Block, DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n";
-import { tagNewWhiteboard } from "./boardTag";
 import { loadBoardBlock, notifyBoardUnreadable } from "./boardWrite";
 import { tryReadCards, writeCards } from "./cards";
-import { insertedBlockId, openBoard, PANEL_TYPE } from "./data";
-import { createdBlockFromResult } from "./newCard";
-import { writeBlockContent } from "./noteWrite";
+import { openBoard, PANEL_TYPE } from "./data";
 import { clearPageWhiteboardFlag, writePageWhiteboardFlag } from "./pageBoardFlag";
 import {
   asBlockId,
   isInlineWhiteboardBlock,
   isPageWhiteboardBlock,
   isWhiteboardBlock,
-  numberedAlias,
   panelIsBlockViewRoot,
   planTurnIntoCards,
   REPR_PROP,
@@ -34,7 +30,6 @@ export {
 } from "./pageBoardPlan";
 
 const PROP_TYPE_JSON = 0;
-const ALIAS_ATTEMPTS = 99;
 
 export function isPanelBlockViewRoot(panelId: string, blockId: DbId): boolean {
   try {
@@ -44,71 +39,6 @@ export function isPanelBlockViewRoot(panelId: string, blockId: DbId): boolean {
     console.warn("[whiteboard] findViewPanel failed", err);
     return false;
   }
-}
-
-function aliasLookupHit(result: unknown): boolean {
-  if (result == null) return false;
-  if (typeof result === "number" && Number.isFinite(result)) return true;
-  if (typeof result !== "object") return false;
-  if ("id" in result && asBlockId((result as { id: unknown }).id) != null) {
-    return true;
-  }
-  if ("id" in result && (result as { id: unknown }).id == null) return false;
-  return true;
-}
-
-export async function aliasExists(name: string): Promise<boolean> {
-  try {
-    const byId = await orca.invokeBackend("get-blockid-by-alias", name);
-    if (aliasLookupHit(byId)) return true;
-  } catch (err: unknown) {
-    console.warn("[whiteboard] get-blockid-by-alias failed", name, err);
-  }
-  try {
-    const block = await orca.invokeBackend("get-block-by-alias", name);
-    return aliasLookupHit(block);
-  } catch (err: unknown) {
-    console.warn("[whiteboard] get-block-by-alias failed", name, err);
-    return false;
-  }
-}
-
-function isCreateAliasError(result: unknown): boolean {
-  if (result == null) return false;
-  if (result instanceof Error) return true;
-  if (typeof result !== "object") return false;
-  const rec = result as { message?: unknown; error?: unknown; id?: unknown };
-  if (asBlockId(rec.id) != null) return false;
-  return rec.message != null || rec.error != null;
-}
-
-export async function assignPageAlias(
-  blockId: DbId,
-  preferred: string,
-): Promise<string | null> {
-  const base = preferred.trim() || t("Untitled whiteboard");
-  for (let i = 1; i <= ALIAS_ATTEMPTS; i++) {
-    const name = numberedAlias(base, i);
-    try {
-      if (await aliasExists(name)) continue;
-    } catch {
-      // Probe failed: still try createAlias.
-    }
-    try {
-      const result = await orca.commands.invokeEditorCommand(
-        "core.editor.createAlias",
-        null,
-        name,
-        blockId,
-        true,
-      );
-      if (isCreateAliasError(result)) continue;
-      return name;
-    } catch (err: unknown) {
-      console.warn("[whiteboard] createAlias failed", name, err);
-    }
-  }
-  return null;
 }
 
 function applyReturnedBlocks(result: unknown): void {
@@ -149,111 +79,6 @@ export async function writeBlockRepr(
     throw new Error(t("Failed to change this block's type"));
   }
   return verified;
-}
-
-async function insertRootTextPage(
-  name: string,
-  cursor: CursorData | null,
-): Promise<DbId | null> {
-  try {
-    const inserted = await orca.commands.invokeEditorCommand(
-      "core.editor.insertBlock",
-      cursor,
-      null,
-      null,
-      [{ t: "t", v: name }],
-      { type: "text" },
-    );
-    const id = insertedBlockId(inserted);
-    if (id != null) return id;
-  } catch (err: unknown) {
-    console.warn("[whiteboard] insertBlock at root failed", err);
-  }
-
-  try {
-    const result = await orca.invokeBackend(
-      "create-block",
-      null,
-      null,
-      null,
-      null,
-      { type: "text" },
-    );
-    const created = createdBlockFromResult(result);
-    try {
-      await writeBlockContent(created.id, [{ t: "t", v: name }]);
-    } catch (err: unknown) {
-      console.warn("[whiteboard] failed to set new page title", err);
-    }
-    return created.id;
-  } catch (err: unknown) {
-    console.warn("[whiteboard] create-block at root failed", err);
-    return null;
-  }
-}
-
-async function pickFreeAliasName(base: string): Promise<string> {
-  for (let i = 1; i <= ALIAS_ATTEMPTS; i++) {
-    const name = numberedAlias(base, i);
-    if (!(await aliasExists(name))) return name;
-  }
-  return `${base} ${Date.now()}`;
-}
-
-export async function createWhiteboardPage(
-  panelId: string,
-  cursor: CursorData | null,
-): Promise<DbId | null> {
-  const baseName = t("Untitled whiteboard");
-  let name = baseName;
-  try {
-    name = await pickFreeAliasName(baseName);
-  } catch (err: unknown) {
-    console.warn("[whiteboard] alias probe failed", err);
-  }
-
-  let newId: DbId | null = null;
-  try {
-    newId = await insertRootTextPage(name, cursor);
-  } catch (err: unknown) {
-    console.error("[whiteboard] failed to insert whiteboard page", err);
-  }
-  if (newId == null) {
-    orca.notify("error", t("Failed to create whiteboard"));
-    return null;
-  }
-
-  try {
-    await writePageWhiteboardFlag(newId, true);
-  } catch (err: unknown) {
-    console.error("[whiteboard] failed to mark new page as whiteboard", err);
-    orca.notify(
-      "error",
-      err instanceof Error
-        ? err.message
-        : t("Failed to mark this page as a whiteboard"),
-    );
-    return newId;
-  }
-
-  const alias = await assignPageAlias(newId, name);
-  if (alias == null) {
-    orca.notify(
-      "warn",
-      t(
-        "Created the whiteboard but could not make it a page. You can add a page alias yourself.",
-      ),
-    );
-  }
-
-  try {
-    await tagNewWhiteboard(newId, cursor);
-  } catch (err: unknown) {
-    console.warn("[whiteboard] failed to tag new whiteboard page", err);
-  }
-
-  openBoard(newId, panelId, false);
-  return newId;
 }
 
 export function resolveTargetBlockId(explicit?: unknown): DbId | null {
