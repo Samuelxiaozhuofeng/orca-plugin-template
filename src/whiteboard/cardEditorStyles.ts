@@ -98,4 +98,13 @@ export const CARD_EDITOR_CSS = `
   color: var(--orca-color-text-3);
   font-size: 12px;
 }
+
+/* Stay in the editor tree. fixed + canvas transform escapes card overflow. */
+.owb-card .orca-editor-toolbar.owb-editor-toolbar-fixed {
+  position: fixed !important;
+  translate: 0 !important;
+  transform-origin: top left;
+  z-index: 360;
+  pointer-events: auto;
+}
 `.trim();

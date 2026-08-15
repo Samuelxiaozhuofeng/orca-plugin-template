@@ -13,6 +13,10 @@ import {
   tagToBoardCommandId,
 } from "./whiteboard/addToBoard";
 import { startBlockMarks, stopBlockMarks } from "./whiteboard/blockMarks";
+import {
+  startCardEditorToolbar,
+  stopCardEditorToolbar,
+} from "./whiteboard/cardEditorToolbar";
 import { clearAllPendingCardFocus } from "./whiteboard/cardFocus";
 import BoardBlock from "./whiteboard/BoardBlock";
 import BoardPanel from "./whiteboard/BoardPanel";
@@ -173,6 +177,7 @@ export async function load(_name: string) {
   void assignShortcutIfFree(findCardId, FIND_CARD_SHORTCUT);
 
   startBlockMarks(pluginName);
+  startCardEditorToolbar();
 
   orca.blockMenuCommands.registerBlockMenuCommand(
     addToBoardCommandId(pluginName),
@@ -276,6 +281,7 @@ export async function unload() {
   resetPageBoardIdCache();
   clearAllPendingCardFocus();
   stopBlockMarks();
+  stopCardEditorToolbar();
   removeWhiteboardStyles();
 }
 
