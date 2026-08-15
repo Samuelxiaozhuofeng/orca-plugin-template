@@ -25,6 +25,13 @@ import {
   mountOpenBoardHost,
   openBoardPicker,
 } from "./whiteboard/openBoardDialog";
+import {
+  mountPageBoardHost,
+  registerPageBoardCommands,
+  unregisterPageBoardCommands,
+} from "./whiteboard/PageBoardMenu";
+import { resetPageBoardIdCache } from "./whiteboard/pageBoardListCache";
+import { startPageBoardRedirect } from "./whiteboard/pageBoardRedirect";
 import { flushAllCardWrites } from "./whiteboard/cardPersist";
 import { flushAllEdgeWrites } from "./whiteboard/edgePersist";
 import { tagNewWhiteboard } from "./whiteboard/boardTag";
@@ -41,6 +48,8 @@ import { invokeWrapSelectedOnActivePanel } from "./whiteboard/useCanvasAreas";
 let pluginName: string;
 let unmountAddToBoard: (() => void) | null = null;
 let unmountOpenBoard: (() => void) | null = null;
+let unmountPageBoard: (() => void) | null = null;
+let stopPageBoardRedirect: (() => void) | null = null;
 
 const INSERT_COMMAND = "insertWhiteboard";
 const INSERT_SLASH = "insertWhiteboardSlash";
@@ -172,6 +181,9 @@ export async function load(_name: string) {
     },
   );
   unmountAddToBoard = mountAddToBoardHost();
+  registerPageBoardCommands(pluginName);
+  unmountPageBoard = mountPageBoardHost();
+  stopPageBoardRedirect = startPageBoardRedirect();
 
   const openId = commandId(OPEN_COMMAND);
   orca.commands.registerCommand(
@@ -217,11 +229,17 @@ export async function unload() {
     orca.commands.unregisterCommand(commandId(OPEN_COMMAND));
     orca.commands.unregisterCommand(commandId(WRAP_AREA_COMMAND));
     orca.headbar.unregisterHeadbarButton(commandId(OPEN_HEADBAR));
+    unregisterPageBoardCommands(pluginName);
   }
   unmountAddToBoard?.();
   unmountAddToBoard = null;
   unmountOpenBoard?.();
   unmountOpenBoard = null;
+  unmountPageBoard?.();
+  unmountPageBoard = null;
+  stopPageBoardRedirect?.();
+  stopPageBoardRedirect = null;
+  resetPageBoardIdCache();
   clearAllPendingCardFocus();
   stopBlockMarks();
   removeWhiteboardStyles();

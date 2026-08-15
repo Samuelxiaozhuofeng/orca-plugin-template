@@ -3,6 +3,7 @@ import { t } from "../libs/l10n";
 import { tryReadCards } from "./cards";
 import { boardName, openBoard } from "./data";
 import { tryReadEdges } from "./edges";
+import { useOpenWhiteboardPageAsCanvas } from "./useOpenWhiteboardPage";
 
 const { useMemo } = window.React;
 const { useSnapshot } = window.Valtio;
@@ -29,6 +30,7 @@ export default function BoardBlock({
   renderingMode,
 }: Props) {
   const { blocks } = useSnapshot(orca.state);
+  useOpenWhiteboardPageAsCanvas(panelId, blockId);
   const dataBlockId = mirrorId ?? blockId;
   const block = blocks[dataBlockId];
   const cardsRead = tryReadCards(block);

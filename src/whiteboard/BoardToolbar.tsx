@@ -3,6 +3,7 @@ import { t } from "../libs/l10n";
 import { canRedo, canUndo } from "./boardHistory";
 import { BoardTitle } from "./BoardTitle";
 import { boardName, clampScale } from "./data";
+import { openBoardAsOutline } from "./pageBoardRedirect";
 import {
   DEFAULT_VIEW,
   type CanvasView,
@@ -39,6 +40,14 @@ export function BoardToolbar({
   return (
     <div className="owb-toolbar">
       <BoardTitle blockId={blockId} name={boardName(block)} />
+      <button
+        type="button"
+        className="owb-toolbar-btn"
+        title={t("Open as outline")}
+        onClick={() => openBoardAsOutline(blockId)}
+      >
+        <i className="ti ti-list" />
+      </button>
       <div className="owb-toolbar-sep" />
       <button
         type="button"

@@ -1,6 +1,27 @@
 const zhCN = {
   "New whiteboard": "新建白板",
+  "New whiteboard page": "新建白板页面",
   "Untitled whiteboard": "未命名白板",
+  "Turn into whiteboard": "转成白板",
+  "Turn back into outline": "转回大纲",
+  "This is already a whiteboard": "这已经是一块白板",
+  "This is not a whiteboard": "这不是一块白板",
+  "Turned back into an outline": "已转回大纲",
+  "Select a block first": "请先选中一个块",
+  "Failed to change this block's type": "无法改这个块的类型",
+  "Failed to turn this block into a whiteboard": "无法把这个块转成白板",
+  "Failed to turn this whiteboard back into an outline":
+    "无法把这块白板转回大纲",
+  "Created the whiteboard but could not make it a page. You can add a page alias yourself.":
+    "白板已经建好，但没能做成页面。你可以自己给它加一个页面别名。",
+  "Turn this whiteboard back into an outline? The canvas layout stays on this block, so you can turn it into a whiteboard again later.":
+    "把这块白板转回大纲？画布布局会留在这个块上，之后还可以再转回白板。",
+  "Open as outline": "以大纲打开",
+  "Failed to open as outline": "无法以大纲打开",
+  "Failed to mark this page as a whiteboard": "无法把这个页面标成白板",
+  "Open whiteboard pages as a canvas": "打开白板页面时直接进入画布",
+  "When you open a page whose root block is a whiteboard, show the full canvas instead of the outline preview.":
+    "打开根块是白板的页面时，直接显示整块画布，而不是大纲里的预览条。",
   "Place this week's journals": "放入本周日记",
   "Place journals…": "放入日记…",
   "Place journals": "放入日记",

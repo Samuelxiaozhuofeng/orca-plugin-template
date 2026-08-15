@@ -14,6 +14,7 @@ export type WhiteboardSettings = {
   markOutlineBlocks: boolean;
   autoTagNewBoards: boolean;
   boardTag: string;
+  openWhiteboardPagesAsCanvas: boolean;
 };
 
 const DEFAULTS: WhiteboardSettings = {
@@ -23,6 +24,7 @@ const DEFAULTS: WhiteboardSettings = {
   markOutlineBlocks: true,
   autoTagNewBoards: true,
   boardTag: DEFAULT_BOARD_TAG,
+  openWhiteboardPagesAsCanvas: true,
 };
 
 let pluginName = "";
@@ -95,6 +97,14 @@ export function whiteboardSettingsSchema(): PluginSettingsSchema {
       type: "string",
       defaultValue: DEFAULTS.boardTag,
     },
+    openWhiteboardPagesAsCanvas: {
+      label: t("Open whiteboard pages as a canvas"),
+      description: t(
+        "When you open a page whose root block is a whiteboard, show the full canvas instead of the outline preview.",
+      ),
+      type: "boolean",
+      defaultValue: DEFAULTS.openWhiteboardPagesAsCanvas,
+    },
   };
 }
 
@@ -108,6 +118,7 @@ export function readWhiteboardSettings(
     markOutlineBlocks: raw?.markOutlineBlocks !== false,
     autoTagNewBoards: raw?.autoTagNewBoards !== false,
     boardTag: typeof raw?.boardTag === "string" ? raw.boardTag : DEFAULTS.boardTag,
+    openWhiteboardPagesAsCanvas: raw?.openWhiteboardPagesAsCanvas !== false,
   };
 }
 

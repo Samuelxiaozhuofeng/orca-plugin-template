@@ -4,6 +4,8 @@ import { t } from "../libs/l10n";
 export const WHITEBOARD_TYPE = "whiteboard.canvas";
 export const PANEL_TYPE = "whiteboard.board";
 
+export { WHITEBOARD_PAGE_PROP } from "./pageBoardPlan";
+
 export {
   CARD_HEIGHT,
   CARD_WIDTH,

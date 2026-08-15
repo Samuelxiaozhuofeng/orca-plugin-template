@@ -5,7 +5,6 @@ import type {
   RowPanel,
   ViewPanel,
 } from "../orca.d.ts";
-import { t } from "../libs/l10n";
 import {
   boardName,
   PANEL_TYPE,
@@ -14,6 +13,18 @@ import {
   type WhiteboardCard,
 } from "./data";
 import { fetchBlock } from "./newCard";
+import {
+  GET_BLOCKS_BATCH_SIZE,
+  chunkIds,
+  idsMissingFromBlocks,
+  isInlineWhiteboardBlock,
+  isPageWhiteboardBlock,
+} from "./pageBoardPlan";
+import {
+  getFreshPageBoardIds,
+  pageBoardCacheEpoch,
+  storePageBoardIds,
+} from "./pageBoardListCache";
 
 export type BoardListItem = {
   id: DbId;
@@ -89,37 +100,150 @@ function collectIds(result: unknown): DbId[] {
   return ids;
 }
 
-function reprType(block: Block): string | null {
-  const repr = block.properties?.find((item) => item.name === "_repr")?.value;
-  if (repr == null || typeof repr !== "object") return null;
-  const type = (repr as { type?: unknown }).type;
-  return typeof type === "string" ? type : null;
-}
-
-export async function fetchWhiteboardBlocks(): Promise<Block[]> {
+async function queryBlockIds(condition: object): Promise<DbId[]> {
   const result = await orca.invokeBackend("query", {
     q: {
       kind: 1,
-      conditions: [
-        {
-          kind: 9,
-          types: { op: 5, value: [WHITEBOARD_TYPE] },
-        },
-      ],
+      conditions: [condition],
     },
     pageSize: -1,
   });
-  const ids = collectIds(result);
+  return collectIds(result);
+}
+
+function collectKnownWhiteboardIds(): DbId[] {
+  const ids: DbId[] = [];
+  for (const block of Object.values(orca.state.blocks)) {
+    if (block == null) continue;
+    if (!isPageWhiteboardBlock(block) && !isInlineWhiteboardBlock(block)) {
+      continue;
+    }
+    const id = asBlockId(block.id);
+    if (id != null) ids.push(id);
+  }
+  return ids;
+}
+
+function collectKnownPageBoardIds(): DbId[] {
+  const ids: DbId[] = [];
+  for (const block of Object.values(orca.state.blocks)) {
+    if (block == null || !isPageWhiteboardBlock(block)) continue;
+    const id = asBlockId(block.id);
+    if (id != null) ids.push(id);
+  }
+  return ids;
+}
+
+async function loadMissingBlocks(ids: readonly DbId[]): Promise<void> {
+  const missing = idsMissingFromBlocks(ids, orca.state.blocks);
+  for (const batch of chunkIds(missing, GET_BLOCKS_BATCH_SIZE)) {
+    try {
+      const result =
+        ((await orca.invokeBackend("get-blocks", batch)) as Block[] | null) ??
+        [];
+      if (!Array.isArray(result)) continue;
+      for (const item of result) {
+        if (item != null && typeof item.id === "number") {
+          orca.state.blocks[item.id] = item;
+        }
+      }
+    } catch (err: unknown) {
+      console.warn("[whiteboard] get-blocks batch failed", err);
+    }
+  }
+}
+
+function uniqueIds(ids: readonly DbId[]): DbId[] {
+  return [...new Set(ids)];
+}
+
+let pageIdDiscover: { epoch: number; task: Promise<DbId[]> } | null = null;
+
+async function discoverPageBoardIds(): Promise<DbId[]> {
+  let aliasIds: DbId[] = [];
+  try {
+    aliasIds = await queryBlockIds({
+      kind: 9,
+      hasAliases: true,
+    });
+  } catch (err: unknown) {
+    console.warn("[whiteboard] hasAliases query for page boards failed", err);
+    return collectKnownPageBoardIds();
+  }
+  await loadMissingBlocks(aliasIds);
+  const found = new Set<DbId>(collectKnownPageBoardIds());
+  for (const id of aliasIds) {
+    if (isPageWhiteboardBlock(orca.state.blocks[id])) found.add(id);
+  }
+  return [...found];
+}
+
+async function pageBoardIdsForList(now: number): Promise<DbId[]> {
+  const cached = getFreshPageBoardIds(now);
+  if (cached != null) return [...cached];
+  const epoch = pageBoardCacheEpoch();
+  if (pageIdDiscover != null && pageIdDiscover.epoch === epoch) {
+    return pageIdDiscover.task;
+  }
+  const task = discoverPageBoardIds()
+    .then((ids) => {
+      storePageBoardIds(ids, Date.now(), epoch);
+      return ids;
+    })
+    .catch((err: unknown) => {
+      console.warn("[whiteboard] page-board id discover failed", err);
+      return collectKnownPageBoardIds();
+    })
+    .finally(() => {
+      if (pageIdDiscover?.task === task) pageIdDiscover = null;
+    });
+  pageIdDiscover = { epoch, task };
+  return task;
+}
+
+function blocksForIds(ids: readonly DbId[]): Block[] {
+  const byId = new Map<DbId, Block>();
+  for (const id of ids) {
+    const block = orca.state.blocks[id];
+    if (block == null) continue;
+    if (isInlineWhiteboardBlock(block) || isPageWhiteboardBlock(block)) {
+      byId.set(id, block);
+    }
+  }
+  return [...byId.values()];
+}
+
+/**
+ * Inline boards via `_repr.type` (always live). Page boards via a TTL cache of
+ * ids; QueryBlock has no custom-property field (query-types.md / QueryBlock2).
+ */
+export async function fetchWhiteboardBlocks(): Promise<Block[]> {
+  let typeIds: DbId[] = [];
+  try {
+    typeIds = await queryBlockIds({
+      kind: 9,
+      types: { op: 5, value: [WHITEBOARD_TYPE] },
+    });
+  } catch (err: unknown) {
+    console.warn("[whiteboard] type query for inline boards failed", err);
+  }
+
+  let pageIds: DbId[] = [];
+  try {
+    pageIds = await pageBoardIdsForList(Date.now());
+  } catch (err: unknown) {
+    console.warn("[whiteboard] page-board id list failed", err);
+    pageIds = collectKnownPageBoardIds();
+  }
+
+  const ids = uniqueIds([
+    ...typeIds,
+    ...pageIds,
+    ...collectKnownWhiteboardIds(),
+  ]);
   if (ids.length === 0) return [];
-  const fetched =
-    ((await orca.invokeBackend("get-blocks", ids)) as Block[] | null) ?? [];
-  if (!Array.isArray(fetched)) {
-    throw new Error(t("Failed to list whiteboards"));
-  }
-  for (const block of fetched) {
-    orca.state.blocks[block.id] = block;
-  }
-  return fetched.filter((block) => reprType(block) === WHITEBOARD_TYPE);
+  await loadMissingBlocks(ids);
+  return blocksForIds(ids);
 }
 
 export function listBoards(blocks: readonly Block[]): BoardListItem[] {

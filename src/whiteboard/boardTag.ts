@@ -11,7 +11,7 @@ export function normalizeBoardTag(raw: string): string {
 
 export async function tagNewWhiteboard(
   blockId: DbId,
-  cursor: CursorData,
+  cursor: CursorData | null,
 ): Promise<void> {
   const settings = currentWhiteboardSettings();
   if (!settings.autoTagNewBoards) return;
