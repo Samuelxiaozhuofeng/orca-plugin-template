@@ -1,5 +1,5 @@
 import { CARD_LOD_SCALE, CARD_MOUNT_CAP, MIN_SCALE } from "./layout.ts";
-import { cardTreeLoadIds } from "./cardTreeLoad.ts";
+import { cardTreeLoadIds, planCardTreeQueue } from "./cardTreeLoad.ts";
 import {
   isLodSimplified,
   marginScreensForScale,
@@ -131,6 +131,16 @@ check(
 check(
   cardTreeLoadIds(many, { simplified: true, keep: 99 }).length === 0,
   "keep id not in shown list loads nothing",
+);
+
+const lodPlan = planCardTreeQueue(many, {}, {
+  retryable: new Set([1, 2, 3]),
+  simplified: true,
+});
+check(lodPlan.queue.length === 0, "lod queue stays empty even after failures");
+check(
+  lodPlan.failedRoots.length === 0,
+  "lod does not surface load-failure state",
 );
 
 console.log("viewLod.test.ts ok");

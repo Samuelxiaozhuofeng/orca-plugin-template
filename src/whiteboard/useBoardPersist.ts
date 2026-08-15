@@ -4,7 +4,6 @@ import {
   ensureBoardSession,
   getBoardSession,
   listBoardSessions,
-  releaseBoardSession,
   type CardBoxPatch,
 } from "./boardSession";
 import {
@@ -16,6 +15,7 @@ import {
   flushCards,
   flushEdges,
   patchCardsOn,
+  releaseBoardSessionAndFlush,
 } from "./boardPersistQueue";
 import { clearBoardProtectTold, notifyBoardUnreadable } from "./boardWrite";
 import { type WhiteboardCard } from "./cards";
@@ -89,7 +89,7 @@ export function useBoardPersist(
     session.listeners.add(sync);
     return () => {
       session.listeners.delete(sync);
-      releaseBoardSession(blockId);
+      releaseBoardSessionAndFlush(blockId);
     };
   }, [blockId]);
 

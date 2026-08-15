@@ -1,41 +1,97 @@
 import type { Block, DbId } from "../orca.d.ts";
+import {
+  CARD_TREE_LOAD_MAX_DEPTH,
+  CARD_TREE_LOAD_MAX_NODES,
+  cardRootsWithHoles,
+  collectMissingCardTreeIds,
+  inspectCardTreeIssue,
+  type BlockChildLookup,
+  type CardLoadCause,
+  type CardLoadScope,
+} from "./cardTreeQueue.ts";
 
-/**
- * How far below a card root we fetch. Images and nested lists live at
- * depth 1–3; 4 covers a toggle/callout around an image without pulling
- * a whole-book outline into memory.
- */
-export const CARD_TREE_LOAD_MAX_DEPTH = 4;
+export {
+  CARD_TREE_LOAD_MAX_DEPTH,
+  CARD_TREE_LOAD_MAX_NODES,
+  cardRootsWithHoles,
+  cardTreeLoadIds,
+  collectMissingCardTreeIds,
+  inspectCardTreeIssue,
+  planCardTreeQueue,
+} from "./cardTreeQueue.ts";
+export type {
+  BlockChildLookup,
+  CardLoadCause,
+  CardLoadNotice,
+  CardLoadScope,
+  CardTreeQueueOptions,
+  CardTreeQueuePlan,
+} from "./cardTreeQueue.ts";
 
-/**
- * Per-card cap, including the root. A card is a small window; 80 blocks
- * is more than it can show without heavy scrolling.
- */
-export const CARD_TREE_LOAD_MAX_NODES = 80;
-
-export type BlockChildLookup = {
-  [id: number]: { children?: DbId[] } | undefined;
+export type VisibleCardTrees = {
+  revByRoot: Record<number, number>;
+  retryingRootSet: ReadonlySet<DbId>;
+  retryRoot: (rootId: DbId) => void;
 };
 
-/** IDs requested this session that the backend did not return. */
-const absentIds = new Set<DbId>();
+/** Backend threw or the request failed. User can retry these. */
+const retryableIds = new Set<DbId>();
+/** Backend returned without this id — treat as deleted. */
+const goneIds = new Set<DbId>();
 const inflight = new Map<DbId, Promise<void>>();
+const loadListeners = new Set<() => void>();
 
 function liveBlocks(): BlockChildLookup {
   return orca.state.blocks as BlockChildLookup;
 }
 
-export function collectMissingCardTreeIds(
+function liveSkipIds(): ReadonlySet<DbId> {
+  if (retryableIds.size === 0) return goneIds;
+  if (goneIds.size === 0) return retryableIds;
+  const skip = new Set<DbId>(retryableIds);
+  for (const id of goneIds) skip.add(id);
+  return skip;
+}
+
+function parsePromotedKey(key: string): Set<DbId> | undefined {
+  if (key === "") return undefined;
+  const ids: DbId[] = [];
+  for (const part of key.split(",")) {
+    const id = Number(part);
+    if (Number.isFinite(id)) ids.push(id);
+  }
+  return new Set(ids);
+}
+
+function emitCardTreeLoad(): void {
+  for (const listener of loadListeners) listener();
+}
+
+function subscribeCardTreeLoad(listener: () => void): () => void {
+  loadListeners.add(listener);
+  return () => {
+    loadListeners.delete(listener);
+  };
+}
+
+function forgetResolvedFailures(blocks: BlockChildLookup): void {
+  for (const id of [...retryableIds]) {
+    if (blocks[id] != null) retryableIds.delete(id);
+  }
+  for (const id of [...goneIds]) {
+    if (blocks[id] != null) goneIds.delete(id);
+  }
+}
+
+function forgetRetryableUnder(
   roots: readonly DbId[],
   blocks: BlockChildLookup,
-  maxDepth = CARD_TREE_LOAD_MAX_DEPTH,
-  maxNodes = CARD_TREE_LOAD_MAX_NODES,
-  skip: ReadonlySet<DbId> = absentIds,
+  maxDepth: number,
+  maxNodes: number,
   promoted?: ReadonlySet<DbId>,
-): DbId[] {
-  const missing: DbId[] = [];
+): void {
+  if (retryableIds.size === 0) return;
   const seen = new Set<DbId>();
-
   for (const root of roots) {
     let nodes = 0;
     const walk = (id: DbId, depth: number) => {
@@ -43,42 +99,32 @@ export function collectMissingCardTreeIds(
       if (seen.has(id)) return;
       seen.add(id);
       nodes += 1;
-      if (skip.has(id)) return;
+      if (retryableIds.has(id)) retryableIds.delete(id);
       const block = blocks[id];
-      if (block == null) {
-        missing.push(id);
-        return;
-      }
-      // Placeholder excerpt needs this block; do not walk its subtree.
+      if (block == null) return;
       if (depth > 0 && promoted?.has(id)) return;
-      // Outline fold is `_repr.fold` and does not remove children ids.
       for (const child of block.children ?? []) {
         walk(child, depth + 1);
       }
     };
     walk(root, 0);
   }
-  return missing;
 }
 
-export function cardRootsWithHoles(
-  roots: readonly DbId[],
-  blocks: BlockChildLookup,
-  maxDepth = CARD_TREE_LOAD_MAX_DEPTH,
-  maxNodes = CARD_TREE_LOAD_MAX_NODES,
-  skip: ReadonlySet<DbId> = absentIds,
-  promoted?: ReadonlySet<DbId>,
-): DbId[] {
-  return roots.filter(
-    (root) =>
-      collectMissingCardTreeIds(
-        [root],
-        blocks,
-        maxDepth,
-        maxNodes,
-        skip,
-        promoted,
-      ).length > 0,
+export function peekCardLoadNotice(
+  rootId: DbId,
+  promotedKey = "",
+): { scope: CardLoadScope; cause: CardLoadCause } | null {
+  const blocks = liveBlocks();
+  forgetResolvedFailures(blocks);
+  return inspectCardTreeIssue(
+    rootId,
+    blocks,
+    retryableIds,
+    goneIds,
+    CARD_TREE_LOAD_MAX_DEPTH,
+    CARD_TREE_LOAD_MAX_NODES,
+    parsePromotedKey(promotedKey),
   );
 }
 
@@ -92,12 +138,14 @@ function cacheFetchedBlocks(result: unknown, requested: readonly DbId[]): number
     if (typeof block.id !== "number") continue;
     orca.state.blocks[block.id] = block;
     returned.add(block.id);
-    absentIds.delete(block.id);
+    retryableIds.delete(block.id);
+    goneIds.delete(block.id);
     cached += 1;
   }
   for (const id of requested) {
     if (!returned.has(id) && orca.state.blocks[id] == null) {
-      absentIds.add(id);
+      goneIds.add(id);
+      retryableIds.delete(id);
     }
   }
   return cached;
@@ -107,7 +155,8 @@ async function fetchAndCacheBlocks(ids: readonly DbId[]): Promise<number> {
   const need: DbId[] = [];
   const waiting: Promise<void>[] = [];
   for (const id of ids) {
-    if (orca.state.blocks[id] != null || absentIds.has(id)) continue;
+    if (orca.state.blocks[id] != null) continue;
+    if (retryableIds.has(id) || goneIds.has(id)) continue;
     const pending = inflight.get(id);
     if (pending != null) {
       waiting.push(pending);
@@ -128,9 +177,16 @@ async function fetchAndCacheBlocks(ids: readonly DbId[]): Promise<number> {
       cached = cacheFetchedBlocks(result, need);
     } catch (error) {
       console.error("[whiteboard] failed to load card blocks", error);
+      for (const id of need) {
+        if (orca.state.blocks[id] == null) {
+          retryableIds.add(id);
+          goneIds.delete(id);
+        }
+      }
     } finally {
       for (const id of need) inflight.delete(id);
       resolveTask();
+      emitCardTreeLoad();
     }
   }
 
@@ -138,22 +194,6 @@ async function fetchAndCacheBlocks(ids: readonly DbId[]): Promise<number> {
     await Promise.all(waiting);
   }
   return cached;
-}
-
-/**
- * Roots whose block trees should be fetched. Far-zoom LOD cards are
- * skipped; the card being edited is kept so it can stay fully rendered.
- */
-export function cardTreeLoadIds(
-  shown: readonly { blockId: DbId }[],
-  options?: { simplified?: boolean; keep?: DbId | null },
-): DbId[] {
-  if (options?.simplified !== true) {
-    return shown.map((card) => card.blockId);
-  }
-  const keep = options.keep ?? null;
-  if (keep == null) return [];
-  return shown.some((card) => card.blockId === keep) ? [keep] : [];
 }
 
 /** Fill missing nodes under `roots`, one batched get-blocks per level. */
@@ -164,6 +204,7 @@ export async function loadCardTrees(
   const unique = [...new Set(roots)];
   if (unique.length === 0) return { fetched: 0 };
 
+  forgetResolvedFailures(liveBlocks());
   let fetched = 0;
   for (let level = 0; level <= CARD_TREE_LOAD_MAX_DEPTH; level++) {
     const missing = collectMissingCardTreeIds(
@@ -171,7 +212,7 @@ export async function loadCardTrees(
       liveBlocks(),
       CARD_TREE_LOAD_MAX_DEPTH,
       CARD_TREE_LOAD_MAX_NODES,
-      absentIds,
+      liveSkipIds(),
       promoted,
     );
     if (missing.length === 0) break;
@@ -188,24 +229,31 @@ export async function loadCardTrees(
 export function useVisibleCardTrees(
   rootIds: readonly DbId[],
   promotedKey = "",
-): Record<number, number> {
-  const { useEffect, useRef, useState } = window.React;
+): VisibleCardTrees {
+  const { useCallback, useEffect, useRef, useState } = window.React;
   const [revByRoot, setRevByRoot] = useState<Record<number, number>>({});
+  const [retryEpoch, setRetryEpoch] = useState<number>(0);
+  const [retryingRoots, setRetryingRoots] = useState<readonly DbId[]>([]);
+  const [, setSessionTick] = useState<number>(0);
+
+  useEffect(
+    () => subscribeCardTreeLoad(() => setSessionTick((n: number) => n + 1)),
+    [],
+  );
+
   const idsKey = rootIds.join(",");
-  const loadKey = `${idsKey}|${promotedKey}`;
-  const promoted =
-    promotedKey === ""
-      ? undefined
-      : new Set(promotedKey.split(",").map(Number).filter(Number.isFinite));
+  const loadKey = `${idsKey}|${promotedKey}|${retryEpoch}`;
+  const promoted = parsePromotedKey(promotedKey);
+  const roots = idsKey === "" ? [] : idsKey.split(",").map(Number);
   const holesAtRender =
-    idsKey === ""
+    roots.length === 0
       ? []
       : cardRootsWithHoles(
-          idsKey.split(",").map(Number),
+          roots,
           liveBlocks(),
           CARD_TREE_LOAD_MAX_DEPTH,
           CARD_TREE_LOAD_MAX_NODES,
-          absentIds,
+          liveSkipIds(),
           promoted,
         );
   const holesForKeyRef = useRef<DbId[]>([]);
@@ -215,22 +263,38 @@ export function useVisibleCardTrees(
     holesForKeyRef.current = holesAtRender;
   }
 
+  const promotedKeyRef = useRef(promotedKey);
+  promotedKeyRef.current = promotedKey;
+
+  const retryRoot = useCallback((rootId: DbId) => {
+    forgetRetryableUnder(
+      [rootId],
+      liveBlocks(),
+      CARD_TREE_LOAD_MAX_DEPTH,
+      CARD_TREE_LOAD_MAX_NODES,
+      parsePromotedKey(promotedKeyRef.current),
+    );
+    setRetryingRoots((prev: readonly DbId[]) =>
+      prev.includes(rootId) ? prev : [...prev, rootId],
+    );
+    setRetryEpoch((n: number) => n + 1);
+    emitCardTreeLoad();
+  }, []);
+
   useEffect(() => {
     if (idsKey === "") return;
-    const roots = idsKey.split(",").map(Number);
+    const effectRoots = idsKey.split(",").map(Number);
     const holes = holesForKeyRef.current;
-    const skipPromoted =
-      promotedKey === ""
-        ? undefined
-        : new Set(
-            promotedKey.split(",").map(Number).filter(Number.isFinite),
-          );
+    const skipPromoted = parsePromotedKey(promotedKey);
     let cancelled = false;
 
-    void loadCardTrees(roots, skipPromoted).then((result) => {
+    void loadCardTrees(effectRoots, skipPromoted).then((result) => {
       if (cancelled) return;
+      setRetryingRoots((prev: readonly DbId[]) =>
+        prev.filter((id: DbId) => !effectRoots.includes(id)),
+      );
       if (result.fetched === 0 && holes.length === 0) return;
-      const bump = holes.length > 0 ? holes : roots;
+      const bump = holes.length > 0 ? holes : effectRoots;
       setRevByRoot((prev: Record<number, number>) => {
         const next = { ...prev };
         for (const id of bump) {
@@ -243,7 +307,11 @@ export function useVisibleCardTrees(
     return () => {
       cancelled = true;
     };
-  }, [idsKey, promotedKey]);
+  }, [idsKey, promotedKey, retryEpoch]);
 
-  return revByRoot;
+  return {
+    revByRoot,
+    retryingRootSet: new Set(retryingRoots),
+    retryRoot,
+  };
 }

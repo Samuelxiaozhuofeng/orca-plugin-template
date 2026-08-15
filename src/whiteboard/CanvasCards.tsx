@@ -61,7 +61,7 @@ export function CanvasCards({
   onExtractRow,
 }: Props) {
   const promotedKey = cardIdsKey(cards);
-  const treeRevByRoot = useVisibleCardTrees(
+  const cardTrees = useVisibleCardTrees(
     cardTreeLoadIds(shownCards, {
       simplified: lodSimplified,
       keep: editingId,
@@ -88,7 +88,9 @@ export function CanvasCards({
           key={card.blockId}
           panelId={panelId}
           card={card}
-          treeRev={treeRevByRoot[card.blockId] ?? 0}
+          treeRev={cardTrees.revByRoot[card.blockId] ?? 0}
+          loadRetrying={cardTrees.retryingRootSet.has(card.blockId)}
+          onRetryLoad={cardTrees.retryRoot}
           editing={editingId === card.blockId}
           simplified={lodSimplified && editingId !== card.blockId}
           selected={selectedSet.has(card.blockId)}

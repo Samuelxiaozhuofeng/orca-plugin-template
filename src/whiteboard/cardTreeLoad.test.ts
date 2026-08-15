@@ -4,6 +4,7 @@ import {
   cardRootsWithHoles,
   cardTreeLoadIds,
   collectMissingCardTreeIds,
+  planCardTreeQueue,
 } from "./cardTreeLoad.ts";
 import {
   hostDrawsOwnChildren,
@@ -148,6 +149,91 @@ check(
     .map((node) => `${node.id}${node.promoted ? "p" : ""}`)
     .join(",") === "1,2p,3",
   "plan keeps a promoted node without its subtree",
+);
+
+const loadedTree = {
+  1: { children: [2] },
+  2: { children: [] },
+};
+check(
+  planCardTreeQueue([{ blockId: 1 }], loadedTree).queue.join(",") === "",
+  "successful tree is not requeued",
+);
+check(
+  planCardTreeQueue([{ blockId: 1 }], loadedTree).failedRoots.join(",") === "",
+  "successful tree is not a load failure",
+);
+
+const holeAtChild = { 1: { children: [2] } };
+const childRetry = planCardTreeQueue([{ blockId: 1 }], holeAtChild, {
+  retryable: new Set([2]),
+});
+check(childRetry.queue.join(",") === "", "failed id is not auto-requeued");
+check(childRetry.failedRoots.join(",") === "1", "failed child marks the card");
+check(childRetry.notices[0]?.scope === "partial", "root present is partial failure");
+check(childRetry.notices[0]?.cause === "retryable", "throw is retryable");
+check(
+  planCardTreeQueue([{ blockId: 1 }], holeAtChild, {
+    retryable: new Set([2]),
+    retry: new Set([2]),
+  }).queue.join(",") === "2",
+  "retry requeues the failed id",
+);
+
+const emptyRetry = planCardTreeQueue([{ blockId: 1 }], {}, {
+  retryable: new Set([1]),
+});
+check(emptyRetry.notices[0]?.scope === "empty", "missing root is whole-card failure");
+check(emptyRetry.notices[0]?.cause === "retryable", "missing root throw is retryable");
+
+const childGone = planCardTreeQueue([{ blockId: 1 }], holeAtChild, {
+  gone: new Set([2]),
+});
+check(childGone.queue.join(",") === "", "gone id is not queued");
+check(childGone.notices[0]?.scope === "partial", "gone child is partial");
+check(childGone.notices[0]?.cause === "gone", "backend miss is not retryable");
+check(
+  planCardTreeQueue([{ blockId: 1 }], holeAtChild, {
+    gone: new Set([2]),
+    retry: new Set([2]),
+  }).queue.join(",") === "",
+  "retry does not requeue a gone id",
+);
+
+const emptyGone = planCardTreeQueue([{ blockId: 1 }], {}, {
+  gone: new Set([1]),
+});
+check(emptyGone.notices[0]?.scope === "empty", "gone root is whole-card failure");
+check(emptyGone.notices[0]?.cause === "gone", "gone root is not retryable");
+
+check(
+  planCardTreeQueue([{ blockId: 1 }], { 1: { children: [] } }, {
+    gone: new Set([1]),
+  }).notices.length === 0,
+  "a block that later appears is no longer gone",
+);
+
+const mixed = planCardTreeQueue(
+  [{ blockId: 1 }],
+  { 1: { children: [2, 3] } },
+  { retryable: new Set([2]), gone: new Set([3]) },
+);
+check(mixed.notices[0]?.scope === "partial", "mixed holes stay partial");
+check(mixed.notices[0]?.cause === "retryable", "retryable wins over gone");
+
+check(
+  planCardTreeQueue([{ blockId: 1 }], {}, {
+    retryable: new Set([1]),
+    simplified: true,
+  }).queue.join(",") === "",
+  "simplified lod does not queue a tree load",
+);
+check(
+  planCardTreeQueue([{ blockId: 1 }], {}, {
+    retryable: new Set([1]),
+    simplified: true,
+  }).failedRoots.join(",") === "",
+  "simplified lod does not report load failure",
 );
 
 console.log("cardTreeLoad.test.ts ok");

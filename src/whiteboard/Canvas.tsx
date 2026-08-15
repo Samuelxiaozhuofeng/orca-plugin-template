@@ -91,7 +91,6 @@ export function Canvas({
   cardsRef.current = cards;
   edgesRef.current = edges;
   settingsRef.current = settings;
-  const refEdges = useReferenceEdges(cards, edges, settings.showReferenceEdges);
 
   const onMoveFrame = useCallback((boxes: Map<DbId, CardBox>) => {
     edgeApiRef.current?.onFrame(boxes);
@@ -155,6 +154,12 @@ export function Canvas({
     onUndo,
     onRedo,
   });
+
+  const { edges: refEdges, truncated: refEdgesTruncated } = useReferenceEdges(
+    shownCards,
+    edges,
+    settings.showReferenceEdges,
+  );
 
   const {
     dropActive,
@@ -322,15 +327,24 @@ export function Canvas({
               </div>
             </div>
           )}
-          {hiddenCardCount > 0 ? (
+          {hiddenCardCount > 0 || refEdgesTruncated ? (
             <div className="owb-lod-hint" role="status">
-              {t(
-                "Showing ${shown} of ${visible} cards. Zoom in to see all.",
-                {
-                  shown: String(shownCards.length),
-                  visible: String(shownCards.length + hiddenCardCount),
-                },
-              )}
+              {hiddenCardCount > 0 ? (
+                <div>
+                  {t(
+                    "Showing ${shown} of ${visible} cards. Zoom in to see all.",
+                    {
+                      shown: String(shownCards.length),
+                      visible: String(shownCards.length + hiddenCardCount),
+                    },
+                  )}
+                </div>
+              ) : null}
+              {refEdgesTruncated ? (
+                <div>
+                  {t("Too many reference links; only some are shown.")}
+                </div>
+              ) : null}
             </div>
           ) : null}
         </div>

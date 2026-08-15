@@ -20,6 +20,8 @@ import type { ArrangeAction } from "./selection";
 import { isHostOverlayTarget } from "./hostOverlay";
 import { useCardBlockView } from "./blockWatch";
 import { CardBlockTree } from "./CardBlockTree";
+import { CardLoadNotice } from "./CardLoadNotice";
+import { peekCardLoadNotice } from "./cardTreeLoad";
 import {
   blockIdFromCardEventTarget,
   isExtractPointerTarget,
@@ -34,6 +36,8 @@ type Props = {
   panelId: string;
   card: WhiteboardCard;
   treeRev?: number;
+  loadRetrying?: boolean;
+  onRetryLoad?: (blockId: DbId) => void;
   editing: boolean;
   simplified?: boolean;
   selected: boolean;
@@ -153,6 +157,8 @@ export function Card({
   panelId,
   card,
   treeRev = 0,
+  loadRetrying = false,
+  onRetryLoad,
   editing,
   simplified = false,
   selected,
@@ -225,6 +231,7 @@ export function Card({
   const onRootMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement | null;
     if (target?.closest(".owb-card-handle") && event.button === 0) return;
+    if (target?.closest(".owb-card-load-error")) return;
     if (isExtractPointerTarget(target)) return;
     if (target?.closest(".owb-card-floating-toolbar")) return;
     if (editing && target?.closest(".owb-card-body")) return;
@@ -295,6 +302,16 @@ export function Card({
     if (el == null) return;
     applyContentHeight(measureCardFitHeight(el), true);
   };
+
+  const loadNotice = peekCardLoadNotice(card.blockId, promotedKey);
+  const shownNotice =
+    loadRetrying
+      ? {
+          scope: loadNotice?.scope ?? (hosted.exists ? "partial" as const : "empty" as const),
+          cause: "retryable" as const,
+        }
+      : loadNotice;
+  const fillLoadError = !editing && shownNotice?.scope === "empty";
 
   const className = [
     "owb-card",
@@ -406,6 +423,14 @@ export function Card({
             >
               {editing ? (
                 <CardEditor panelId={panelId} blockId={card.blockId} />
+              ) : fillLoadError && shownNotice != null ? (
+                <CardLoadNotice
+                  scope={shownNotice.scope}
+                  cause={shownNotice.cause}
+                  fill
+                  retrying={loadRetrying}
+                  onRetry={() => onRetryLoad?.(card.blockId)}
+                />
               ) : isEmptyJournal ? (
                 <div className="owb-card-empty">{t("No notes this day")}</div>
               ) : (
@@ -416,6 +441,14 @@ export function Card({
                   promotedKey={promotedKey}
                 />
               )}
+              {shownNotice != null && !fillLoadError ? (
+                <CardLoadNotice
+                  scope={shownNotice.scope}
+                  cause={shownNotice.cause}
+                  retrying={loadRetrying}
+                  onRetry={() => onRetryLoad?.(card.blockId)}
+                />
+              ) : null}
             </div>
           )}
           {showResize

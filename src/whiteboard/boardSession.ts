@@ -1,29 +1,27 @@
 import type { DbId } from "../orca.d.ts";
-import { t } from "../libs/l10n";
-import { emitBoardCardsChanged } from "./boardEvents";
+import { t } from "../libs/l10n.ts";
+import { emitBoardCardsChanged } from "./boardEvents.ts";
 import {
   assertBoardWritable,
   notifyBoardUnreadable,
   retryLastBoardWrite,
   writeProperties,
-} from "./boardWrite";
+} from "./boardWrite.ts";
 import {
   CARDS_PROP,
   PROP_TYPE_TEXT,
   cardsEqual,
   preparedCards,
   tryReadCards,
-  writeCards,
   type WhiteboardCard,
-} from "./cards";
+} from "./cards.ts";
 import {
   EDGES_PROP,
   edgesEqual,
   preparedEdges,
   tryReadEdges,
-  writeEdges,
   type WhiteboardEdge,
-} from "./edges";
+} from "./edges.ts";
 
 export type CardBoxPatch = Partial<
   Pick<WhiteboardCard, "x" | "y" | "w" | "h" | "color">
@@ -32,6 +30,8 @@ export type CardBoxPatch = Partial<
 export type BoardSession = {
   id: DbId;
   refCount: number;
+  /** Pinned by `ensure` while no panel has acquired, so a remount can reuse it. */
+  viewPinned: boolean;
   listeners: Set<() => void>;
   protect: boolean;
   cards: WhiteboardCard[];
@@ -99,6 +99,7 @@ function createSession(
   return {
     id,
     refCount: 0,
+    viewPinned: false,
     listeners: new Set(),
     protect,
     cards,
@@ -132,6 +133,7 @@ export function ensureBoardSession(
     sessions.set(id, session);
   }
   session.protect = protect;
+  if (session.refCount === 0) session.viewPinned = true;
   return session;
 }
 
@@ -143,7 +145,29 @@ export function acquireBoardSession(
 ): BoardSession {
   const session = ensureBoardSession(id, cards, edges, protect);
   session.refCount += 1;
+  session.viewPinned = false;
   return session;
+}
+
+export function sessionHasPersistWork(session: BoardSession): boolean {
+  return (
+    session.cardTimer !== 0 ||
+    session.cardPending != null ||
+    session.edgePending != null ||
+    session.cardInFlight ||
+    session.edgeInFlight ||
+    session.cardDirty ||
+    session.edgeDirty
+  );
+}
+
+export function maybeDisposeBoardSession(id: DbId): void {
+  const session = sessions.get(id);
+  if (session == null) return;
+  if (session.refCount > 0 || session.viewPinned) return;
+  if (session.protect || !sessionHasPersistWork(session)) {
+    sessions.delete(id);
+  }
 }
 
 export async function writeSessionSnapshot(
@@ -187,24 +211,13 @@ export function releaseBoardSession(id: DbId): void {
     window.clearTimeout(session.cardTimer);
     session.cardTimer = 0;
   }
-  const leftoverCards = session.cardPending;
-  const leftoverEdges = session.edgePending;
-  sessions.delete(id);
-  if (session.protect) return;
-  if (leftoverCards == null && leftoverEdges == null) return;
-  void session.cardFlight
-    .then(() => session.edgeFlight)
-    .then(async () => {
-      if (leftoverCards != null && leftoverEdges != null) {
-        await writeSessionSnapshot(id, leftoverCards, leftoverEdges);
-        return;
-      }
-      if (leftoverCards != null) await writeCards(id, leftoverCards);
-      if (leftoverEdges != null) await writeEdges(id, leftoverEdges);
-    })
-    .catch((error: unknown) => {
-      notifyWriteError(leftoverCards != null ? "cards" : "edges", error);
-    });
+  if (session.protect) {
+    sessions.delete(id);
+    return;
+  }
+  if (!sessionHasPersistWork(session) && !session.viewPinned) {
+    sessions.delete(id);
+  }
 }
 
 export function listBoardSessions(): BoardSession[] {

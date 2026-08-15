@@ -282,6 +282,51 @@ export const CARD_CSS = `
   font-style: italic;
 }
 
+.owb-card-load-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px dashed color-mix(in oklab, var(--orca-color-dangerous-5, #d9381e) 50%, var(--orca-color-border));
+  border-radius: var(--owb-radius-sm, 3px);
+  background: color-mix(in oklab, var(--orca-color-dangerous-5, #d9381e) 8%, transparent);
+  color: var(--orca-color-text-2);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: center;
+  cursor: pointer;
+}
+
+.owb-card-load-error.is-fill {
+  min-height: 3.6em;
+}
+
+.owb-card-load-error.is-banner {
+  margin-top: 10px;
+  min-height: 0;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.owb-card-load-error.is-static,
+.owb-card-load-error.is-busy {
+  cursor: default;
+}
+
+.owb-card-load-error.is-busy {
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+.owb-card-load-error:not(.is-static):not(.is-busy):hover {
+  background: color-mix(in oklab, var(--orca-color-dangerous-5, #d9381e) 14%, transparent);
+  color: var(--orca-color-text-1);
+}
+
 .owb-card.is-simplified {
   justify-content: center;
 }

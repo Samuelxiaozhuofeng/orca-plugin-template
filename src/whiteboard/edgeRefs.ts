@@ -16,16 +16,26 @@ export type ReferenceEdge = {
   to: DbId;
 };
 
+export type ReferenceEdgesResult = {
+  edges: ReferenceEdge[];
+  truncated: boolean;
+};
+
 function buildOwnerMap(
   cards: readonly WhiteboardCard[],
   blocks: { [id: number]: Block | undefined },
-): Map<DbId, DbId> {
+): { owner: Map<DbId, DbId>; truncated: boolean } {
   const owner = new Map<DbId, DbId>();
   let visits = 0;
+  let truncated = false;
 
   const walk = (root: DbId, id: DbId, depth: number) => {
-    if (visits >= REF_WALK_MAX_BLOCKS || depth > REF_WALK_MAX_DEPTH) return;
+    if (depth > REF_WALK_MAX_DEPTH) return;
     if (owner.has(id)) return;
+    if (visits >= REF_WALK_MAX_BLOCKS) {
+      truncated = true;
+      return;
+    }
     visits += 1;
     owner.set(id, root);
     const block = blocks[id];
@@ -38,15 +48,15 @@ function buildOwnerMap(
   for (const card of cards) {
     walk(card.blockId, card.blockId, 0);
   }
-  return owner;
+  return { owner, truncated };
 }
 
 export function collectReferenceEdges(
   cards: readonly WhiteboardCard[],
   blocks: { [id: number]: Block | undefined },
   drawnPairs: ReadonlySet<string>,
-): ReferenceEdge[] {
-  const owner = buildOwnerMap(cards, blocks);
+): ReferenceEdgesResult {
+  const { owner, truncated } = buildOwnerMap(cards, blocks);
   const seen = new Set<string>();
   const out: ReferenceEdge[] = [];
 
@@ -63,7 +73,7 @@ export function collectReferenceEdges(
       out.push({ id: `ref:${key}`, from: fromCard, to: toCard });
     }
   }
-  return out;
+  return { edges: out, truncated };
 }
 
 function liveBlocks(): { [id: number]: Block | undefined } {
@@ -75,7 +85,7 @@ export function referenceRelationKey(
   cards: readonly WhiteboardCard[],
   blocks: { [id: number]: Block | undefined },
 ): string {
-  const owner = buildOwnerMap(cards, blocks);
+  const { owner } = buildOwnerMap(cards, blocks);
   const ids = [...owner.keys()].sort((a, b) => a - b);
   const parts: string[] = [];
   for (const id of ids) {
@@ -94,7 +104,7 @@ export function useReferenceEdges(
   cards: readonly WhiteboardCard[],
   drawn: readonly WhiteboardEdge[],
   enabled: boolean,
-): ReferenceEdge[] {
+): ReferenceEdgesResult {
   const cardKey = cards.map((card) => card.blockId).join(",");
   const drawnKey = drawn
     .map((edge) => pairKey(edge.from, edge.to))
@@ -118,7 +128,9 @@ export function useReferenceEdges(
   );
 
   return useMemo(() => {
-    if (!enabled || cards.length === 0) return [];
+    if (!enabled || cards.length === 0) {
+      return { edges: [], truncated: false };
+    }
     const pairs = new Set(
       drawn.map((edge) => pairKey(edge.from, edge.to)),
     );
