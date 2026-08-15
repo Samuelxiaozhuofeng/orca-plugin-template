@@ -10,13 +10,18 @@ import {
   encodeExtractPayload,
   findOwningCardId,
   findVacantCardPosition,
+  hasAncestorInIds,
+  hasExtractOrigin,
   isExtractableDepth,
+  isParentBoardBlock,
   orcaBlocksPayload,
   parseExtractPayload,
   parseIdKey,
   parseOwbExtract,
   planExtractEdge,
+  planExtractMoves,
   rectsOverlap,
+  shouldExtractMove,
 } from "./cardExtract.ts";
 
 function check(cond: boolean, message: string): void {
@@ -33,6 +38,9 @@ const tree = {
 
 check(isExtractableDepth(0) === false, "root row is not extractable");
 check(isExtractableDepth(1) === true, "child row is extractable");
+check(hasExtractOrigin({ parent: 10 }) === true, "note child can extract");
+check(hasExtractOrigin({ parent: null }) === false, "page root stays in place");
+check(hasExtractOrigin({}) === false, "missing parent stays in place");
 
 check(cardIdsKey([{ blockId: 3 }, { blockId: 1 }]) === "1,3", "id key sorts");
 check(cardIdsKey([]) === "", "empty id key");
@@ -82,6 +90,117 @@ check(findOwningCardId(4, cardIds, owners) == null, "outside tree has no owner")
 check(
   findOwningCardId(5, new Set([1]), owners) == null,
   "cycle without a card stops",
+);
+
+const boardId = 100;
+check(
+  isParentBoardBlock({ parent: boardId }, boardId) === true,
+  "parent board means already extracted",
+);
+check(
+  isParentBoardBlock({ parent: 50 }, boardId) === false,
+  "parent journal still needs extract",
+);
+check(
+  isParentBoardBlock({ parent: null }, boardId) === false,
+  "page root is not extracted under the board",
+);
+check(
+  isParentBoardBlock(undefined, boardId) === false,
+  "missing block is not extracted under the board",
+);
+
+const family = {
+  50: { parent: null },
+  1: { parent: 50 },
+  2: { parent: 1 },
+  3: { parent: 2 },
+  7: { parent: boardId },
+  8: { parent: 8 },
+};
+check(
+  hasAncestorInIds(3, new Set([1, 3]), family) === true,
+  "grandchild has ancestor in the same drop",
+);
+check(
+  hasAncestorInIds(3, new Set([3]), family) === false,
+  "lone descendant has no ancestor in the drop",
+);
+check(
+  hasAncestorInIds(1, new Set([1, 3]), family) === false,
+  "parent is not an ancestor of itself",
+);
+check(
+  hasAncestorInIds(8, new Set([1, 8]), family) === false,
+  "parent cycle without an ancestor in the set stops",
+);
+
+check(
+  shouldExtractMove({
+    blockId: 7,
+    boardBlockId: boardId,
+    dragIds: new Set([7]),
+    block: family[7],
+    blocks: family,
+  }) === false,
+  "already under the whiteboard is not moved again",
+);
+check(
+  shouldExtractMove({
+    blockId: 2,
+    boardBlockId: boardId,
+    dragIds: new Set([2]),
+    block: family[2],
+    blocks: family,
+  }) === true,
+  "card still in a note is extracted even if no ancestor card is on the board",
+);
+check(
+  shouldExtractMove({
+    blockId: 3,
+    boardBlockId: boardId,
+    dragIds: new Set([1, 3]),
+    block: family[3],
+    blocks: family,
+  }) === false,
+  "descendant dropped with an ancestor is not moved",
+);
+check(
+  shouldExtractMove({
+    blockId: 1,
+    boardBlockId: boardId,
+    dragIds: new Set([1, 3]),
+    block: family[1],
+    blocks: family,
+  }) === true,
+  "parent in a parent+child drop is still extracted",
+);
+check(
+  shouldExtractMove({
+    blockId: 50,
+    boardBlockId: boardId,
+    dragIds: new Set([50]),
+    block: family[50],
+    blocks: family,
+  }) === false,
+  "page root is placed without a move",
+);
+
+check(
+  planExtractMoves([1, 3], boardId, family).join(",") === "1",
+  "parent+child drop only moves the parent",
+);
+check(
+  planExtractMoves([2], boardId, family).join(",") === "2",
+  "lone nested block still in a note is moved",
+);
+check(
+  planExtractMoves([7], boardId, family).length === 0,
+  "already extracted card is not moved",
+);
+check(
+  planExtractMoves([50], boardId, family).length === 0,
+  "page root is not moved",
 );
 
 check(

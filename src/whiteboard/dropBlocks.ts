@@ -200,25 +200,3 @@ export function dropMessage(result: DropBlocksResult): string {
   if (parts.length === 0) return t("Nothing to add to the board");
   return parts.join(t(", "));
 }
-
-export async function completeBoardDrop(opts: {
-  dataTransfer: DataTransfer | null;
-  at: { x: number; y: number };
-  existing: readonly WhiteboardCard[];
-  boardBlockId: DbId;
-  addCards: (cards: WhiteboardCard[]) => Promise<boolean>;
-}): Promise<void> {
-  const ids = parseDroppedBlockIds(opts.dataTransfer);
-  if (ids.length === 0) return;
-  const result = await placeDroppedBlocks({
-    ids,
-    at: opts.at,
-    existing: opts.existing,
-    boardBlockId: opts.boardBlockId,
-  });
-  if (result.added > 0) {
-    const saved = await opts.addCards(result.incoming);
-    if (!saved) return;
-  }
-  orca.notify(result.added > 0 ? "success" : "info", dropMessage(result));
-}
