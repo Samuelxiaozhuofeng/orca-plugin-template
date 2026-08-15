@@ -7,6 +7,8 @@ import {
   LocateOnBoardMenuItem,
   locateOnBoardCommandId,
   mountAddToBoardHost,
+  TagToBoardMenuItem,
+  tagToBoardCommandId,
 } from "./whiteboard/addToBoard";
 import { startBlockMarks, stopBlockMarks } from "./whiteboard/blockMarks";
 import { clearAllPendingCardFocus } from "./whiteboard/cardFocus";
@@ -144,6 +146,14 @@ export async function load(_name: string) {
       ),
     },
   );
+  orca.tagMenuCommands.registerTagMenuCommand(
+    tagToBoardCommandId(pluginName),
+    {
+      render: (tagBlock, close) => (
+        <TagToBoardMenuItem tagBlock={tagBlock} close={close} />
+      ),
+    },
+  );
   unmountAddToBoard = mountAddToBoardHost();
 
   const openId = commandId(OPEN_COMMAND);
@@ -183,6 +193,9 @@ export async function unload() {
     );
     orca.blockMenuCommands.unregisterBlockMenuCommand(
       locateOnBoardCommandId(pluginName),
+    );
+    orca.tagMenuCommands.unregisterTagMenuCommand(
+      tagToBoardCommandId(pluginName),
     );
     orca.commands.unregisterCommand(commandId(OPEN_COMMAND));
     orca.headbar.unregisterHeadbarButton(commandId(OPEN_HEADBAR));

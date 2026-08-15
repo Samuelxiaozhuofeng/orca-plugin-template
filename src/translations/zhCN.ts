@@ -186,6 +186,11 @@ const zhCN = {
   "This note is gone": "这块笔记已经不在了",
   "Some of this note is gone": "这里有部分内容已经不在了",
   "Retrying…": "正在重试…",
+  "Spread onto whiteboard…": "铺到白板…",
+  "only the first ${limit} notes were placed": "只铺了前 ${limit} 条",
+  "This tag has no notes": "这个标签下还没有笔记",
+  "This tag has no name": "读不到这个标签的名称",
+  "Failed to spread tagged notes onto the board": "没能把这个标签下的笔记铺到白板上",
 };
 
 export default zhCN;

@@ -31,6 +31,10 @@ export function bindWhiteboardPlugin(name: string): void {
   pluginName = name;
 }
 
+export function whiteboardPluginName(): string {
+  return pluginName;
+}
+
 export function whiteboardSettingsSchema(): PluginSettingsSchema {
   return {
     mouseScheme: {

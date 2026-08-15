@@ -20,12 +20,18 @@ import { tryReadEdges } from "./edges";
 import { PlaceDialog } from "./PlaceDialog";
 import { useBoardCommands } from "./useBoardCommands";
 import {
+  flushRememberedView,
+  loadRememberedView,
+  scheduleRememberedView,
+} from "./viewMemory";
+import {
   DEFAULT_VIEW,
   formatZoomPercent,
   type CanvasView,
 } from "./viewTransform";
 
-const { useEffect, useLayoutEffect, useRef, useState } = window.React;
+const { useCallback, useEffect, useLayoutEffect, useRef, useState } =
+  window.React;
 const { useSnapshot } = window.Valtio;
 
 type Props = {
@@ -52,6 +58,8 @@ export default function BoardPanel({ panelId, blockId }: Props) {
     commitBoard,
   } = useBoardPersist(blockId ?? null, serverCards, serverEdges, protect);
   const [view, setView] = useState<CanvasView>(DEFAULT_VIEW);
+  const [loadedFor, setLoadedFor] = useState<DbId | null>(null);
+  const viewReady = blockId != null && loadedFor === blockId;
   const [busy, setBusy] = useState(false);
   const [viewportWidth, setViewportWidth] = useState(800);
   const [placeOpen, setPlaceOpen] = useState(false);
@@ -123,7 +131,7 @@ export default function BoardPanel({ panelId, blockId }: Props) {
   }, [blockId]);
 
   useEffect(() => {
-    if (pendingFocus == null) return;
+    if (pendingFocus == null || !viewReady) return;
     if (
       !cards.some((card: WhiteboardCard) => card.blockId === pendingFocus)
     ) {
@@ -134,21 +142,53 @@ export default function BoardPanel({ panelId, blockId }: Props) {
     if (!ok) {
       orca.notify("info", t("This card is no longer on the board"));
     }
-  }, [cards, pendingFocus]);
+  }, [cards, pendingFocus, viewReady]);
 
   useEffect(() => {
-    if (pendingFocus == null) return;
+    if (pendingFocus == null || !viewReady) return;
     const timer = window.setTimeout(() => {
       orca.notify("info", t("This card is no longer on the board"));
       setPendingFocus(null);
     }, CARD_FOCUS_WAIT_MS);
     return () => window.clearTimeout(timer);
-  }, [pendingFocus]);
+  }, [pendingFocus, viewReady]);
 
   useEffect(() => {
     if (blockId == null) return;
     return retainBoardHistory(blockId);
   }, [blockId]);
+
+  useEffect(() => {
+    if (blockId == null) {
+      setView(DEFAULT_VIEW);
+      setLoadedFor(null);
+      return;
+    }
+    let cancelled = false;
+    const settle = (stored: CanvasView | null) => {
+      if (cancelled) return;
+      setView(stored ?? DEFAULT_VIEW);
+      setLoadedFor(blockId);
+    };
+    // Never leave the panel stuck on the blank pre-restore shell: a rejected
+    // read just means "no memory", not "do not render the board".
+    void loadRememberedView(blockId).then(settle, () => settle(null));
+    return () => {
+      cancelled = true;
+      flushRememberedView(blockId);
+    };
+  }, [blockId]);
+
+  const setViewAndRemember = useCallback(
+    (next: CanvasView | ((current: CanvasView) => CanvasView)) => {
+      setView((current: CanvasView) => {
+        const resolved = typeof next === "function" ? next(current) : next;
+        if (blockId != null) scheduleRememberedView(blockId, resolved);
+        return resolved;
+      });
+    },
+    [blockId],
+  );
 
   useLayoutEffect(() => {
     const el = zoomLabelRef.current;
@@ -181,6 +221,10 @@ export default function BoardPanel({ panelId, blockId }: Props) {
     );
   }
 
+  if (!viewReady) {
+    return <div className="owb-panel" />;
+  }
+
   return (
     <div className="owb-panel">
       {protect ? (
@@ -195,7 +239,7 @@ export default function BoardPanel({ panelId, blockId }: Props) {
         view={view}
         zoomLabelRef={zoomLabelRef}
         weekdayGuide={weekdayGuide}
-        onViewChange={setView}
+        onViewChange={setViewAndRemember}
         onPatchCards={onPatchCards}
         onRemoveCards={onRemoveCards}
         onAddCards={onAddCards}
@@ -223,7 +267,7 @@ export default function BoardPanel({ panelId, blockId }: Props) {
           setPlaceOpen(true);
         }}
         onFitView={() => focusApiRef.current?.fitAll() ?? false}
-        setView={setView}
+        setView={setViewAndRemember}
       />
       <PlaceDialog
         visible={placeOpen}
