@@ -238,7 +238,7 @@ function cardEl(canvas: HTMLElement, blockId: DbId): HTMLElement | null {
   return canvas.querySelector(`[data-block-id="${blockId}"]`);
 }
 
-/** Drag the title bar: area + contained cards follow. Membership is snapshotted. */
+/** Drag the area (title or interior): area + contained cards follow. Membership is snapshotted. */
 export function startMoveArea(opts: {
   startX: number;
   startY: number;

@@ -1,6 +1,6 @@
 import type { DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n";
-import type { WhiteboardArea } from "./areas";
+import { sortAreasBackToFront, type WhiteboardArea } from "./areas";
 import {
   AREA_CORNERS,
   startMoveArea,
@@ -73,6 +73,7 @@ function AreaBox({
     if (event.button !== 0) return;
     event.preventDefault();
     event.stopPropagation();
+    const wasSelected = selected;
     onSelect(area.id);
     if (editing) return;
     const canvas = canvasRef.current;
@@ -86,10 +87,21 @@ function AreaBox({
       canvas,
       cards,
       pointerToWorld,
-      onClick: () => onBeginEdit(area.id),
+      onClick: () => {
+        if (wasSelected) onBeginEdit(area.id);
+      },
       onFrame: onMoveFrame,
       onEnd: (dx, dy) => onMove(area.id, dx, dy),
     });
+  };
+
+  const onTitleDoubleClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (editing) return;
+    onSelect(area.id);
+    onBeginEdit(area.id);
   };
 
   const onHandleMouseDown = (
@@ -124,6 +136,7 @@ function AreaBox({
       <div
         className="owb-area-title"
         onMouseDown={onTitleMouseDown}
+        onDoubleClick={onTitleDoubleClick}
       >
         {editing ? (
           <input
@@ -195,15 +208,18 @@ export function AreaLayer({
     }
   }, [areas, editingId]);
 
-  const visible = areas.filter(
-    (area) =>
-      area.id === selectedId ||
-      area.id === editingId ||
-      cardIntersectsViewport(area, view, viewportSize, 0),
+  const visible = sortAreasBackToFront(
+    areas.filter(
+      (area) =>
+        area.id === selectedId ||
+        area.id === editingId ||
+        cardIntersectsViewport(area, view, viewportSize, 0),
+    ),
   );
+  const inv = 1 / Math.max(view.scale, 0.01);
 
   return (
-    <div className="owb-area-layer">
+    <div className="owb-area-layer" style={{ ["--owb-area-inv" as string]: String(inv) }}>
       {visible.map((area) => (
         <AreaBox
           key={area.id}

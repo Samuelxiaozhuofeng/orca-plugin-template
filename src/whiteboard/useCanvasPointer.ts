@@ -1,5 +1,10 @@
 import type { DbId } from "../orca.d.ts";
-import { abortAreaGestures, startDrawArea } from "./areaGestures";
+import { hitAreaAt, type WhiteboardArea } from "./areas";
+import {
+  abortAreaGestures,
+  startDrawArea,
+  startMoveArea,
+} from "./areaGestures";
 import {
   abortCardGestures,
   startMoveCards,
@@ -43,6 +48,7 @@ type Refs = {
   editing: { current: DbId | null };
   selected: { current: DbId[] };
   cards: { current: WhiteboardCard[] };
+  areas: { current: WhiteboardArea[] };
   liveView: { current: CanvasView };
   tool: { current: "select" | "drawArea" };
   areaGhost: { current: HTMLDivElement | null };
@@ -57,6 +63,7 @@ export function useCanvasPointer(opts: {
   onCreateArea: (box: CardRect) => void;
   onExitDrawArea: () => void;
   onPatchCards: PatchCardsFn;
+  onMoveArea: (id: string, dx: number, dy: number) => void;
   onMoveFrame?: (boxes: Map<DbId, CardRect>) => void;
 }): {
   onViewportMouseDown: (event: React.MouseEvent<HTMLDivElement>) => void;
@@ -74,6 +81,7 @@ export function useCanvasPointer(opts: {
     onCreateArea,
     onExitDrawArea,
     onPatchCards,
+    onMoveArea,
     onMoveFrame,
   } = opts;
   const mountedRef = useRef(true);
@@ -230,6 +238,34 @@ export function useCanvasPointer(opts: {
           onExitDrawArea();
         },
       });
+      return;
+    }
+    const world = pointerToWorld(event.clientX, event.clientY);
+    const areaId = hitAreaAt(world.x, world.y, refs.areas.current);
+    if (areaId != null && !event.shiftKey) {
+      setSelectedArea(areaId);
+      setSelected([]);
+      const area = refs.areas.current.find((item) => item.id === areaId);
+      const areaEl = canvas.querySelector<HTMLElement>(
+        `[data-area-id="${areaId}"]`,
+      );
+      if (area != null && areaEl != null) {
+        startMoveArea({
+          startX: event.clientX,
+          startY: event.clientY,
+          area,
+          areaEl,
+          canvas,
+          cards: refs.cards.current,
+          pointerToWorld,
+          onClick: () => {},
+          onFrame: onMoveFrame,
+          onEnd: (dx, dy) => {
+            if (!mountedRef.current) return;
+            onMoveArea(areaId, dx, dy);
+          },
+        });
+      }
       return;
     }
     setSelectedArea(null);

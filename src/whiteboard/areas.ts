@@ -242,6 +242,49 @@ export function cardInArea(
   );
 }
 
+/** Inclusive of the border, matching `cardInArea`. */
+export function pointInArea(
+  x: number,
+  y: number,
+  area: { x: number; y: number; w: number; h: number },
+): boolean {
+  return (
+    x >= area.x &&
+    y >= area.y &&
+    x <= area.x + area.w &&
+    y <= area.y + area.h
+  );
+}
+
+/**
+ * Area under a world-space point. Nested / overlapping frames pick the
+ * smallest by area; equal size keeps the later item (same as paint order).
+ */
+export function hitAreaAt(
+  x: number,
+  y: number,
+  areas: ReadonlyArray<{ id: string; x: number; y: number; w: number; h: number }>,
+): string | null {
+  let bestId: string | null = null;
+  let bestSize = Infinity;
+  for (const area of areas) {
+    if (!pointInArea(x, y, area)) continue;
+    const size = area.w * area.h;
+    if (size <= bestSize) {
+      bestSize = size;
+      bestId = area.id;
+    }
+  }
+  return bestId;
+}
+
+/** Large frames first so nested smaller ones paint on top. */
+export function sortAreasBackToFront<T extends { w: number; h: number }>(
+  areas: readonly T[],
+): T[] {
+  return [...areas].sort((left, right) => right.w * right.h - left.w * left.h);
+}
+
 /** Areas-only delete. Never takes or returns cards. */
 export function removeArea(
   areas: readonly WhiteboardArea[],

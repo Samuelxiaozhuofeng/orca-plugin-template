@@ -240,6 +240,7 @@ export function Canvas({
       liveView: liveViewRef,
       tool: toolRef,
       areaGhost: areaGhostRef,
+      areas: areasRef,
     },
     pointerToWorld,
     startPan,
@@ -248,6 +249,7 @@ export function Canvas({
     onCreateArea: createAreaAt,
     onExitDrawArea,
     onPatchCards,
+    onMoveArea: moveAreaBy,
     onMoveFrame,
   });
 
