@@ -26,7 +26,8 @@ export const CANVAS_CSS = `
   cursor: grabbing;
 }
 
-.owb-viewport.is-marqueeing {
+.owb-viewport.is-marqueeing,
+.owb-viewport.is-draw-area {
   cursor: crosshair;
 }
 

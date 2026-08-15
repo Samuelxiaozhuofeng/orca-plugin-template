@@ -62,6 +62,22 @@ export {
 } from "./edges";
 
 export {
+  AREAS_PROP,
+  areasEqual,
+  cardInArea,
+  nextAreaId,
+  normalizeArea,
+  parseAreas,
+  planAreaFromCards,
+  readAreas,
+  removeArea,
+  shouldPersistAreas,
+  tryReadAreas,
+  writeAreas,
+  type WhiteboardArea,
+} from "./areas";
+
+export {
   fetchJournalBlocks,
   journalDateKey,
   journalHasContent,

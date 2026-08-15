@@ -1,5 +1,18 @@
 import type { DbId } from "../orca.d.ts";
 import {
+  areasEqual,
+  shouldPersistAreas,
+  writeAreas,
+  type WhiteboardArea,
+} from "./areas.ts";
+import {
+  laneGen,
+  shouldApplyPersistSeq,
+  shouldSendPersistSeq,
+  takeLaneSeq,
+  type PersistLane,
+} from "./boardPersistSeq.ts";
+import {
   emitBoardSession,
   getBoardSession,
   maybeDisposeBoardSession,
@@ -11,7 +24,6 @@ import {
   type CardBoxPatch,
 } from "./boardSession.ts";
 import {
-  cardsEqual,
   writeCards,
   type WhiteboardCard,
 } from "./cards.ts";
@@ -22,41 +34,9 @@ import {
   type WhiteboardEdge,
 } from "./edges.ts";
 
+export { shouldApplyPersistSeq } from "./boardPersistSeq.ts";
+
 const WRITE_DEBOUNCE_MS = 300;
-
-type LaneGen = { issued: number; applied: number };
-
-const writeGens = new Map<DbId, { card: LaneGen; edge: LaneGen }>();
-
-function laneGen(id: DbId, lane: "card" | "edge"): LaneGen {
-  let gen = writeGens.get(id);
-  if (gen == null) {
-    gen = {
-      card: { issued: 0, applied: 0 },
-      edge: { issued: 0, applied: 0 },
-    };
-    writeGens.set(id, gen);
-  }
-  return gen[lane];
-}
-
-function takeLaneSeq(id: DbId, lane: "card" | "edge"): number {
-  const gen = laneGen(id, lane);
-  gen.issued += 1;
-  return gen.issued;
-}
-
-/** Apply a write result only when its seq is strictly newer than the last applied. */
-export function shouldApplyPersistSeq(
-  appliedSeq: number,
-  incomingSeq: number,
-): boolean {
-  return incomingSeq > appliedSeq;
-}
-
-function shouldSendPersistSeq(issuedSeq: number, writeSeq: number): boolean {
-  return writeSeq === issuedSeq;
-}
 
 export function releaseBoardSessionAndFlush(id: DbId): void {
   releaseBoardSession(id);
@@ -64,14 +44,23 @@ export function releaseBoardSessionAndFlush(id: DbId): void {
   if (session == null || session.refCount > 0) return;
   void flushCards(session);
   void flushEdges(session);
+  void flushAreas(session);
+}
+
+function flightKey(
+  lane: PersistLane,
+): "cardFlight" | "edgeFlight" | "areaFlight" {
+  if (lane === "card") return "cardFlight";
+  if (lane === "edge") return "edgeFlight";
+  return "areaFlight";
 }
 
 function enqueue<T>(
   session: BoardSession,
-  lane: "card" | "edge",
+  lane: PersistLane,
   run: () => Promise<T>,
 ): Promise<T> {
-  const key = lane === "card" ? "cardFlight" : "edgeFlight";
+  const key = flightKey(lane);
   const queued = session[key].then(run, run);
   session[key] = queued.then(
     () => {},
@@ -82,9 +71,9 @@ function enqueue<T>(
 
 async function idleLane(
   session: BoardSession,
-  lane: "card" | "edge",
+  lane: PersistLane,
 ): Promise<boolean> {
-  await (lane === "card" ? session.cardFlight : session.edgeFlight);
+  await session[flightKey(lane)];
   maybeDisposeBoardSession(session.id);
   return true;
 }
@@ -193,6 +182,61 @@ export async function flushEdges(session: BoardSession): Promise<boolean> {
   return ok;
 }
 
+export async function flushAreas(session: BoardSession): Promise<boolean> {
+  if (session.areaPending == null || refuseIfProtected(session)) {
+    return idleLane(session, "area");
+  }
+  const id = session.id;
+  const toWrite = session.areaPending;
+  session.areaPending = null;
+  session.areaInFlight = true;
+  const seq = takeLaneSeq(id, "area");
+  const ok = await enqueue(session, "area", async () => {
+    const gen = laneGen(id, "area");
+    if (
+      session.areaPending != null ||
+      !shouldSendPersistSeq(gen.issued, seq)
+    ) {
+      return true;
+    }
+    try {
+      await writeAreas(id, toWrite, session.areasPresent);
+      if (getBoardSession(id) !== session) return true;
+      if (!shouldApplyPersistSeq(gen.applied, seq)) return true;
+      gen.applied = seq;
+      if (shouldPersistAreas(toWrite, session.areasPresent)) {
+        session.areasPresent = true;
+      }
+      session.areaBaseline = toWrite;
+      session.areaDirty = session.areaPending != null;
+      session.areaAwaitingEcho = !session.areaDirty;
+      if (!areasEqual(session.areas, toWrite) && session.areaPending == null) {
+        session.areas = toWrite;
+        emitBoardSession(session);
+      }
+      return true;
+    } catch (error) {
+      if (getBoardSession(id) === session) {
+        if (session.areaPending == null) {
+          session.areaDirty = false;
+          session.areaAwaitingEcho = false;
+          session.areas = session.areaBaseline;
+          emitBoardSession(session);
+        } else {
+          session.areaDirty = true;
+          session.areaAwaitingEcho = false;
+        }
+        notifyWriteError("areas", error);
+      }
+      return false;
+    }
+  });
+  session.areaInFlight = false;
+  if (session.areaPending != null) return flushAreas(session);
+  maybeDisposeBoardSession(id);
+  return ok;
+}
+
 function scheduleCardWrite(session: BoardSession): void {
   session.cardPending = session.cards;
   session.cardDirty = true;
@@ -250,6 +294,18 @@ export async function commitEdgesOn(
   return flushEdges(session);
 }
 
+export async function commitAreasOn(
+  session: BoardSession,
+  next: WhiteboardArea[],
+): Promise<boolean> {
+  if (refuseIfProtected(session)) return false;
+  session.areas = next;
+  session.areaPending = next;
+  session.areaDirty = true;
+  emitBoardSession(session);
+  return flushAreas(session);
+}
+
 export async function commitBoardOn(
   session: BoardSession,
   cards: WhiteboardCard[],
@@ -262,64 +318,99 @@ export async function commitBoardOn(
   }
   session.cardPending = null;
   session.edgePending = null;
+  session.areaPending = null;
   session.cards = cards;
   session.edges = sanitizeEdges(edges);
   session.cardDirty = true;
   session.edgeDirty = true;
+  session.areaDirty = true;
   emitBoardSession(session);
   const id = session.id;
   const toWriteCards = session.cards;
   const toWriteEdges = session.edges;
+  const toWriteAreas = session.areas;
+  const areasPresent = session.areasPresent;
   const ok = await enqueue(session, "card", async () =>
-    enqueue(session, "edge", async () => {
-      if (getBoardSession(id) !== session) return true;
-      if (session.cardPending != null || session.edgePending != null) {
-        return true;
-      }
-      const cardSeq = takeLaneSeq(id, "card");
-      const edgeSeq = takeLaneSeq(id, "edge");
-      const cardsGen = laneGen(id, "card");
-      const edgesGen = laneGen(id, "edge");
-      try {
-        await writeSessionSnapshot(id, toWriteCards, toWriteEdges);
+    enqueue(session, "edge", async () =>
+      enqueue(session, "area", async () => {
         if (getBoardSession(id) !== session) return true;
-        if (shouldApplyPersistSeq(cardsGen.applied, cardSeq)) {
-          cardsGen.applied = cardSeq;
-          session.cardBaseline = toWriteCards;
-          session.cardDirty = session.cardPending != null;
-          session.cardAwaitingEcho = !session.cardDirty;
+        if (
+          session.cardPending != null ||
+          session.edgePending != null ||
+          session.areaPending != null
+        ) {
+          return true;
         }
-        if (shouldApplyPersistSeq(edgesGen.applied, edgeSeq)) {
-          edgesGen.applied = edgeSeq;
-          session.edgeBaseline = toWriteEdges;
-          session.edgeDirty = session.edgePending != null;
-          session.edgeAwaitingEcho = !session.edgeDirty;
-        }
-        return true;
-      } catch (error) {
-        if (getBoardSession(id) === session) {
-          if (session.cardPending == null) {
-            session.cards = session.cardBaseline;
-            session.cardDirty = false;
-            session.cardAwaitingEcho = false;
-          } else {
-            session.cardDirty = true;
-            session.cardAwaitingEcho = false;
+        const cardSeq = takeLaneSeq(id, "card");
+        const edgeSeq = takeLaneSeq(id, "edge");
+        const areaSeq = takeLaneSeq(id, "area");
+        const cardsGen = laneGen(id, "card");
+        const edgesGen = laneGen(id, "edge");
+        const areasGen = laneGen(id, "area");
+        try {
+          await writeSessionSnapshot(
+            id,
+            toWriteCards,
+            toWriteEdges,
+            toWriteAreas,
+            areasPresent,
+          );
+          if (getBoardSession(id) !== session) return true;
+          if (shouldApplyPersistSeq(cardsGen.applied, cardSeq)) {
+            cardsGen.applied = cardSeq;
+            session.cardBaseline = toWriteCards;
+            session.cardDirty = session.cardPending != null;
+            session.cardAwaitingEcho = !session.cardDirty;
           }
-          if (session.edgePending == null) {
-            session.edges = session.edgeBaseline;
-            session.edgeDirty = false;
-            session.edgeAwaitingEcho = false;
-          } else {
-            session.edgeDirty = true;
-            session.edgeAwaitingEcho = false;
+          if (shouldApplyPersistSeq(edgesGen.applied, edgeSeq)) {
+            edgesGen.applied = edgeSeq;
+            session.edgeBaseline = toWriteEdges;
+            session.edgeDirty = session.edgePending != null;
+            session.edgeAwaitingEcho = !session.edgeDirty;
           }
-          emitBoardSession(session);
-          notifyWriteError("cards", error);
+          if (shouldApplyPersistSeq(areasGen.applied, areaSeq)) {
+            areasGen.applied = areaSeq;
+            if (shouldPersistAreas(toWriteAreas, areasPresent)) {
+              session.areasPresent = true;
+            }
+            session.areaBaseline = toWriteAreas;
+            session.areaDirty = session.areaPending != null;
+            session.areaAwaitingEcho = !session.areaDirty;
+          }
+          return true;
+        } catch (error) {
+          if (getBoardSession(id) === session) {
+            if (session.cardPending == null) {
+              session.cards = session.cardBaseline;
+              session.cardDirty = false;
+              session.cardAwaitingEcho = false;
+            } else {
+              session.cardDirty = true;
+              session.cardAwaitingEcho = false;
+            }
+            if (session.edgePending == null) {
+              session.edges = session.edgeBaseline;
+              session.edgeDirty = false;
+              session.edgeAwaitingEcho = false;
+            } else {
+              session.edgeDirty = true;
+              session.edgeAwaitingEcho = false;
+            }
+            if (session.areaPending == null) {
+              session.areas = session.areaBaseline;
+              session.areaDirty = false;
+              session.areaAwaitingEcho = false;
+            } else {
+              session.areaDirty = true;
+              session.areaAwaitingEcho = false;
+            }
+            emitBoardSession(session);
+            notifyWriteError("cards", error);
+          }
+          return false;
         }
-        return false;
-      }
-    }),
+      }),
+    ),
   );
   let result = ok;
   if (session.cardPending != null) {
@@ -328,50 +419,9 @@ export async function commitBoardOn(
   if (session.edgePending != null) {
     result = (await flushEdges(session)) && result;
   }
+  if (session.areaPending != null) {
+    result = (await flushAreas(session)) && result;
+  }
   maybeDisposeBoardSession(id);
   return result;
-}
-
-export function applyCardEcho(
-  session: BoardSession,
-  serverCards: WhiteboardCard[],
-): void {
-  if (session.protect) return;
-  if (session.cardAwaitingEcho) {
-    if (cardsEqual(serverCards, session.cards)) {
-      session.cardAwaitingEcho = false;
-      session.cardBaseline = serverCards;
-    }
-    return;
-  }
-  if (session.cardPending != null || session.cardDirty || session.cardInFlight) {
-    return;
-  }
-  if (!cardsEqual(serverCards, session.cards)) {
-    session.cards = serverCards;
-    session.cardBaseline = serverCards;
-    emitBoardSession(session);
-  }
-}
-
-export function applyEdgeEcho(
-  session: BoardSession,
-  serverEdges: WhiteboardEdge[],
-): void {
-  if (session.protect) return;
-  if (session.edgeAwaitingEcho) {
-    if (edgesEqual(serverEdges, session.edges)) {
-      session.edgeAwaitingEcho = false;
-      session.edgeBaseline = serverEdges;
-    }
-    return;
-  }
-  if (session.edgePending != null || session.edgeDirty || session.edgeInFlight) {
-    return;
-  }
-  if (!edgesEqual(serverEdges, session.edges)) {
-    session.edges = serverEdges;
-    session.edgeBaseline = serverEdges;
-    emitBoardSession(session);
-  }
 }

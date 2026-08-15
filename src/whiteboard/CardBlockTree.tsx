@@ -21,6 +21,9 @@ import {
   cardExcerpt,
   collectBlockTreeIds,
 } from "./viewTransform";
+import { attachCardRefHoverPreview } from "./hoverPreview";
+
+const { useEffect, useRef } = window.React;
 
 type Props = {
   panelId: string;
@@ -37,6 +40,13 @@ export function CardBlockTree({
   blockId,
   promotedKey = "",
 }: Props) {
+  const treeRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = treeRef.current;
+    if (el == null) return;
+    return attachCardRefHoverPreview(el);
+  }, []);
+
   const plan = useWatchedValue(
     () =>
       planCardBlockTree(
@@ -59,6 +69,7 @@ export function CardBlockTree({
 
   return (
     <div
+      ref={treeRef}
       className="owb-card-block-tree"
       onMouseDown={(event) => {
         const target = event.target as HTMLElement | null;

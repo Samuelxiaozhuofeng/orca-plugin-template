@@ -1,4 +1,6 @@
 import type { DbId } from "../orca.d.ts";
+import { type WhiteboardArea } from "./areas";
+import { bindHistoryAreas } from "./boardHistory";
 import {
   acquireBoardSession,
   ensureBoardSession,
@@ -7,11 +9,16 @@ import {
   type CardBoxPatch,
 } from "./boardSession";
 import {
+  applyAreaEcho,
   applyCardEcho,
   applyEdgeEcho,
+} from "./boardPersistEcho";
+import {
+  commitAreasOn,
   commitBoardOn,
   commitCardsOn,
   commitEdgesOn,
+  flushAreas,
   flushCards,
   flushEdges,
   patchCardsOn,
@@ -23,11 +30,21 @@ import { type WhiteboardEdge } from "./edges";
 
 const { useCallback, useEffect, useRef, useState } = window.React;
 
+bindHistoryAreas({
+  read: (boardId) => getBoardSession(boardId)?.areas ?? [],
+  apply: (boardId, areas) => {
+    const session = getBoardSession(boardId);
+    if (session == null) return;
+    void commitAreasOn(session, areas);
+  },
+});
+
 export async function flushAllSessionWrites(): Promise<void> {
   await Promise.all(
     listBoardSessions().map(async (session) => {
       await flushCards(session);
       await flushEdges(session);
+      await flushAreas(session);
     }),
   );
 }
@@ -35,6 +52,7 @@ export async function flushAllSessionWrites(): Promise<void> {
 export type BoardPersistApi = {
   cards: WhiteboardCard[];
   edges: WhiteboardEdge[];
+  areas: WhiteboardArea[];
   patchCard: (cardBlockId: DbId, patch: CardBoxPatch) => void;
   patchCards: (
     entries: ReadonlyArray<{ blockId: DbId; patch: CardBoxPatch }>,
@@ -45,6 +63,7 @@ export type BoardPersistApi = {
     next: WhiteboardEdge[],
     cardIds?: ReadonlySet<DbId>,
   ) => Promise<boolean>;
+  commitAreas: (next: WhiteboardArea[]) => Promise<boolean>;
   commitBoard: (
     cards: WhiteboardCard[],
     edges: WhiteboardEdge[],
@@ -56,34 +75,50 @@ export function useBoardPersist(
   blockId: DbId | null,
   serverCards: WhiteboardCard[],
   serverEdges: WhiteboardEdge[],
+  serverAreas: WhiteboardArea[],
   protect: boolean,
+  areasPresent: boolean,
 ): BoardPersistApi {
   if (blockId != null) {
-    ensureBoardSession(blockId, serverCards, serverEdges, protect);
+    ensureBoardSession(
+      blockId,
+      serverCards,
+      serverEdges,
+      serverAreas,
+      protect,
+      areasPresent,
+    );
   }
   const joined = blockId == null ? undefined : getBoardSession(blockId);
   const [cards, setCards] = useState(joined?.cards ?? serverCards);
   const [edges, setEdges] = useState(joined?.edges ?? serverEdges);
+  const [areas, setAreas] = useState(joined?.areas ?? serverAreas);
   const serverCardsRef = useRef(serverCards);
   const serverEdgesRef = useRef(serverEdges);
+  const serverAreasRef = useRef(serverAreas);
   serverCardsRef.current = serverCards;
   serverEdgesRef.current = serverEdges;
+  serverAreasRef.current = serverAreas;
 
   useEffect(() => {
     if (blockId == null) {
       setCards(serverCardsRef.current);
       setEdges(serverEdgesRef.current);
+      setAreas(serverAreasRef.current);
       return;
     }
     const session = acquireBoardSession(
       blockId,
       serverCardsRef.current,
       serverEdgesRef.current,
+      serverAreasRef.current,
       protect,
+      areasPresent,
     );
     const sync = () => {
       setCards(session.cards);
       setEdges(session.edges);
+      setAreas(session.areas);
     };
     sync();
     session.listeners.add(sync);
@@ -115,6 +150,13 @@ export function useBoardPersist(
     if (session == null) return;
     applyEdgeEcho(session, serverEdges);
   }, [blockId, serverEdges]);
+
+  useEffect(() => {
+    if (blockId == null) return;
+    const session = getBoardSession(blockId);
+    if (session == null) return;
+    applyAreaEcho(session, serverAreas, areasPresent);
+  }, [blockId, serverAreas, areasPresent]);
 
   const patchCards = useCallback(
     (entries: ReadonlyArray<{ blockId: DbId; patch: CardBoxPatch }>) => {
@@ -169,6 +211,16 @@ export function useBoardPersist(
     [blockId],
   );
 
+  const commitAreas = useCallback(
+    async (next: WhiteboardArea[]): Promise<boolean> => {
+      if (blockId == null) return false;
+      const session = getBoardSession(blockId);
+      if (session == null) return false;
+      return commitAreasOn(session, next);
+    },
+    [blockId],
+  );
+
   const commitBoard = useCallback(
     async (
       nextCards: WhiteboardCard[],
@@ -188,16 +240,19 @@ export function useBoardPersist(
     if (session == null) return;
     await flushCards(session);
     await flushEdges(session);
+    await flushAreas(session);
   }, [blockId]);
 
   return {
     cards,
     edges,
+    areas,
     patchCard,
     patchCards,
     commitCards,
     appendCards,
     commitEdges,
+    commitAreas,
     commitBoard,
     flush,
   };

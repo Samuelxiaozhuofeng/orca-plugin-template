@@ -191,6 +191,20 @@ const zhCN = {
   "This tag has no notes": "这个标签下还没有笔记",
   "This tag has no name": "读不到这个标签的名称",
   "Failed to spread tagged notes onto the board": "没能把这个标签下的笔记铺到白板上",
+  Section: "区域",
+  "Section name": "区域名称",
+  "Group into section": "圈成区域",
+  "Draw section": "画区域",
+  "Whiteboard sections were not saved": "区域没能写进这块白板",
+  "Failed to save sections": "保存区域失败",
+  "${count} sections could not be read. Saving has been stopped so nothing is overwritten. Changes you make now will not be kept.":
+    "有 ${count} 个区域读不出来，已停止保存以免覆盖，你现在做的改动不会被保留。",
+  "${cards} cards and ${areas} sections could not be read. Saving has been stopped so nothing is overwritten. Changes you make now will not be kept.":
+    "有 ${cards} 张卡片和 ${areas} 个区域读不出来，已停止保存以免覆盖，你现在做的改动不会被保留。",
+  "${edges} connections and ${areas} sections could not be read. Saving has been stopped so nothing is overwritten. Changes you make now will not be kept.":
+    "有 ${edges} 条连线和 ${areas} 个区域读不出来，已停止保存以免覆盖，你现在做的改动不会被保留。",
+  "${cards} cards, ${edges} connections and ${areas} sections could not be read. Saving has been stopped so nothing is overwritten. Changes you make now will not be kept.":
+    "有 ${cards} 张卡片、${edges} 条连线和 ${areas} 个区域读不出来，已停止保存以免覆盖，你现在做的改动不会被保留。",
 };
 
 export default zhCN;

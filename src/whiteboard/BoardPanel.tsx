@@ -10,6 +10,7 @@ import { retainBoardHistory } from "./boardHistory";
 import { BoardToolbar } from "./BoardToolbar";
 import { useBoardPersist } from "./useBoardPersist";
 import { formatProtectMessage } from "./boardWrite";
+import { areasPropertyPresent, tryReadAreas } from "./areas";
 import { tryReadCards, type WhiteboardCard } from "./cards";
 import { Canvas } from "./Canvas";
 import {
@@ -45,23 +46,36 @@ export default function BoardPanel({ panelId, blockId }: Props) {
   const block = blockId == null ? undefined : blocks[blockId];
   const cardsRead = tryReadCards(block);
   const edgesRead = tryReadEdges(block);
-  const protect = block != null && (!cardsRead.ok || !edgesRead.ok);
+  const areasRead = tryReadAreas(block);
+  const protect =
+    block != null && (!cardsRead.ok || !edgesRead.ok || !areasRead.ok);
   const serverCards = cardsRead.ok ? cardsRead.value : [];
   const serverEdges = edgesRead.ok ? edgesRead.value : [];
+  const serverAreas = areasRead.ok ? areasRead.value : [];
   const {
     cards,
     edges,
+    areas,
     patchCards,
     commitCards,
     appendCards,
     commitEdges,
+    commitAreas,
     commitBoard,
-  } = useBoardPersist(blockId ?? null, serverCards, serverEdges, protect);
+  } = useBoardPersist(
+    blockId ?? null,
+    serverCards,
+    serverEdges,
+    serverAreas,
+    protect,
+    areasPropertyPresent(block),
+  );
   const [view, setView] = useState<CanvasView>(DEFAULT_VIEW);
   const [loadedFor, setLoadedFor] = useState<DbId | null>(null);
   const viewReady = blockId != null && loadedFor === blockId;
   const [busy, setBusy] = useState(false);
   const [viewportWidth, setViewportWidth] = useState(800);
+  const [drawArea, setDrawArea] = useState(false);
   const [placeOpen, setPlaceOpen] = useState(false);
   // Set when the journal dialog was opened from the canvas context menu, so
   // the cards land where the user right-clicked instead of at the viewport.
@@ -74,6 +88,10 @@ export default function BoardPanel({ panelId, blockId }: Props) {
   const edgesRef = useRef(edges);
   cardsRef.current = cards;
   edgesRef.current = edges;
+
+  useEffect(() => {
+    setDrawArea(false);
+  }, [blockId]);
 
   const {
     historyTick,
@@ -229,7 +247,7 @@ export default function BoardPanel({ panelId, blockId }: Props) {
     <div className="owb-panel">
       {protect ? (
         <div className="owb-protect-banner" role="alert">
-          {formatProtectMessage(cardsRead, edgesRead)}
+          {formatProtectMessage(cardsRead, edgesRead, areasRead)}
         </div>
       ) : null}
       <Canvas
@@ -244,7 +262,11 @@ export default function BoardPanel({ panelId, blockId }: Props) {
         onRemoveCards={onRemoveCards}
         onAddCards={onAddCards}
         edges={edges}
+        areas={areas}
         onCommitEdges={onCommitEdges}
+        onCommitAreas={commitAreas}
+        drawArea={drawArea}
+        onExitDrawArea={() => setDrawArea(false)}
         onUndo={onUndo}
         onRedo={onRedo}
         onViewportWidth={setViewportWidth}
@@ -262,6 +284,8 @@ export default function BoardPanel({ panelId, blockId }: Props) {
         zoomLabelRef={zoomLabelRef}
         onUndo={onUndo}
         onRedo={onRedo}
+        drawArea={drawArea}
+        onToggleDrawArea={() => setDrawArea((on: boolean) => !on)}
         onPlace={() => {
           setPlaceOrigin(null);
           setPlaceOpen(true);

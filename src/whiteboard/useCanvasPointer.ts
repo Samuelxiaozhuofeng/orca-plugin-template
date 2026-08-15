@@ -1,4 +1,5 @@
 import type { DbId } from "../orca.d.ts";
+import { abortAreaGestures, startDrawArea } from "./areaGestures";
 import {
   abortCardGestures,
   startMoveCards,
@@ -14,6 +15,9 @@ import type { WhiteboardSettings } from "./settings";
 import { isEditableTarget } from "./canvasKeys";
 import { isHostOverlayTarget } from "./hostOverlay";
 import type { CanvasView } from "./viewTransform";
+
+const CANVAS_CHROME =
+  ".owb-card, .owb-edge-hit, .owb-edge-editor, .owb-area-title, .owb-area-handle, .owb-area-title-input, .owb-area-wrap-bar";
 
 const { useEffect, useRef } = window.React;
 
@@ -40,6 +44,8 @@ type Refs = {
   selected: { current: DbId[] };
   cards: { current: WhiteboardCard[] };
   liveView: { current: CanvasView };
+  tool: { current: "select" | "drawArea" };
+  areaGhost: { current: HTMLDivElement | null };
 };
 
 export function useCanvasPointer(opts: {
@@ -47,6 +53,9 @@ export function useCanvasPointer(opts: {
   pointerToWorld: (clientX: number, clientY: number) => { x: number; y: number };
   startPan: (startX: number, startY: number) => void;
   setSelected: (next: DbId[]) => void;
+  setSelectedArea: (id: string | null) => void;
+  onCreateArea: (box: CardRect) => void;
+  onExitDrawArea: () => void;
   onPatchCards: PatchCardsFn;
   onMoveFrame?: (boxes: Map<DbId, CardRect>) => void;
 }): {
@@ -56,7 +65,17 @@ export function useCanvasPointer(opts: {
     card: WhiteboardCard,
   ) => void;
 } {
-  const { refs, pointerToWorld, startPan, setSelected, onPatchCards, onMoveFrame } = opts;
+  const {
+    refs,
+    pointerToWorld,
+    startPan,
+    setSelected,
+    setSelectedArea,
+    onCreateArea,
+    onExitDrawArea,
+    onPatchCards,
+    onMoveFrame,
+  } = opts;
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -71,6 +90,8 @@ export function useCanvasPointer(opts: {
       abortMarquees(viewport);
       abortEdgeGestures(canvas);
       abortEdgeGestures(viewport);
+      abortAreaGestures(canvas);
+      abortAreaGestures(viewport);
     };
   }, [refs.canvas]);
 
@@ -152,10 +173,10 @@ export function useCanvasPointer(opts: {
   const onViewportMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement | null;
     if (isHostOverlayTarget(target) || isEditableTarget(target)) return;
-    if (target?.closest(".owb-card, .owb-edge-hit, .owb-edge-editor")) return;
+    if (target?.closest(CANVAS_CHROME)) return;
     focusViewport();
 
-    const blank = target?.closest(".owb-card, .owb-edge-hit, .owb-edge-editor") == null;
+    const blank = target?.closest(CANVAS_CHROME) == null;
     const spacePan = refs.spaceHeld.current;
     if (
       event.button === 1 ||
@@ -193,6 +214,25 @@ export function useCanvasPointer(opts: {
     const canvas = refs.canvas.current;
     const marquee = refs.marquee.current;
     if (viewport == null || canvas == null || marquee == null) return;
+    if (refs.tool.current === "drawArea") {
+      const ghost = refs.areaGhost.current;
+      if (ghost == null) return;
+      startDrawArea({
+        startX: event.clientX,
+        startY: event.clientY,
+        canvas,
+        ghostEl: ghost,
+        pointerToWorld,
+        onCancel: () => {},
+        onEnd: (box) => {
+          if (!mountedRef.current) return;
+          onCreateArea(box);
+          onExitDrawArea();
+        },
+      });
+      return;
+    }
+    setSelectedArea(null);
     startMarquee({
       startX: event.clientX,
       startY: event.clientY,
@@ -230,6 +270,7 @@ export function useCanvasPointer(opts: {
       event.preventDefault();
       event.stopPropagation();
       focusViewport();
+      setSelectedArea(null);
       const canMove =
         refs.editing.current !== card.blockId && selectCardOnPointer(card, event);
       if (canMove) beginMoveSelection(event.clientX, event.clientY);
@@ -248,6 +289,7 @@ export function useCanvasPointer(opts: {
     event.preventDefault();
     event.stopPropagation();
     focusViewport();
+    setSelectedArea(null);
 
     if (!selectCardOnPointer(card, event)) return;
     if (refs.settings.current.mouseScheme === "rightDrag") return;

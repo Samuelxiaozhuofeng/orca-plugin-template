@@ -16,6 +16,8 @@ type Props = {
   zoomLabelRef: { current: HTMLButtonElement | null };
   onUndo: () => void;
   onRedo: () => void;
+  drawArea: boolean;
+  onToggleDrawArea: () => void;
   onPlace: () => void;
   /** Frames every card. False when the board is empty. */
   onFitView: () => boolean;
@@ -32,6 +34,8 @@ export function BoardToolbar({
   zoomLabelRef,
   onUndo,
   onRedo,
+  drawArea,
+  onToggleDrawArea,
   onPlace,
   onFitView,
   setView,
@@ -66,6 +70,15 @@ export function BoardToolbar({
         onClick={onPlace}
       >
         {t("Place journals…")}
+      </button>
+      <button
+        type="button"
+        className={drawArea ? "owb-toolbar-btn is-active" : "owb-toolbar-btn"}
+        title={t("Draw section")}
+        aria-pressed={drawArea}
+        onClick={onToggleDrawArea}
+      >
+        <i className="ti ti-rectangle" />
       </button>
       <div className="owb-toolbar-sep" />
       <div className="owb-zoom">

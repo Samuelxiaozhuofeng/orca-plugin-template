@@ -1,5 +1,7 @@
 import type { DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n";
+import { AreaLayer } from "./AreaLayer";
+import type { WhiteboardArea } from "./areas";
 import type { CanvasOrigin, WhiteboardCard } from "./data";
 import {
   tryFocusCardFromRefClick,
@@ -43,9 +45,13 @@ type Props = {
     next: WhiteboardEdge[],
     cardIds?: ReadonlySet<DbId>,
   ) => Promise<boolean>;
+  onCommitAreas: (next: WhiteboardArea[]) => Promise<boolean>;
+  drawArea: boolean;
+  onExitDrawArea: () => void;
   onUndo: () => void;
   onRedo: () => void;
   edges: WhiteboardEdge[];
+  areas: WhiteboardArea[];
   onViewportWidth: (width: number) => void;
   /** Opens the journal dialog with cards landing at this canvas point. */
   onPlaceJournalsAt: (origin: CanvasOrigin) => void;
@@ -64,9 +70,13 @@ export function Canvas({
   onRemoveCards,
   onAddCards,
   onCommitEdges,
+  onCommitAreas,
+  drawArea,
+  onExitDrawArea,
   onUndo,
   onRedo,
   edges,
+  areas,
   onViewportWidth,
   onPlaceJournalsAt,
   weekdayGuide,
@@ -75,9 +85,13 @@ export function Canvas({
   const editingRef = useRef<DbId | null>(null);
   const selectedRef = useRef<DbId[]>([]);
   const selectedEdgeRef = useRef<string | null>(null);
+  const selectedAreaRef = useRef<string | null>(null);
   const cardsRef = useRef(cards);
   const edgesRef = useRef(edges);
+  const areasRef = useRef(areas);
   const marqueeRef = useRef<HTMLDivElement | null>(null);
+  const areaGhostRef = useRef<HTMLDivElement | null>(null);
+  const toolRef = useRef<"select" | "drawArea">("select");
   const guidesRef = useRef<HTMLDivElement | null>(null);
   const edgeApiRef = useRef<EdgeLayerApi | null>(null);
   const menuPointRef = useRef<CanvasOrigin>({ x: 0, y: 0 });
@@ -90,7 +104,9 @@ export function Canvas({
   const settingsRef = useRef(settings);
   cardsRef.current = cards;
   edgesRef.current = edges;
+  areasRef.current = areas;
   settingsRef.current = settings;
+  toolRef.current = drawArea ? "drawArea" : "select";
 
   const onMoveFrame = useCallback((boxes: Map<DbId, CardBox>) => {
     edgeApiRef.current?.onFrame(boxes);
@@ -118,10 +134,16 @@ export function Canvas({
     editingId,
     selected,
     selectedEdge,
+    selectedArea,
     edgeDrop,
     setEdgeDrop,
     selectCards,
     selectEdge,
+    selectArea,
+    wrapSelected,
+    createAreaAt,
+    renameArea,
+    resizeArea,
     applyArrange,
     applyContentHeight,
     startEdit,
@@ -138,19 +160,24 @@ export function Canvas({
     boardBlockId,
     cards,
     edges,
+    areas,
     view,
     viewportSize,
     viewportRef,
     editingRef,
     selectedRef,
     selectedEdgeRef,
+    selectedAreaRef,
     cardsRef,
     edgesRef,
+    areasRef,
     edgeApiRef,
     onPatchCards,
     onRemoveCards,
     onAddCards,
     onCommitEdges,
+    onCommitAreas,
+    onExitDrawArea,
     onUndo,
     onRedo,
   });
@@ -202,10 +229,15 @@ export function Canvas({
       selected: selectedRef,
       cards: cardsRef,
       liveView: liveViewRef,
+      tool: toolRef,
+      areaGhost: areaGhostRef,
     },
     pointerToWorld,
     startPan,
     setSelected: selectCards,
+    setSelectedArea: selectArea,
+    onCreateArea: createAreaAt,
+    onExitDrawArea,
     onPatchCards,
     onMoveFrame,
   });
@@ -214,7 +246,13 @@ export function Canvas({
     <>
       <div
           ref={viewportRef}
-          className={dropActive ? "owb-viewport is-drop-target" : "owb-viewport"}
+          className={[
+            "owb-viewport",
+            dropActive ? "is-drop-target" : "",
+            drawArea ? "is-draw-area" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
           data-mouse-scheme={settings.mouseScheme}
           tabIndex={0}
           onMouseDown={onViewportMouseDown}
@@ -222,12 +260,12 @@ export function Canvas({
             const target = event.target as HTMLElement | null;
             if (
               target?.closest(
-                ".owb-card, .owb-edge-hit, .owb-edge-editor, .owb-edge-label, .owb-edge-link-badge",
+                ".owb-card, .owb-edge-hit, .owb-edge-editor, .owb-edge-label, .owb-edge-link-badge, .owb-area-title, .owb-area-handle",
               )
             ) {
               return;
             }
-            if (spaceHeldRef.current) return;
+            if (spaceHeldRef.current || drawArea) return;
             if (event.button !== 0) return;
             event.preventDefault();
             if (edgeDrop != null) closeEdgeDrop();
@@ -253,7 +291,7 @@ export function Canvas({
           }}
           onContextMenu={(event) => {
             const target = event.target as HTMLElement | null;
-            if (target?.closest(".owb-card, .owb-edge-hit, .owb-edge-editor")) return;
+            if (target?.closest(".owb-card, .owb-edge-hit, .owb-edge-editor, .owb-area-title, .owb-area-handle")) return;
             event.preventDefault();
             event.stopPropagation();
             // Anything the menu creates lands where the user right-clicked.
@@ -263,6 +301,18 @@ export function Canvas({
         >
           <div ref={gridRef} className="owb-grid" />
           <div ref={canvasRef} className="owb-canvas">
+            <AreaLayer
+              areas={areas}
+              selectedId={selectedArea}
+              view={view}
+              viewportSize={viewportSize}
+              ghostRef={areaGhostRef}
+              canvasRef={canvasRef}
+              pointerToWorld={pointerToWorld}
+              onSelect={selectArea}
+              onRename={renameArea}
+              onResize={resizeArea}
+            />
             <EdgeLayer
               panelId={panelId}
               cards={cards}
@@ -345,6 +395,22 @@ export function Canvas({
                   {t("Too many reference links; only some are shown.")}
                 </div>
               ) : null}
+            </div>
+          ) : null}
+          {selected.length > 0 ? (
+            <div
+              className="owb-area-wrap-bar"
+              onMouseDown={(event: React.MouseEvent<HTMLDivElement>) =>
+                event.stopPropagation()
+              }
+            >
+              <button
+                type="button"
+                className="owb-toolbar-btn"
+                onClick={wrapSelected}
+              >
+                {t("Group into section")}
+              </button>
             </div>
           ) : null}
         </div>

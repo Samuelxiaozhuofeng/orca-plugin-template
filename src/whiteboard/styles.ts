@@ -1,4 +1,5 @@
 import { ADD_TO_BOARD_CSS } from "./addToBoardStyles";
+import { AREA_CSS } from "./areaStyles";
 import { BOARD_TITLE_CSS } from "./boardTitleStyles";
 import { CANVAS_CSS } from "./canvasStyles";
 import { CARD_EDITOR_CSS } from "./cardEditorStyles";
@@ -33,6 +34,7 @@ export const WHITEBOARD_CSS = [
   CARD_EDITOR_CSS,
   CARD_CHROME_CSS,
   EDGE_CSS,
+  AREA_CSS,
   ADD_TO_BOARD_CSS,
   BOARD_TITLE_CSS,
 ].join("\n");

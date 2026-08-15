@@ -1,5 +1,13 @@
 import type { DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n.ts";
+import {
+  AREAS_PROP,
+  areasEqual,
+  preparedAreas,
+  shouldPersistAreas,
+  tryReadAreas,
+  type WhiteboardArea,
+} from "./areas.ts";
 import { emitBoardCardsChanged } from "./boardEvents.ts";
 import {
   assertBoardWritable,
@@ -49,6 +57,15 @@ export type BoardSession = {
   edgeAwaitingEcho: boolean;
   edgeInFlight: boolean;
   edgeFlight: Promise<void>;
+  areas: WhiteboardArea[];
+  areaBaseline: WhiteboardArea[];
+  areaPending: WhiteboardArea[] | null;
+  areaDirty: boolean;
+  areaAwaitingEcho: boolean;
+  areaInFlight: boolean;
+  areaFlight: Promise<void>;
+  /** True once the board block has (or has been written) an `areas` property. */
+  areasPresent: boolean;
 };
 
 const sessions = new Map<DbId, BoardSession>();
@@ -62,7 +79,7 @@ export function emitBoardSession(session: BoardSession): void {
 }
 
 export function notifyWriteError(
-  kind: "cards" | "edges",
+  kind: "cards" | "edges" | "areas",
   error: unknown,
 ): void {
   console.error(`[whiteboard] failed to save ${kind}`, error);
@@ -72,7 +89,9 @@ export function notifyWriteError(
       ? error.message
       : kind === "cards"
         ? t("Failed to save card positions")
-        : t("Failed to save connections"),
+        : kind === "edges"
+          ? t("Failed to save connections")
+          : t("Failed to save sections"),
     {
       title: t("Retry"),
       action: () => {
@@ -94,7 +113,9 @@ function createSession(
   id: DbId,
   cards: WhiteboardCard[],
   edges: WhiteboardEdge[],
+  areas: WhiteboardArea[],
   protect: boolean,
+  areasPresent: boolean,
 ): BoardSession {
   return {
     id,
@@ -117,6 +138,14 @@ function createSession(
     edgeAwaitingEcho: false,
     edgeInFlight: false,
     edgeFlight: Promise.resolve(),
+    areas,
+    areaBaseline: areas,
+    areaPending: null,
+    areaDirty: false,
+    areaAwaitingEcho: false,
+    areaInFlight: false,
+    areaFlight: Promise.resolve(),
+    areasPresent,
   };
 }
 
@@ -125,11 +154,13 @@ export function ensureBoardSession(
   id: DbId,
   cards: WhiteboardCard[],
   edges: WhiteboardEdge[],
+  areas: WhiteboardArea[],
   protect: boolean,
+  areasPresent: boolean,
 ): BoardSession {
   let session = sessions.get(id);
   if (session == null) {
-    session = createSession(id, cards, edges, protect);
+    session = createSession(id, cards, edges, areas, protect, areasPresent);
     sessions.set(id, session);
   }
   session.protect = protect;
@@ -141,9 +172,18 @@ export function acquireBoardSession(
   id: DbId,
   cards: WhiteboardCard[],
   edges: WhiteboardEdge[],
+  areas: WhiteboardArea[],
   protect: boolean,
+  areasPresent: boolean,
 ): BoardSession {
-  const session = ensureBoardSession(id, cards, edges, protect);
+  const session = ensureBoardSession(
+    id,
+    cards,
+    edges,
+    areas,
+    protect,
+    areasPresent,
+  );
   session.refCount += 1;
   session.viewPinned = false;
   return session;
@@ -154,10 +194,13 @@ export function sessionHasPersistWork(session: BoardSession): boolean {
     session.cardTimer !== 0 ||
     session.cardPending != null ||
     session.edgePending != null ||
+    session.areaPending != null ||
     session.cardInFlight ||
     session.edgeInFlight ||
+    session.areaInFlight ||
     session.cardDirty ||
-    session.edgeDirty
+    session.edgeDirty ||
+    session.areaDirty
   );
 }
 
@@ -174,11 +217,15 @@ export async function writeSessionSnapshot(
   id: DbId,
   cards: WhiteboardCard[],
   edges: WhiteboardEdge[],
+  areas: WhiteboardArea[],
+  areasPresent: boolean,
 ): Promise<void> {
   await assertBoardWritable(id);
   const storedCards = preparedCards(cards);
   const storedEdges = preparedEdges(edges);
-  const fresh = await writeProperties(id, [
+  const storedAreas = preparedAreas(areas);
+  const persistAreas = shouldPersistAreas(storedAreas, areasPresent);
+  const props = [
     {
       name: CARDS_PROP,
       type: PROP_TYPE_TEXT,
@@ -189,7 +236,15 @@ export async function writeSessionSnapshot(
       type: PROP_TYPE_TEXT,
       value: JSON.stringify(storedEdges),
     },
-  ]);
+  ];
+  if (persistAreas) {
+    props.push({
+      name: AREAS_PROP,
+      type: PROP_TYPE_TEXT,
+      value: JSON.stringify(storedAreas),
+    });
+  }
+  const fresh = await writeProperties(id, props);
   const block = fresh ?? orca.state.blocks[id];
   const cardsBack = tryReadCards(block);
   const edgesBack = tryReadEdges(block);
@@ -198,6 +253,12 @@ export async function writeSessionSnapshot(
   }
   if (!edgesBack.ok || !edgesEqual(edgesBack.value, storedEdges)) {
     throw new Error(t("Whiteboard connections were not saved"));
+  }
+  if (persistAreas) {
+    const areasBack = tryReadAreas(block);
+    if (!areasBack.ok || !areasEqual(areasBack.value, storedAreas)) {
+      throw new Error(t("Whiteboard sections were not saved"));
+    }
   }
   emitBoardCardsChanged(id);
 }

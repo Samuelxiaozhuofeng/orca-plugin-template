@@ -1,4 +1,5 @@
 import type { DbId } from "../orca.d.ts";
+import { areasEqual, type WhiteboardArea } from "./areas";
 import type { WhiteboardCard } from "./cards";
 import { bendsEqual, type WhiteboardEdge } from "./edges";
 
@@ -7,7 +8,36 @@ export const HISTORY_LIMIT = 50;
 export type BoardSnapshot = {
   cards: WhiteboardCard[];
   edges: WhiteboardEdge[];
+  areas?: WhiteboardArea[];
 };
+
+type HistoryAreasApi = {
+  read: (boardId: DbId) => WhiteboardArea[];
+  apply: (boardId: DbId, areas: WhiteboardArea[]) => void;
+};
+
+let historyAreas: HistoryAreasApi | null = null;
+
+/** Lets persist restore areas on undo/redo without a history→queue import. */
+export function bindHistoryAreas(api: HistoryAreasApi): void {
+  historyAreas = api;
+}
+
+function readLiveAreas(boardId: DbId): WhiteboardArea[] {
+  return historyAreas?.read(boardId) ?? [];
+}
+
+function hydrateAreas(boardId: DbId, snapshot: BoardSnapshot): BoardSnapshot {
+  if (snapshot.areas != null) return snapshot;
+  return { ...snapshot, areas: readLiveAreas(boardId) };
+}
+
+function syncAreasFromSnapshot(boardId: DbId, snapshot: BoardSnapshot): void {
+  if (historyAreas == null) return;
+  const next = snapshot.areas ?? readLiveAreas(boardId);
+  if (areasEqual(historyAreas.read(boardId), next)) return;
+  historyAreas.apply(boardId, next);
+}
 
 type BoardHistory = {
   past: BoardSnapshot[];
@@ -31,6 +61,7 @@ export function cloneSnapshot(snapshot: BoardSnapshot): BoardSnapshot {
         },
       };
     }),
+    areas: (snapshot.areas ?? []).map((area) => ({ ...area })),
   };
 }
 
@@ -97,7 +128,7 @@ export function historyDepth(boardId: DbId): number {
 export function recordBefore(boardId: DbId, current: BoardSnapshot): void {
   if (holdCount > 0) return;
   const history = getOrCreate(boardId);
-  history.past.push(cloneSnapshot(current));
+  history.past.push(cloneSnapshot(hydrateAreas(boardId, current)));
   if (history.past.length > HISTORY_LIMIT) history.past.shift();
   history.future = [];
 }
@@ -113,7 +144,8 @@ export function takeUndo(
   const history = histories.get(boardId);
   const prev = history?.past.pop();
   if (prev == null || history == null) return null;
-  history.future.push(cloneSnapshot(current));
+  history.future.push(cloneSnapshot(hydrateAreas(boardId, current)));
+  syncAreasFromSnapshot(boardId, prev);
   return prev;
 }
 
@@ -124,8 +156,9 @@ export function takeRedo(
   const history = histories.get(boardId);
   const next = history?.future.pop();
   if (next == null || history == null) return null;
-  history.past.push(cloneSnapshot(current));
+  history.past.push(cloneSnapshot(hydrateAreas(boardId, current)));
   if (history.past.length > HISTORY_LIMIT) history.past.shift();
+  syncAreasFromSnapshot(boardId, next);
   return next;
 }
 

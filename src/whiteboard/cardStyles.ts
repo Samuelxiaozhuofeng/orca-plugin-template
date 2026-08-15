@@ -233,6 +233,11 @@ export const CARD_CSS = `
   text-overflow: ellipsis;
   white-space: nowrap;
   cursor: pointer;
+  border-radius: 3px;
+}
+
+.owb-card-ref-row:hover {
+  background: color-mix(in oklab, var(--orca-color-primary-5, #00a896) 12%, transparent);
 }
 
 /* Stamped cinnabar ink-drop extract bullet */

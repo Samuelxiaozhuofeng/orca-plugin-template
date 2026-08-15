@@ -1,5 +1,6 @@
 import type { Block, DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n.ts";
+import { tryReadAreas } from "./areas.ts";
 import { emitBoardCardsChanged } from "./boardEvents.ts";
 import { tryReadCards, type JsonParseResult } from "./cards.ts";
 import { tryReadEdges } from "./edges.ts";
@@ -13,8 +14,16 @@ const CARDS_DROPPED_MSG =
   "${count} cards could not be read. Saving has been stopped so nothing is overwritten. Changes you make now will not be kept.";
 const EDGES_DROPPED_MSG =
   "${count} connections could not be read. Saving has been stopped so nothing is overwritten. Changes you make now will not be kept.";
+const AREAS_DROPPED_MSG =
+  "${count} sections could not be read. Saving has been stopped so nothing is overwritten. Changes you make now will not be kept.";
 const BOTH_DROPPED_MSG =
   "${cards} cards and ${edges} connections could not be read. Saving has been stopped so nothing is overwritten. Changes you make now will not be kept.";
+const CARDS_AREAS_DROPPED_MSG =
+  "${cards} cards and ${areas} sections could not be read. Saving has been stopped so nothing is overwritten. Changes you make now will not be kept.";
+const EDGES_AREAS_DROPPED_MSG =
+  "${edges} connections and ${areas} sections could not be read. Saving has been stopped so nothing is overwritten. Changes you make now will not be kept.";
+const ALL_DROPPED_MSG =
+  "${cards} cards, ${edges} connections and ${areas} sections could not be read. Saving has been stopped so nothing is overwritten. Changes you make now will not be kept.";
 
 const protectTold = new Set<DbId>();
 
@@ -25,14 +34,38 @@ type LastWrite = {
 
 let lastWrite: LastWrite | null = null;
 
+function droppedCount(read: JsonParseResult<unknown> | undefined): number {
+  if (read == null || read.ok) return 0;
+  return read.reason === "bad-items" ? read.dropped : 0;
+}
+
 export function formatProtectMessage(
   cardsRead: JsonParseResult<unknown>,
   edgesRead: JsonParseResult<unknown>,
+  areasRead?: JsonParseResult<unknown>,
 ): string {
-  const cardsDropped =
-    !cardsRead.ok && cardsRead.reason === "bad-items" ? cardsRead.dropped : 0;
-  const edgesDropped =
-    !edgesRead.ok && edgesRead.reason === "bad-items" ? edgesRead.dropped : 0;
+  const cardsDropped = droppedCount(cardsRead);
+  const edgesDropped = droppedCount(edgesRead);
+  const areasDropped = droppedCount(areasRead);
+  if (cardsDropped > 0 && edgesDropped > 0 && areasDropped > 0) {
+    return t(ALL_DROPPED_MSG, {
+      cards: String(cardsDropped),
+      edges: String(edgesDropped),
+      areas: String(areasDropped),
+    });
+  }
+  if (cardsDropped > 0 && areasDropped > 0) {
+    return t(CARDS_AREAS_DROPPED_MSG, {
+      cards: String(cardsDropped),
+      areas: String(areasDropped),
+    });
+  }
+  if (edgesDropped > 0 && areasDropped > 0) {
+    return t(EDGES_AREAS_DROPPED_MSG, {
+      edges: String(edgesDropped),
+      areas: String(areasDropped),
+    });
+  }
   if (cardsDropped > 0 && edgesDropped > 0) {
     return t(BOTH_DROPPED_MSG, {
       cards: String(cardsDropped),
@@ -45,6 +78,9 @@ export function formatProtectMessage(
   if (edgesDropped > 0) {
     return t(EDGES_DROPPED_MSG, { count: String(edgesDropped) });
   }
+  if (areasDropped > 0) {
+    return t(AREAS_DROPPED_MSG, { count: String(areasDropped) });
+  }
   return t(BOARD_UNREADABLE_MSG);
 }
 
@@ -54,9 +90,10 @@ export function notifyBoardUnreadable(boardId: DbId): void {
   const block = orca.state.blocks[boardId];
   const cardsRead = tryReadCards(block);
   const edgesRead = tryReadEdges(block);
+  const areasRead = tryReadAreas(block);
   const message =
-    !cardsRead.ok || !edgesRead.ok
-      ? formatProtectMessage(cardsRead, edgesRead)
+    !cardsRead.ok || !edgesRead.ok || !areasRead.ok
+      ? formatProtectMessage(cardsRead, edgesRead, areasRead)
       : t(BOARD_UNREADABLE_MSG);
   orca.notify("error", message);
 }
@@ -99,7 +136,9 @@ export function boardPropsReadable(
     | undefined,
 ): boolean {
   if (block == null) return true;
-  return tryReadCards(block).ok && tryReadEdges(block).ok;
+  return (
+    tryReadCards(block).ok && tryReadEdges(block).ok && tryReadAreas(block).ok
+  );
 }
 
 export async function assertBoardWritable(blockId: DbId): Promise<void> {
@@ -108,7 +147,8 @@ export async function assertBoardWritable(blockId: DbId): Promise<void> {
   notifyBoardUnreadable(blockId);
   const cardsRead = tryReadCards(block ?? undefined);
   const edgesRead = tryReadEdges(block ?? undefined);
-  throw new Error(formatProtectMessage(cardsRead, edgesRead));
+  const areasRead = tryReadAreas(block ?? undefined);
+  throw new Error(formatProtectMessage(cardsRead, edgesRead, areasRead));
 }
 
 export async function retryLastBoardWrite(): Promise<void> {
