@@ -27,12 +27,18 @@ const ALL_DROPPED_MSG =
 
 const protectTold = new Set<DbId>();
 
-type LastWrite = {
+export type BoardWritePayload = {
   blockId: DbId;
   props: Array<{ name: string; type: number; value: string }>;
 };
 
-let lastWrite: LastWrite | null = null;
+const lastWrites = new Map<DbId, BoardWritePayload>();
+
+export function peekLastBoardWrite(
+  blockId: DbId,
+): BoardWritePayload | undefined {
+  return lastWrites.get(blockId);
+}
 
 function droppedCount(read: JsonParseResult<unknown> | undefined): number {
   if (read == null || read.ok) return 0;
@@ -151,14 +157,19 @@ export async function assertBoardWritable(blockId: DbId): Promise<void> {
   throw new Error(formatProtectMessage(cardsRead, edgesRead, areasRead));
 }
 
-export async function retryLastBoardWrite(): Promise<void> {
-  const attempt = lastWrite;
-  if (attempt == null) return;
-  await assertBoardWritable(attempt.blockId);
-  await writeProperties(attempt.blockId, attempt.props);
-  if (attempt.props.some((prop) => prop.name === CARDS_PROP)) {
-    emitBoardCardsChanged(attempt.blockId);
+export async function retryBoardWrite(
+  payload: BoardWritePayload | null | undefined,
+): Promise<void> {
+  if (payload == null) return;
+  await assertBoardWritable(payload.blockId);
+  await writeProperties(payload.blockId, payload.props);
+  if (payload.props.some((prop) => prop.name === CARDS_PROP)) {
+    emitBoardCardsChanged(payload.blockId);
   }
+}
+
+export async function retryLastBoardWrite(blockId: DbId): Promise<void> {
+  await retryBoardWrite(lastWrites.get(blockId));
 }
 
 function applyReturnedBlocks(result: unknown): void {
@@ -184,7 +195,7 @@ export async function writeProperties(
   if (props.length === 0) {
     return orca.state.blocks[blockId] ?? null;
   }
-  lastWrite = { blockId, props };
+  lastWrites.set(blockId, { blockId, props: props.slice() });
   const result = await orca.invokeBackend("set-properties", [blockId], props);
   applyReturnedBlocks(result);
   const fresh = (await orca.invokeBackend("get-block", blockId)) as

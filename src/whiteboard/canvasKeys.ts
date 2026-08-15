@@ -43,6 +43,13 @@ export type WhiteboardKeyActions = {
   redo: () => void;
 };
 
+export type WhiteboardUndoGate = {
+  canUndo: boolean;
+  canRedo: boolean;
+  /** First undo/redo after leaving card edit goes to the host editor. */
+  takeHostUndo?: () => boolean;
+};
+
 const ARROWS: Record<string, [number, number]> = {
   ArrowLeft: [-1, 0],
   ArrowRight: [1, 0],
@@ -53,6 +60,7 @@ const ARROWS: Record<string, [number, number]> = {
 export function handleWhiteboardKey(
   event: KeyboardEvent,
   actions: WhiteboardKeyActions,
+  undoGate?: WhiteboardUndoGate,
 ): boolean {
   if (event.key === "Escape") {
     actions.escape();
@@ -71,12 +79,21 @@ export function handleWhiteboardKey(
       return true;
     }
     if (key === "z") {
+      const host = undoGate?.takeHostUndo?.() === true;
+      if (event.shiftKey) {
+        if (host || undoGate?.canRedo === false) return false;
+        event.preventDefault();
+        actions.redo();
+        return true;
+      }
+      if (host || undoGate?.canUndo === false) return false;
       event.preventDefault();
-      if (event.shiftKey) actions.redo();
-      else actions.undo();
+      actions.undo();
       return true;
     }
     if (key === "y") {
+      const host = undoGate?.takeHostUndo?.() === true;
+      if (host || undoGate?.canRedo === false) return false;
       event.preventDefault();
       actions.redo();
       return true;

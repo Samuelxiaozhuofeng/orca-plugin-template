@@ -103,21 +103,26 @@ export function useCanvasPointer(opts: {
     onStartEdit,
   } = opts;
   const mountedRef = useRef(true);
+  const abortCanvasRef = useRef<HTMLElement | null>(null);
+  const abortViewportRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (refs.canvas.current) abortCanvasRef.current = refs.canvas.current;
+    if (refs.viewport.current) abortViewportRef.current = refs.viewport.current;
+  });
 
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      const canvas = refs.canvas.current;
-      const viewport = refs.viewport.current;
-      abortCardGestures(canvas);
-      abortCardGestures(viewport);
-      abortMarquees(canvas);
-      abortMarquees(viewport);
-      abortEdgeGestures(canvas);
-      abortEdgeGestures(viewport);
-      abortAreaGestures(canvas);
-      abortAreaGestures(viewport);
+      abortCardGestures(abortCanvasRef.current);
+      abortCardGestures(abortViewportRef.current);
+      abortMarquees(abortCanvasRef.current);
+      abortMarquees(abortViewportRef.current);
+      abortEdgeGestures(abortCanvasRef.current);
+      abortEdgeGestures(abortViewportRef.current);
+      abortAreaGestures(abortCanvasRef.current);
+      abortAreaGestures(abortViewportRef.current);
     };
   }, [refs.canvas]);
 

@@ -34,6 +34,7 @@ import { resetPageBoardIdCache } from "./whiteboard/pageBoardListCache";
 import { startPageBoardRedirect } from "./whiteboard/pageBoardRedirect";
 import { flushAllCardWrites } from "./whiteboard/cardPersist";
 import { flushAllEdgeWrites } from "./whiteboard/edgePersist";
+import { abortAllEdgeGestures } from "./whiteboard/edgeGestures";
 import { tagNewWhiteboard } from "./whiteboard/boardTag";
 import {
   bindWhiteboardPlugin,
@@ -208,6 +209,7 @@ export async function load(_name: string) {
 }
 
 export async function unload() {
+  abortAllEdgeGestures();
   await flushAllCardWrites();
   await flushAllEdgeWrites();
   orca.panels.unregisterPanel(PANEL_TYPE);

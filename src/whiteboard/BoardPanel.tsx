@@ -44,15 +44,17 @@ type Props = {
 export default function BoardPanel({ panelId, blockId }: Props) {
   const { blocks } = useSnapshot(orca.state);
   const block = blockId == null ? undefined : blocks[blockId];
+  const serverReady = block != null;
   const cardsRead = tryReadCards(block);
   const edgesRead = tryReadEdges(block);
   const areasRead = tryReadAreas(block);
   const protect =
-    block != null && (!cardsRead.ok || !edgesRead.ok || !areasRead.ok);
-  const serverCards = cardsRead.ok ? cardsRead.value : [];
-  const serverEdges = edgesRead.ok ? edgesRead.value : [];
-  const serverAreas = areasRead.ok ? areasRead.value : [];
+    serverReady && (!cardsRead.ok || !edgesRead.ok || !areasRead.ok);
+  const serverCards = serverReady && cardsRead.ok ? cardsRead.value : [];
+  const serverEdges = serverReady && edgesRead.ok ? edgesRead.value : [];
+  const serverAreas = serverReady && areasRead.ok ? areasRead.value : [];
   const {
+    ready: persistReady,
     cards,
     edges,
     areas,
@@ -70,10 +72,12 @@ export default function BoardPanel({ panelId, blockId }: Props) {
     serverAreas,
     protect,
     areasPropertyPresent(block),
+    serverReady,
   );
   const [view, setView] = useState<CanvasView>(DEFAULT_VIEW);
   const [loadedFor, setLoadedFor] = useState<DbId | null>(null);
   const viewReady = blockId != null && loadedFor === blockId;
+  const [blockError, setBlockError] = useState(false);
   const [busy, setBusy] = useState(false);
   const [viewportWidth, setViewportWidth] = useState(800);
   const [drawArea, setDrawArea] = useState(false);
@@ -129,7 +133,7 @@ export default function BoardPanel({ panelId, blockId }: Props) {
   });
 
   useEffect(() => {
-    if (blockId == null) return;
+    if (blockId == null || !serverReady || !persistReady) return;
     return registerOpenBoard(blockId, {
       getCards: () => cardsRef.current,
       appendCards: onAddCards,
@@ -144,7 +148,7 @@ export default function BoardPanel({ panelId, blockId }: Props) {
         return focusApiRef.current?.focusCard(cardBlockId) ?? false;
       },
     });
-  }, [blockId, onAddCards]);
+  }, [blockId, onAddCards, persistReady, serverReady]);
 
   useEffect(() => {
     if (blockId == null) {
@@ -220,17 +224,32 @@ export default function BoardPanel({ panelId, blockId }: Props) {
   }, [view.scale]);
 
   useEffect(() => {
-    if (blockId == null || orca.state.blocks[blockId]) return;
+    if (blockId == null) {
+      setBlockError(false);
+      return;
+    }
+    if (orca.state.blocks[blockId]) {
+      setBlockError(false);
+      return;
+    }
+    setBlockError(false);
     let cancelled = false;
     void orca
       .invokeBackend("get-block", blockId)
       .then((loaded: Block | null) => {
-        if (cancelled || loaded == null) return;
+        if (cancelled) return;
+        if (loaded == null) {
+          setBlockError(true);
+          orca.notify("error", t("Failed to load whiteboard"));
+          return;
+        }
         orca.state.blocks[loaded.id] = loaded;
       })
       .catch((error: unknown) => {
+        if (cancelled) return;
         console.error("[whiteboard] failed to load board block", error);
         orca.notify("error", t("Failed to load whiteboard"));
+        setBlockError(true);
       });
     return () => {
       cancelled = true;
@@ -245,8 +264,20 @@ export default function BoardPanel({ panelId, blockId }: Props) {
     );
   }
 
-  if (!viewReady) {
-    return <div className="owb-panel" />;
+  if (blockError && !serverReady) {
+    return (
+      <div className="owb-panel">
+        <div className="owb-empty">{t("Failed to load whiteboard")}</div>
+      </div>
+    );
+  }
+
+  if (!viewReady || !serverReady || !persistReady) {
+    return (
+      <div className="owb-panel">
+        <div className="owb-empty">{t("Loading whiteboard…")}</div>
+      </div>
+    );
   }
 
   return (

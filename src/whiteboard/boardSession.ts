@@ -12,7 +12,8 @@ import { emitBoardCardsChanged } from "./boardEvents.ts";
 import {
   assertBoardWritable,
   notifyBoardUnreadable,
-  retryLastBoardWrite,
+  peekLastBoardWrite,
+  retryBoardWrite,
   writeProperties,
 } from "./boardWrite.ts";
 import {
@@ -42,6 +43,11 @@ export type BoardSession = {
   viewPinned: boolean;
   listeners: Set<() => void>;
   protect: boolean;
+  /**
+   * False until this session has seen a real board block. Missing cache must
+   * not look like an empty board — writes and empty echoes stay off.
+   */
+  hydrated: boolean;
   cards: WhiteboardCard[];
   cardBaseline: WhiteboardCard[];
   cardPending: WhiteboardCard[] | null;
@@ -81,7 +87,9 @@ export function emitBoardSession(session: BoardSession): void {
 export function notifyWriteError(
   kind: "cards" | "edges" | "areas",
   error: unknown,
+  blockId: DbId,
 ): void {
+  const payload = peekLastBoardWrite(blockId);
   console.error(`[whiteboard] failed to save ${kind}`, error);
   orca.notify(
     "error",
@@ -95,18 +103,34 @@ export function notifyWriteError(
     {
       title: t("Retry"),
       action: () => {
-        void retryLastBoardWrite().catch((retryError: unknown) => {
-          notifyWriteError(kind, retryError);
+        void retryBoardWrite(payload).catch((retryError: unknown) => {
+          notifyWriteError(kind, retryError, blockId);
         });
       },
     },
   );
 }
 
+export function notifyBoardNotReady(): void {
+  const host = (globalThis as { orca?: { notify?: (kind: string, msg: string) => void } })
+    .orca;
+  host?.notify?.("warn", t("Whiteboard is still loading"));
+}
+
 export function refuseIfProtected(session: BoardSession): boolean {
   if (!session.protect) return false;
   notifyBoardUnreadable(session.id);
   return true;
+}
+
+export function refuseIfNotHydrated(session: BoardSession): boolean {
+  if (session.hydrated) return false;
+  notifyBoardNotReady();
+  return true;
+}
+
+export function refuseIfNotWritable(session: BoardSession): boolean {
+  return refuseIfProtected(session) || refuseIfNotHydrated(session);
 }
 
 function createSession(
@@ -116,6 +140,7 @@ function createSession(
   areas: WhiteboardArea[],
   protect: boolean,
   areasPresent: boolean,
+  hydrated: boolean,
 ): BoardSession {
   return {
     id,
@@ -123,6 +148,7 @@ function createSession(
     viewPinned: false,
     listeners: new Set(),
     protect,
+    hydrated,
     cards,
     cardBaseline: cards,
     cardPending: null,
@@ -149,6 +175,26 @@ function createSession(
   };
 }
 
+/** First successful read of this board. No-op if already hydrated. */
+export function hydrateBoardSession(
+  session: BoardSession,
+  cards: WhiteboardCard[],
+  edges: WhiteboardEdge[],
+  areas: WhiteboardArea[],
+  areasPresent: boolean,
+): void {
+  if (session.hydrated) return;
+  session.hydrated = true;
+  if (sessionHasPersistWork(session)) return;
+  session.cards = cards;
+  session.cardBaseline = cards;
+  session.edges = edges;
+  session.edgeBaseline = edges;
+  session.areas = areas;
+  session.areaBaseline = areas;
+  session.areasPresent = areasPresent;
+}
+
 /** Create the shared session if needed, without changing the panel refcount. */
 export function ensureBoardSession(
   id: DbId,
@@ -157,11 +203,22 @@ export function ensureBoardSession(
   areas: WhiteboardArea[],
   protect: boolean,
   areasPresent: boolean,
+  hydrated = true,
 ): BoardSession {
   let session = sessions.get(id);
   if (session == null) {
-    session = createSession(id, cards, edges, areas, protect, areasPresent);
+    session = createSession(
+      id,
+      cards,
+      edges,
+      areas,
+      protect,
+      areasPresent,
+      hydrated,
+    );
     sessions.set(id, session);
+  } else if (!session.hydrated && hydrated) {
+    hydrateBoardSession(session, cards, edges, areas, areasPresent);
   }
   session.protect = protect;
   if (session.refCount === 0) session.viewPinned = true;
@@ -175,6 +232,7 @@ export function acquireBoardSession(
   areas: WhiteboardArea[],
   protect: boolean,
   areasPresent: boolean,
+  hydrated = true,
 ): BoardSession {
   const session = ensureBoardSession(
     id,
@@ -183,6 +241,7 @@ export function acquireBoardSession(
     areas,
     protect,
     areasPresent,
+    hydrated,
   );
   session.refCount += 1;
   session.viewPinned = false;
@@ -323,4 +382,8 @@ export function releaseBoardSession(id: DbId): void {
 
 export function listBoardSessions(): BoardSession[] {
   return [...sessions.values()];
+}
+
+export function resetBoardSessions(): void {
+  sessions.clear();
 }

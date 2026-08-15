@@ -7,6 +7,7 @@ import {
   ensureBoardSession,
   getBoardSession,
   listBoardSessions,
+  notifyBoardNotReady,
   type CardBoxPatch,
 } from "./boardSession";
 import {
@@ -56,6 +57,7 @@ export async function flushAllSessionWrites(): Promise<void> {
 }
 
 export type BoardPersistApi = {
+  ready: boolean;
   cards: WhiteboardCard[];
   edges: WhiteboardEdge[];
   areas: WhiteboardArea[];
@@ -88,6 +90,7 @@ export function useBoardPersist(
   serverAreas: WhiteboardArea[],
   protect: boolean,
   areasPresent: boolean,
+  serverReady: boolean,
 ): BoardPersistApi {
   if (blockId != null) {
     ensureBoardSession(
@@ -97,6 +100,7 @@ export function useBoardPersist(
       serverAreas,
       protect,
       areasPresent,
+      serverReady,
     );
   }
   const joined = blockId == null ? undefined : getBoardSession(blockId);
@@ -124,6 +128,7 @@ export function useBoardPersist(
       serverAreasRef.current,
       protect,
       areasPresent,
+      serverReady,
     );
     const sync = () => {
       setCards(session.cards);
@@ -148,31 +153,34 @@ export function useBoardPersist(
   }, [blockId, protect]);
 
   useEffect(() => {
-    if (blockId == null) return;
+    if (blockId == null || !serverReady) return;
     const session = getBoardSession(blockId);
-    if (session == null) return;
+    if (session == null || !session.hydrated) return;
     applyCardEcho(session, serverCards);
-  }, [blockId, serverCards]);
+  }, [blockId, serverReady, serverCards]);
 
   useEffect(() => {
-    if (blockId == null) return;
+    if (blockId == null || !serverReady) return;
     const session = getBoardSession(blockId);
-    if (session == null) return;
+    if (session == null || !session.hydrated) return;
     applyEdgeEcho(session, serverEdges);
-  }, [blockId, serverEdges]);
+  }, [blockId, serverReady, serverEdges]);
 
   useEffect(() => {
-    if (blockId == null) return;
+    if (blockId == null || !serverReady) return;
     const session = getBoardSession(blockId);
-    if (session == null) return;
+    if (session == null || !session.hydrated) return;
     applyAreaEcho(session, serverAreas, areasPresent);
-  }, [blockId, serverAreas, areasPresent]);
+  }, [blockId, serverReady, serverAreas, areasPresent]);
 
   const patchCards = useCallback(
     (entries: ReadonlyArray<{ blockId: DbId; patch: CardBoxPatch }>) => {
       if (blockId == null) return;
       const session = getBoardSession(blockId);
-      if (session == null) return;
+      if (session == null) {
+        notifyBoardNotReady();
+        return;
+      }
       patchCardsOn(session, entries);
     },
     [blockId],
@@ -189,7 +197,10 @@ export function useBoardPersist(
     async (next: WhiteboardCard[]): Promise<boolean> => {
       if (blockId == null) return false;
       const session = getBoardSession(blockId);
-      if (session == null) return false;
+      if (session == null) {
+        notifyBoardNotReady();
+        return false;
+      }
       return commitCardsOn(session, next);
     },
     [blockId],
@@ -199,7 +210,10 @@ export function useBoardPersist(
     async (incoming: WhiteboardCard[]): Promise<boolean> => {
       if (blockId == null || incoming.length === 0) return true;
       const session = getBoardSession(blockId);
-      if (session == null) return false;
+      if (session == null) {
+        notifyBoardNotReady();
+        return false;
+      }
       const occupied = new Set(session.cards.map((card) => card.blockId));
       const fresh = incoming.filter((card) => !occupied.has(card.blockId));
       if (fresh.length === 0) return true;
@@ -215,7 +229,10 @@ export function useBoardPersist(
     ): Promise<boolean> => {
       if (blockId == null) return false;
       const session = getBoardSession(blockId);
-      if (session == null) return false;
+      if (session == null) {
+        notifyBoardNotReady();
+        return false;
+      }
       return commitEdgesOn(session, next);
     },
     [blockId],
@@ -225,7 +242,10 @@ export function useBoardPersist(
     async (next: WhiteboardArea[]): Promise<boolean> => {
       if (blockId == null) return false;
       const session = getBoardSession(blockId);
-      if (session == null) return false;
+      if (session == null) {
+        notifyBoardNotReady();
+        return false;
+      }
       return commitAreasOn(session, next);
     },
     [blockId],
@@ -238,7 +258,10 @@ export function useBoardPersist(
     ): Promise<boolean> => {
       if (blockId == null) return false;
       const session = getBoardSession(blockId);
-      if (session == null) return false;
+      if (session == null) {
+        notifyBoardNotReady();
+        return false;
+      }
       return commitCardsAndAreasOn(session, nextCards, nextAreas);
     },
     [blockId],
@@ -251,7 +274,10 @@ export function useBoardPersist(
     ): Promise<boolean> => {
       if (blockId == null) return false;
       const session = getBoardSession(blockId);
-      if (session == null) return false;
+      if (session == null) {
+        notifyBoardNotReady();
+        return false;
+      }
       return commitBoardOn(session, nextCards, nextEdges);
     },
     [blockId],
@@ -267,9 +293,10 @@ export function useBoardPersist(
   }, [blockId]);
 
   return {
-    cards,
-    edges,
-    areas,
+    ready: joined?.hydrated === true,
+    cards: joined?.hydrated ? joined.cards : cards,
+    edges: joined?.hydrated ? joined.edges : edges,
+    areas: joined?.hydrated ? joined.areas : areas,
     patchCard,
     patchCards,
     commitCards,

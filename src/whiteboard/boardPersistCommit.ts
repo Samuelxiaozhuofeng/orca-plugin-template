@@ -11,7 +11,7 @@ import {
   getBoardSession,
   maybeDisposeBoardSession,
   notifyWriteError,
-  refuseIfProtected,
+  refuseIfNotWritable,
   writeCardsAndAreas,
   writeSessionSnapshot,
   type BoardSession,
@@ -24,7 +24,7 @@ export async function commitBoardOn(
   cards: WhiteboardCard[],
   edges: WhiteboardEdge[],
 ): Promise<boolean> {
-  if (refuseIfProtected(session)) return false;
+  if (refuseIfNotWritable(session)) return false;
   if (session.cardTimer !== 0) {
     window.clearTimeout(session.cardTimer);
     session.cardTimer = 0;
@@ -125,7 +125,7 @@ export async function commitBoardOn(
               session.areaAwaitingEcho = false;
             }
             emitBoardSession(session);
-            notifyWriteError("cards", error);
+            notifyWriteError("cards", error, id);
           }
           return false;
         }
@@ -152,7 +152,7 @@ export async function commitCardsAndAreasOn(
   cards: WhiteboardCard[],
   areas: WhiteboardArea[],
 ): Promise<boolean> {
-  if (refuseIfProtected(session)) return false;
+  if (refuseIfNotWritable(session)) return false;
   if (session.cardTimer !== 0) {
     window.clearTimeout(session.cardTimer);
     session.cardTimer = 0;
@@ -222,7 +222,7 @@ export async function commitCardsAndAreasOn(
             session.areaAwaitingEcho = false;
           }
           emitBoardSession(session);
-          notifyWriteError("cards", error);
+          notifyWriteError("cards", error, id);
         }
         return false;
       }

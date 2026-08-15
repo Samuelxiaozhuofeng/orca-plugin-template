@@ -117,6 +117,7 @@ type TrackedGesture = {
 };
 
 const edgeGestureBuckets = new WeakMap<object, Set<TrackedGesture>>();
+const liveEdgeGestures = new Set<TrackedGesture>();
 
 export function trackEdgeGesture(root: object, onAbort: () => void): TrackedGesture {
   let open = true;
@@ -130,15 +131,18 @@ export function trackEdgeGesture(root: object, onAbort: () => void): TrackedGest
       if (!open) return;
       open = false;
       bucket!.delete(entry);
+      liveEdgeGestures.delete(entry);
       onAbort();
     },
     untrack() {
       if (!open) return;
       open = false;
       bucket!.delete(entry);
+      liveEdgeGestures.delete(entry);
     },
   };
   bucket.add(entry);
+  liveEdgeGestures.add(entry);
   return entry;
 }
 
@@ -147,6 +151,10 @@ export function abortEdgeGestures(root: object | null | undefined): void {
   const bucket = edgeGestureBuckets.get(root);
   if (bucket == null) return;
   for (const entry of [...bucket]) entry.abort();
+}
+
+export function abortAllEdgeGestures(): void {
+  for (const entry of [...liveEdgeGestures]) entry.abort();
 }
 
 export function startDrawEdge(opts: {

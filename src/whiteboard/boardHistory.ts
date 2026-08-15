@@ -1,7 +1,7 @@
 import type { DbId } from "../orca.d.ts";
-import { areasEqual, type WhiteboardArea } from "./areas";
-import type { WhiteboardCard } from "./cards";
-import { bendsEqual, type WhiteboardEdge } from "./edges";
+import { areasEqual, type WhiteboardArea } from "./areas.ts";
+import type { WhiteboardCard } from "./cards.ts";
+import { bendsEqual, type WhiteboardEdge } from "./edges.ts";
 
 export const HISTORY_LIMIT = 50;
 
@@ -45,7 +45,7 @@ type BoardHistory = {
 };
 
 const histories = new Map<DbId, BoardHistory>();
-let holdCount = 0;
+const holdCounts = new Map<DbId | "global", number>();
 let blankUndoTold = false;
 
 export function cloneSnapshot(snapshot: BoardSnapshot): BoardSnapshot {
@@ -98,18 +98,27 @@ export function retainBoardHistory(boardId: DbId): () => void {
 export function resetAllHistory(): void {
   histories.clear();
   retainCounts.clear();
-  holdCount = 0;
+  holdCounts.clear();
   blankUndoTold = false;
 }
 
-export function isHistoryHeld(): boolean {
-  return holdCount > 0;
+export function isHistoryHeld(boardId?: DbId): boolean {
+  if (boardId != null) {
+    return (
+      (holdCounts.get(boardId) ?? 0) > 0 ||
+      (holdCounts.get("global") ?? 0) > 0
+    );
+  }
+  return holdCounts.size > 0;
 }
 
-export function holdHistory(): () => void {
-  holdCount += 1;
+export function holdHistory(boardId?: DbId): () => void {
+  const key: DbId | "global" = boardId ?? "global";
+  holdCounts.set(key, (holdCounts.get(key) ?? 0) + 1);
   return () => {
-    holdCount = Math.max(0, holdCount - 1);
+    const next = (holdCounts.get(key) ?? 1) - 1;
+    if (next <= 0) holdCounts.delete(key);
+    else holdCounts.set(key, next);
   };
 }
 
@@ -126,7 +135,8 @@ export function historyDepth(boardId: DbId): number {
 }
 
 export function recordBefore(boardId: DbId, current: BoardSnapshot): void {
-  if (holdCount > 0) return;
+  if ((holdCounts.get(boardId) ?? 0) > 0) return;
+  if ((holdCounts.get("global") ?? 0) > 0) return;
   const history = getOrCreate(boardId);
   history.past.push(cloneSnapshot(hydrateAreas(boardId, current)));
   if (history.past.length > HISTORY_LIMIT) history.past.shift();
@@ -256,7 +266,7 @@ export async function runAsHistoryStep<T>(
   run: () => Promise<T>,
 ): Promise<T> {
   recordBefore(boardId, current);
-  const release = holdHistory();
+  const release = holdHistory(boardId);
   try {
     return await run();
   } finally {

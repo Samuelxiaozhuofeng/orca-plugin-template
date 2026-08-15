@@ -1,6 +1,7 @@
 import type { DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n";
 import type { WhiteboardArea } from "./areas";
+import { canRedo, canUndo } from "./boardHistory";
 import {
   handleWhiteboardKey,
   isWhiteboardShortcutTarget,
@@ -239,6 +240,7 @@ export function useCanvasBoard({
 
   const editGenRef = useRef(0);
   const flushTimerRef = useRef(0);
+  const hostUndoOnceRef = useRef(false);
 
   useEffect(() => {
     return () => window.clearTimeout(flushTimerRef.current);
@@ -278,6 +280,7 @@ export function useCanvasBoard({
 
   const endEdit = useCallback(() => {
     if (editingRef.current == null) return;
+    hostUndoOnceRef.current = true;
     afterEditorFlush(() => setEditingId(null));
   }, [afterEditorFlush]);
 
@@ -398,6 +401,14 @@ export function useCanvasBoard({
         },
         undo: onUndo,
         redo: onRedo,
+      }, {
+        canUndo: canUndo(boardBlockId),
+        canRedo: canRedo(boardBlockId),
+        takeHostUndo: () => {
+          if (!hostUndoOnceRef.current) return false;
+          hostUndoOnceRef.current = false;
+          return true;
+        },
       });
     };
     window.addEventListener("keydown", onKey);
@@ -411,6 +422,7 @@ export function useCanvasBoard({
     onRedo,
     onRemoveCards,
     onUndo,
+    boardBlockId,
     panelId,
     selectArea,
     selectCards,

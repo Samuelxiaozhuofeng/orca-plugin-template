@@ -7,7 +7,7 @@ export function applyCardEcho(
   session: BoardSession,
   serverCards: WhiteboardCard[],
 ): void {
-  if (session.protect) return;
+  if (session.protect || !session.hydrated) return;
   if (session.cardAwaitingEcho) {
     if (cardsEqual(serverCards, session.cards)) {
       session.cardAwaitingEcho = false;
@@ -29,7 +29,7 @@ export function applyEdgeEcho(
   session: BoardSession,
   serverEdges: WhiteboardEdge[],
 ): void {
-  if (session.protect) return;
+  if (session.protect || !session.hydrated) return;
   if (session.edgeAwaitingEcho) {
     if (edgesEqual(serverEdges, session.edges)) {
       session.edgeAwaitingEcho = false;
@@ -52,7 +52,7 @@ export function applyAreaEcho(
   serverAreas: WhiteboardArea[],
   areasPresent: boolean,
 ): void {
-  if (session.protect) return;
+  if (session.protect || !session.hydrated) return;
   if (areasPresent) session.areasPresent = true;
   if (session.areaAwaitingEcho) {
     if (areasEqual(serverAreas, session.areas)) {

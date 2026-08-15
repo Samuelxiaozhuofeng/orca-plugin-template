@@ -63,6 +63,8 @@ const zhCN = {
   "Failed to open whiteboard panel": "无法打开白板面板",
   "Failed to create whiteboard": "无法创建白板",
   "Failed to load whiteboard": "无法加载白板",
+  "Loading whiteboard…": "正在加载白板…",
+  "Whiteboard is still loading": "白板还在加载，请等加载完成后再放内容",
   "Whiteboard not found": "找不到这块白板",
   "No journals found for this week": "本周没有可放入的日记",
   "Added ${count} journal cards": "已放入 ${count} 张日记卡片",

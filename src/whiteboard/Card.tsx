@@ -265,6 +265,16 @@ export function Card({
         }
       : loadNotice;
   const fillLoadError = !editing && shownNotice?.scope === "empty";
+  const noteGone =
+    shownNotice != null &&
+    shownNotice.cause === "gone" &&
+    shownNotice.scope === "empty";
+
+  useEffect(() => {
+    if (!editing || !noteGone) return;
+    orca.notify("info", t("This note is gone"));
+    onEndEdit();
+  }, [editing, noteGone, onEndEdit]);
 
   const className = [
     "owb-card",
@@ -355,6 +365,10 @@ export function Card({
             if (target?.closest(".owb-card-handle, .owb-card-floating-toolbar")) {
               return;
             }
+            if (noteGone) {
+              orca.notify("info", t("This note is gone"));
+              return;
+            }
             onStartEdit(card.blockId);
           }}
           onContextMenu={(event) => {
@@ -380,10 +394,15 @@ export function Card({
               className="owb-card-body"
               title={editing ? undefined : t("Click to edit")}
               onDoubleClick={() => {
-                if (!editing) onStartEdit(card.blockId);
+                if (editing) return;
+                if (noteGone) {
+                  orca.notify("info", t("This note is gone"));
+                  return;
+                }
+                onStartEdit(card.blockId);
               }}
             >
-              {editing ? (
+              {editing && !noteGone ? (
                 <CardEditor panelId={panelId} blockId={card.blockId} />
               ) : fillLoadError && shownNotice != null ? (
                 <CardLoadNotice

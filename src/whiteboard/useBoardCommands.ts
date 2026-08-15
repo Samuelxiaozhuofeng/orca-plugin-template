@@ -171,7 +171,7 @@ export function useBoardCommands(opts: {
         (edge) => !drop.has(edge.from) && !drop.has(edge.to),
       );
       record();
-      const release = holdHistory();
+      const release = blockId != null ? holdHistory(blockId) : holdHistory();
       try {
         const saved = await commitBoard(next, leftover);
         if (!saved) {

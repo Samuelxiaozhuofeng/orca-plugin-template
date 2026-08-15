@@ -291,6 +291,8 @@ export function useEdgeLayerApi(opts: {
       },
     };
     return () => {
+      dismissDrawRef.current?.();
+      dismissDrawRef.current = null;
       apiRef.current = null;
     };
   }, [apiRef, canvasRef, pointerToWorld]);

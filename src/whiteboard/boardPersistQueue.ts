@@ -17,7 +17,7 @@ import {
   getBoardSession,
   maybeDisposeBoardSession,
   notifyWriteError,
-  refuseIfProtected,
+  refuseIfNotWritable,
   releaseBoardSession,
   type BoardSession,
   type CardBoxPatch,
@@ -82,7 +82,7 @@ export async function flushCards(session: BoardSession): Promise<boolean> {
     window.clearTimeout(session.cardTimer);
     session.cardTimer = 0;
   }
-  if (session.cardPending == null || refuseIfProtected(session)) {
+  if (session.cardPending == null || refuseIfNotWritable(session)) {
     return idleLane(session, "card");
   }
   const id = session.id;
@@ -118,7 +118,7 @@ export async function flushCards(session: BoardSession): Promise<boolean> {
           session.cardDirty = true;
           session.cardAwaitingEcho = false;
         }
-        notifyWriteError("cards", error);
+        notifyWriteError("cards", error, id);
       }
       return false;
     }
@@ -130,7 +130,7 @@ export async function flushCards(session: BoardSession): Promise<boolean> {
 }
 
 export async function flushEdges(session: BoardSession): Promise<boolean> {
-  if (session.edgePending == null || refuseIfProtected(session)) {
+  if (session.edgePending == null || refuseIfNotWritable(session)) {
     return idleLane(session, "edge");
   }
   const id = session.id;
@@ -170,7 +170,7 @@ export async function flushEdges(session: BoardSession): Promise<boolean> {
           session.edgeDirty = true;
           session.edgeAwaitingEcho = false;
         }
-        notifyWriteError("edges", error);
+        notifyWriteError("edges", error, id);
       }
       return false;
     }
@@ -182,7 +182,7 @@ export async function flushEdges(session: BoardSession): Promise<boolean> {
 }
 
 export async function flushAreas(session: BoardSession): Promise<boolean> {
-  if (session.areaPending == null || refuseIfProtected(session)) {
+  if (session.areaPending == null || refuseIfNotWritable(session)) {
     return idleLane(session, "area");
   }
   const id = session.id;
@@ -225,7 +225,7 @@ export async function flushAreas(session: BoardSession): Promise<boolean> {
           session.areaDirty = true;
           session.areaAwaitingEcho = false;
         }
-        notifyWriteError("areas", error);
+        notifyWriteError("areas", error, id);
       }
       return false;
     }
@@ -251,7 +251,7 @@ export function patchCardsOn(
   session: BoardSession,
   entries: ReadonlyArray<{ blockId: DbId; patch: CardBoxPatch }>,
 ): void {
-  if (entries.length === 0 || refuseIfProtected(session)) return;
+  if (entries.length === 0 || refuseIfNotWritable(session)) return;
   const byId = new Map<DbId, CardBoxPatch>();
   for (const entry of entries) {
     const prev = byId.get(entry.blockId);
@@ -272,7 +272,7 @@ export async function commitCardsOn(
   session: BoardSession,
   next: WhiteboardCard[],
 ): Promise<boolean> {
-  if (refuseIfProtected(session)) return false;
+  if (refuseIfNotWritable(session)) return false;
   session.cards = next;
   session.cardPending = next;
   session.cardDirty = true;
@@ -284,7 +284,7 @@ export async function commitEdgesOn(
   session: BoardSession,
   next: WhiteboardEdge[],
 ): Promise<boolean> {
-  if (refuseIfProtected(session)) return false;
+  if (refuseIfNotWritable(session)) return false;
   const cleaned = sanitizeEdges(next);
   session.edges = cleaned;
   session.edgePending = cleaned;
@@ -297,7 +297,7 @@ export async function commitAreasOn(
   session: BoardSession,
   next: WhiteboardArea[],
 ): Promise<boolean> {
-  if (refuseIfProtected(session)) return false;
+  if (refuseIfNotWritable(session)) return false;
   session.areas = next;
   session.areaPending = next;
   session.areaDirty = true;
