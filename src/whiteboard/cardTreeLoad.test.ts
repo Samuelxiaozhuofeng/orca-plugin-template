@@ -5,7 +5,9 @@ import {
   cardTreeLoadIds,
   collectMissingCardTreeIds,
   planCardTreeQueue,
+  planGetBlocksBatches,
 } from "./cardTreeLoad.ts";
+import { GET_BLOCKS_BATCH_SIZE } from "./pageBoardPlan.ts";
 import {
   hostDrawsOwnChildren,
   isBlockFolded,
@@ -234,6 +236,17 @@ check(
     simplified: true,
   }).failedRoots.join(",") === "",
   "simplified lod does not report load failure",
+);
+
+const fiveHundred = Array.from({ length: 500 }, (_, i) => i + 1);
+const batches = planGetBlocksBatches(fiveHundred);
+check(GET_BLOCKS_BATCH_SIZE === 200, "get-blocks batch size is 200");
+check(batches.length === 3, "500 ids split into 3 get-blocks calls");
+check(batches[0].length === 200 && batches[1].length === 200, "full batches are 200");
+check(batches[2].length === 100, "remainder is its own batch");
+check(
+  planGetBlocksBatches([]).length === 0,
+  "empty id list does not emit a get-blocks call",
 );
 
 console.log("cardTreeLoad.test.ts ok");

@@ -125,8 +125,14 @@ export function CardBlockTree({
               data-type="r"
               data-ref={node.id}
             >
-              {cardExcerpt(cachedBlockPlainText(node.id, liveBlocks())) ||
-                t("Extracted as a card")}
+              {cardExcerpt(
+                cachedBlockPlainText(
+                  node.id,
+                  liveBlocks(),
+                  CARD_TREE_LOAD_MAX_NODES,
+                  CARD_TREE_LOAD_MAX_DEPTH,
+                ),
+              ) || t("Extracted as a card")}
             </span>
           ) : (
             <orca.components.Block
