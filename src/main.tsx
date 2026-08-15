@@ -7,6 +7,8 @@ import {
   LocateOnBoardMenuItem,
   locateOnBoardCommandId,
   mountAddToBoardHost,
+  QueryToBoardMenuItem,
+  queryToBoardCommandId,
   TagToBoardMenuItem,
   tagToBoardCommandId,
 } from "./whiteboard/addToBoard";
@@ -198,6 +200,15 @@ export async function load(_name: string) {
       ),
     },
   );
+  orca.blockMenuCommands.registerBlockMenuCommand(
+    queryToBoardCommandId(pluginName),
+    {
+      worksOnMultipleBlocks: false,
+      render: (blockId, _rootBlockId, close) => (
+        <QueryToBoardMenuItem blockId={blockId} close={close} />
+      ),
+    },
+  );
   unmountAddToBoard = mountAddToBoardHost();
   registerPageBoardCommands(pluginName);
   unmountPageBoard = mountPageBoardHost();
@@ -244,6 +255,9 @@ export async function unload() {
     );
     orca.tagMenuCommands.unregisterTagMenuCommand(
       tagToBoardCommandId(pluginName),
+    );
+    orca.blockMenuCommands.unregisterBlockMenuCommand(
+      queryToBoardCommandId(pluginName),
     );
     orca.commands.unregisterCommand(commandId(OPEN_COMMAND));
     orca.commands.unregisterCommand(commandId(WRAP_AREA_COMMAND));
