@@ -11,6 +11,7 @@ import { EdgeDropMenu } from "./EdgeDropMenu";
 import type { DrawDropEmpty } from "./edgeGestures";
 import type { WhiteboardEdge } from "./edges";
 import type { ArrangeAction } from "./selection";
+import { CardFilterBanner } from "./CardFilterPopover";
 import { SelectionToolbar } from "./SelectionToolbar";
 
 const { useCallback, useEffect, useRef, useState } = window.React;
@@ -58,6 +59,7 @@ type SharedProps = {
   overlay: ReturnType<typeof useCanvasOverlayState>;
   boardBlockId: DbId;
   cards: WhiteboardCard[];
+  viewCards: WhiteboardCard[];
   interactiveCards: WhiteboardCard[];
   cardsRef: { current: WhiteboardCard[] };
   selected: DbId[];
@@ -70,6 +72,11 @@ type SharedProps = {
   ) => Promise<boolean>;
   applyCardColor: (color: string | undefined) => void;
   applyUnifySize: (mode: UnifySizeMode) => void;
+  filterActive: boolean;
+  filterTags: readonly string[];
+  filterMatched: number;
+  filterTotal: number;
+  onClearFilter: () => void;
 };
 
 /** Status chrome and in-viewport popovers (must sit inside `.owb-viewport`). */
@@ -77,6 +84,7 @@ export function CanvasViewportOverlays({
   overlay,
   boardBlockId,
   cards,
+  viewCards,
   interactiveCards,
   selected,
   edges,
@@ -90,6 +98,11 @@ export function CanvasViewportOverlays({
   onCloseEdgeDrop,
   applyCardColor,
   applyUnifySize,
+  filterActive,
+  filterTags,
+  filterMatched,
+  filterTotal,
+  onClearFilter,
 }: SharedProps & {
   edgeDrop: DrawDropEmpty | null;
   hiddenCardCount: number;
@@ -137,9 +150,18 @@ export function CanvasViewportOverlays({
           ) : null}
         </div>
       ) : null}
+      {filterActive ? (
+        <CardFilterBanner
+          tags={filterTags}
+          matched={filterMatched}
+          total={filterTotal}
+          belowSearch={searchOpen}
+          onClear={onClearFilter}
+        />
+      ) : null}
       {searchOpen ? (
         <CardSearchOverlay
-          cards={interactiveCards}
+          cards={viewCards}
           onPick={(cardBlockId: DbId) => {
             closeSearch();
             focusApiRef.current?.focusCard(cardBlockId);

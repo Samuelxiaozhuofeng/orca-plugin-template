@@ -69,6 +69,8 @@ type Args = {
   focusApiRef: { current: CanvasFocusApi | null };
   onViewChange: (view: CanvasView) => void;
   searchOpen: boolean;
+  /** Extra ids that must drop out of selection (tag filter). */
+  inoperableIds?: ReadonlySet<DbId> | null;
 };
 
 export function useCanvasBoard({
@@ -101,6 +103,7 @@ export function useCanvasBoard({
   focusApiRef,
   onViewChange,
   searchOpen,
+  inoperableIds,
 }: Args) {
   const [editingId, setEditingId] = useState<DbId | null>(null);
   const [selected, setSelected] = useState<DbId[]>([]);
@@ -154,11 +157,14 @@ export function useCanvasBoard({
 
   useEffect(() => {
     const ids = new Set(cards.map((card: WhiteboardCard) => card.blockId));
+    if (inoperableIds != null) {
+      for (const id of inoperableIds) ids.delete(id);
+    }
     setSelected((prev: DbId[]) => {
       const next = prev.filter((id) => ids.has(id));
       return next.length === prev.length ? prev : next;
     });
-  }, [cards]);
+  }, [cards, inoperableIds]);
 
   useEffect(() => {
     if (selectedEdge == null) return;

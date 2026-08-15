@@ -277,6 +277,136 @@ export const CANVAS_CSS = `
   color: var(--orca-color-text-3);
 }
 
+.owb-filter-banner {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 36;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(520px, calc(100% - 32px));
+  padding: 6px 8px 6px 12px;
+  border-radius: var(--owb-radius-card, 6px);
+  background: var(--orca-color-bg-1);
+  border: 1.5px solid var(--orca-color-border);
+  box-shadow: 3px 3px 0 0 var(--orca-color-border);
+  color: var(--orca-color-text-1);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.owb-filter-banner.is-below-search {
+  top: 72px;
+}
+
+.owb-filter-banner-clear {
+  appearance: none;
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border: 1.5px solid var(--orca-color-border);
+  border-radius: var(--owb-radius-btn, 4px);
+  background: transparent;
+  color: var(--orca-color-text-1);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.owb-filter-banner-clear:hover {
+  background: var(--orca-color-warning-5, #f4a259);
+  color: #111417;
+}
+
+.owb-toolbar-filter {
+  position: relative;
+}
+
+.owb-card-filter {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 40;
+  width: 240px;
+  padding: 8px;
+  border-radius: var(--owb-radius-card, 6px);
+  background: var(--orca-color-bg-1);
+  border: 1.5px solid var(--orca-color-border);
+  box-shadow: 3px 3px 0 0 var(--orca-color-border);
+}
+
+.owb-card-filter-input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 7px 10px;
+  border: 1.5px solid var(--orca-color-border);
+  border-radius: var(--owb-radius-btn, 4px);
+  background: var(--orca-color-bg-1);
+  color: var(--orca-color-text-1);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.owb-card-filter-input:focus {
+  border-color: var(--orca-color-primary-5, #00a896);
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--orca-color-primary-5, #00a896) 25%, transparent);
+}
+
+.owb-card-filter-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 240px;
+  margin-top: 6px;
+  overflow: auto;
+}
+
+.owb-card-filter-item {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 1.5px solid transparent;
+  border-radius: var(--owb-radius-btn, 4px);
+  background: transparent;
+  color: var(--orca-color-text-1);
+  cursor: pointer;
+  text-align: left;
+}
+
+.owb-card-filter-item:hover,
+.owb-card-filter-item.is-on {
+  background: var(--orca-color-warning-5, #f4a259);
+  color: #111417;
+  border-color: var(--orca-color-border);
+}
+
+.owb-card-filter-check {
+  flex: 0 0 14px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.owb-card-filter-name {
+  font-size: 13px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.owb-card-filter-hint {
+  margin-top: 6px;
+  padding: 4px 6px;
+  font-size: 12px;
+  color: var(--orca-color-text-3);
+}
+
 .owb-selection-bar {
   position: absolute;
   bottom: 16px;

@@ -244,6 +244,14 @@ const zhCN = {
   "Search cards": "搜索卡片",
   "Type to find cards on this board.": "输入关键词，在这块白板里找卡片。",
   "No matching cards": "没有匹配的卡片",
+  "Filter cards": "筛选卡片",
+  "Type a tag name": "输入标签名",
+  "Pick tags to highlight matching cards on this board.":
+    "选标签后，只突出显示带这些标签的卡片。",
+  "No matching tags": "没有匹配的标签",
+  "Filtering: ${tags} (${matched} / ${total} cards)":
+    "筛选中：${tags}（${matched} / ${total} 张）",
+  "Clear filter": "清除筛选",
   "Unify size": "统一尺寸",
   "Match widest": "按最宽的",
   "Match narrowest": "按最窄的",

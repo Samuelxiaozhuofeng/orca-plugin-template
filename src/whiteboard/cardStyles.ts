@@ -352,6 +352,16 @@ export const CARD_CSS = `
   color: var(--orca-color-text-1);
 }
 
+.owb-card.is-filter-dim {
+  opacity: 0.28;
+  pointer-events: none;
+}
+
+.owb-card.is-filter-dim.is-editing {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .owb-card.is-simplified {
   justify-content: center;
 }
