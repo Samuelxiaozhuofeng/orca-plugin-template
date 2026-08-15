@@ -165,6 +165,17 @@ const zhCN = {
   "Failed to rename whiteboard": "无法重命名白板",
   "Undo removed the card from the board. The note is still under this whiteboard in the outline.":
     "卡片已从白板上拿掉，笔记还在这块白板下面，没有被删除。",
+  "New card here": "在这里新建卡片",
+  "Add a note as a card…": "把已有笔记加成卡片…",
+  "Tidy all cards up to grid": "把所有卡片理成网格",
+  "Zoom to fit": "缩放到全部内容",
+  "Search notes": "搜索笔记",
+  "Type to search your notes.": "输入关键词搜索笔记。",
+  "Searching…": "正在搜索…",
+  "No matching notes": "没有匹配的笔记",
+  "Failed to search notes": "搜索笔记失败",
+  "Already on this board": "已在这块白板上",
+  "Untitled block": "无标题内容",
   "This whiteboard's data could not be read. Saving has been stopped so nothing is overwritten.":
     "这块白板的数据读不出来，已停止保存以免覆盖",
 };

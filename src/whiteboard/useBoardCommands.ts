@@ -337,13 +337,13 @@ export function useBoardCommands(opts: {
   );
 
   const confirmPlace = useCallback(
-    async (value: PlaceDialogValue) => {
+    async (value: PlaceDialogValue, origin?: CanvasOrigin | null) => {
       if (busy || blockId == null) return;
       setBusy(true);
       try {
         const result = await placeJournalCards({
           ...value,
-          origin: viewportOrigin(view),
+          origin: origin ?? viewportOrigin(view),
           existing: cards,
         });
         if (result.placed > 0) {

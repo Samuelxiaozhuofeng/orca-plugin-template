@@ -6,7 +6,8 @@ import {
   useCanvasFocusApi,
   type CanvasFocusApi,
 } from "./cardFocus";
-import { boardMenu, canOpenBoardMenu } from "./canvasBoardMenu";
+import { AddNoteCard } from "./AddNoteCard";
+import { boardMenu } from "./canvasBoardMenu";
 import { CanvasCards } from "./CanvasCards";
 import { EdgeDropMenu } from "./EdgeDropMenu";
 import { EdgeLayer, type EdgeLayerApi } from "./EdgeLayer";
@@ -26,7 +27,7 @@ import { type CanvasView } from "./viewTransform";
 
 export type { CanvasView, CardPatchEntry };
 
-const { useCallback, useRef } = window.React;
+const { useCallback, useRef, useState } = window.React;
 
 type Props = {
   panelId: string;
@@ -47,6 +48,8 @@ type Props = {
   onRestoreExtract: (cardBlockId: DbId) => Promise<boolean>;
   edges: WhiteboardEdge[];
   onViewportWidth: (width: number) => void;
+  /** Opens the journal dialog with cards landing at this canvas point. */
+  onPlaceJournalsAt: (origin: CanvasOrigin) => void;
   weekdayGuide?: CanvasOrigin | null;
   focusApiRef: { current: CanvasFocusApi | null };
 };
@@ -67,6 +70,7 @@ export function Canvas({
   onRestoreExtract,
   edges,
   onViewportWidth,
+  onPlaceJournalsAt,
   weekdayGuide,
   focusApiRef,
 }: Props) {
@@ -79,6 +83,8 @@ export function Canvas({
   const guidesRef = useRef<HTMLDivElement | null>(null);
   const edgeApiRef = useRef<EdgeLayerApi | null>(null);
   const bodyRef = useRef(document.body);
+  const menuPointRef = useRef<CanvasOrigin>({ x: 0, y: 0 });
+  const [addNoteAt, setAddNoteAt] = useState<CanvasOrigin | null>(null);
   const settings = useWhiteboardSettings();
   const settingsRef = useRef(settings);
   cardsRef.current = cards;
@@ -210,6 +216,12 @@ export function Canvas({
           cardsRef,
           selectCards,
           applyArrange,
+          onNewCard: () => void createBlankAt(menuPointRef.current, true),
+          onAddFromNote: () => setAddNoteAt(menuPointRef.current),
+          onPlaceJournals: () => onPlaceJournalsAt(menuPointRef.current),
+          onFitAll: () => {
+            focusApiRef.current?.fitAll();
+          },
         })
       }
     >
@@ -256,10 +268,9 @@ export function Canvas({
           onContextMenu={(event) => {
             const target = event.target as HTMLElement | null;
             if (target?.closest(".owb-card, .owb-edge-hit, .owb-edge-editor")) return;
-            if (!canOpenBoardMenu(selectedRef, cardsRef)) {
-              event.preventDefault();
-              return;
-            }
+            // Anything the menu creates lands where the user right-clicked,
+            // so capture the world point before the menu takes over.
+            menuPointRef.current = pointerToWorld(event.clientX, event.clientY);
             open(event);
           }}
         >
@@ -317,6 +328,18 @@ export function Canvas({
             onCommitEdges={onCommitEdges}
             onClose={closeEdgeDrop}
           />
+          {addNoteAt != null && (
+            <AddNoteCard
+              boardBlockId={boardBlockId}
+              at={addNoteAt}
+              cardsRef={cardsRef}
+              onAddCards={onAddCards}
+              onFocusCard={(cardBlockId: DbId) => {
+                focusApiRef.current?.focusCard(cardBlockId);
+              }}
+              onClose={() => setAddNoteAt(null)}
+            />
+          )}
           {cards.length === 0 && (
             <div className="owb-canvas-empty">
               <i className="ti ti-layout-grid owb-canvas-empty-icon" />

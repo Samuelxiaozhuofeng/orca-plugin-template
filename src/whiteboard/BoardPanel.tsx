@@ -54,6 +54,9 @@ export default function BoardPanel({ panelId, blockId }: Props) {
   const [busy, setBusy] = useState(false);
   const [viewportWidth, setViewportWidth] = useState(800);
   const [placeOpen, setPlaceOpen] = useState(false);
+  // Set when the journal dialog was opened from the canvas context menu, so
+  // the cards land where the user right-clicked instead of at the viewport.
+  const [placeOrigin, setPlaceOrigin] = useState<CanvasOrigin | null>(null);
   const [weekdayGuide, setWeekdayGuide] = useState<CanvasOrigin | null>(null);
   const [pendingFocus, setPendingFocus] = useState<DbId | null>(null);
   const zoomLabelRef = useRef<HTMLButtonElement | null>(null);
@@ -197,6 +200,10 @@ export default function BoardPanel({ panelId, blockId }: Props) {
         onRedo={onRedo}
         onRestoreExtract={onRestoreExtract}
         onViewportWidth={setViewportWidth}
+        onPlaceJournalsAt={(origin: CanvasOrigin) => {
+          setPlaceOrigin(origin);
+          setPlaceOpen(true);
+        }}
         focusApiRef={focusApiRef}
       />
       <BoardToolbar
@@ -207,7 +214,11 @@ export default function BoardPanel({ panelId, blockId }: Props) {
         zoomLabelRef={zoomLabelRef}
         onUndo={onUndo}
         onRedo={onRedo}
-        onPlace={() => setPlaceOpen(true)}
+        onPlace={() => {
+          setPlaceOrigin(null);
+          setPlaceOpen(true);
+        }}
+        onFitView={() => focusApiRef.current?.fitAll() ?? false}
         setView={setView}
       />
       <PlaceDialog
@@ -217,7 +228,7 @@ export default function BoardPanel({ panelId, blockId }: Props) {
         onClose={() => {
           if (!busy) setPlaceOpen(false);
         }}
-        onConfirm={(value) => void confirmPlace(value)}
+        onConfirm={(value) => void confirmPlace(value, placeOrigin)}
       />
     </div>
   );

@@ -2,6 +2,7 @@ import type { DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n";
 import { getOpenBoard } from "./boards";
 import { clampScale, type WhiteboardCard } from "./data";
+import { fitViewForBoxes } from "./fitView";
 import type { CanvasView } from "./viewTransform";
 
 const { useEffect } = window.React;
@@ -25,6 +26,8 @@ export const CARD_FOCUS_WAIT_MS = PENDING_WAIT_MS;
 
 export type CanvasFocusApi = {
   focusCard: (cardBlockId: DbId) => boolean;
+  /** Frames every card on the board. False when there is nothing to frame. */
+  fitAll: () => boolean;
 };
 
 export function focusView(
@@ -148,6 +151,22 @@ export function applyCanvasCardFocus(opts: {
   return true;
 }
 
+export function applyCanvasFitAll(opts: {
+  cards: readonly WhiteboardCard[];
+  viewport: { width: number; height: number };
+  canvas: HTMLElement | null;
+  grid: HTMLElement | null;
+  viewportEl: HTMLElement | null;
+  onViewChange: (view: CanvasView) => void;
+}): boolean {
+  const viewport = liveViewportSize(opts.viewportEl) ?? opts.viewport;
+  const next = fitViewForBoxes(opts.cards, viewport);
+  if (next == null) return false;
+  beginViewAnimation(opts.canvas, opts.grid, opts.viewportEl);
+  opts.onViewChange(next);
+  return true;
+}
+
 export function useCanvasFocusApi(
   apiRef: { current: CanvasFocusApi | null },
   ctx: {
@@ -184,6 +203,15 @@ export function useCanvasFocusApi(
           viewportEl: viewportRef.current,
           onViewChange,
           selectCards,
+        }),
+      fitAll: () =>
+        applyCanvasFitAll({
+          cards: cardsRef.current,
+          viewport: viewportSize,
+          canvas: canvasRef.current,
+          grid: gridRef.current,
+          viewportEl: viewportRef.current,
+          onViewChange,
         }),
     };
     return () => {

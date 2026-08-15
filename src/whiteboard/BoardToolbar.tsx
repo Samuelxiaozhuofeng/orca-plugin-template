@@ -17,6 +17,8 @@ type Props = {
   onUndo: () => void;
   onRedo: () => void;
   onPlace: () => void;
+  /** Frames every card. False when the board is empty. */
+  onFitView: () => boolean;
   setView: (
     next: CanvasView | ((current: CanvasView) => CanvasView),
   ) => void;
@@ -31,6 +33,7 @@ export function BoardToolbar({
   onUndo,
   onRedo,
   onPlace,
+  onFitView,
   setView,
 }: Props) {
   return (
@@ -83,8 +86,11 @@ export function BoardToolbar({
           type="button"
           className="owb-zoom-btn"
           ref={zoomLabelRef}
-          title={t("Reset view")}
-          onClick={() => setView(DEFAULT_VIEW)}
+          title={t("Zoom to fit")}
+          onClick={() => {
+            // Empty board: nothing to frame, so fall back to the home view.
+            if (!onFitView()) setView(DEFAULT_VIEW);
+          }}
         />
         <div className="owb-zoom-sep" />
         <button

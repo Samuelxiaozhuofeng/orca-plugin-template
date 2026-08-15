@@ -163,8 +163,8 @@ export function useCanvasBoard({
   );
 
   const applyArrange = useCallback(
-    (action: ArrangeAction) => {
-      const ids = new Set<DbId>(selectedRef.current);
+    (action: ArrangeAction, over?: readonly DbId[]) => {
+      const ids = new Set<DbId>(over ?? selectedRef.current);
       const patches = arrangeCards(action, cardsRef.current, ids, viewportSize.width);
       if (patches.length === 0) return;
       onPatchCards(
