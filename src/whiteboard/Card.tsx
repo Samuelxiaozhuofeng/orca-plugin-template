@@ -64,6 +64,45 @@ type Props = {
 
 type CardBox = { x: number; y: number; w: number; h: number };
 
+/**
+ * Full visible body content — the flattened tree, excerpt, or hosted
+ * editor. Do not use the first `.orca-block`: child rows are siblings
+ * in `.owb-card-block-tree`, so that only measures the parent row.
+ */
+function cardFitContentRoot(cardEl: Element): HTMLElement | null {
+  const body = cardEl.querySelector(".owb-card-body");
+  if (body == null) return null;
+  return (
+    (body.querySelector(".owb-card-block-tree") as HTMLElement | null) ??
+    (body.querySelector(".owb-card-excerpt") as HTMLElement | null) ??
+    (body.querySelector(".owb-card-empty") as HTMLElement | null) ??
+    (body.querySelector(".orca-block-editor-blocks") as HTMLElement | null) ??
+    (body.querySelector(".orca-block-editor") as HTMLElement | null) ??
+    (body as HTMLElement)
+  );
+}
+
+function measureCardFitHeight(cardEl: HTMLElement): number {
+  const header = cardEl.querySelector(".owb-card-header") as HTMLElement | null;
+  const body = cardEl.querySelector(".owb-card-body") as HTMLElement | null;
+  const content = cardFitContentRoot(cardEl);
+  if (body == null || content == null) return MIN_CARD_HEIGHT;
+
+  const bodyStyle = getComputedStyle(body);
+  const padY =
+    (parseFloat(bodyStyle.paddingTop) || 0) +
+    (parseFloat(bodyStyle.paddingBottom) || 0);
+  const contentH =
+    content === body
+      ? Math.max(0, content.scrollHeight - padY)
+      : content.scrollHeight;
+  const borderY = Math.max(0, cardEl.offsetHeight - cardEl.clientHeight);
+  return Math.max(
+    MIN_CARD_HEIGHT,
+    Math.ceil((header?.offsetHeight ?? 0) + padY + contentH + borderY),
+  );
+}
+
 /** First visible editable line inside the card editor (hidden chrome skipped). */
 function firstEditableLine(root: HTMLElement): HTMLElement | null {
   const candidates = root.querySelectorAll<HTMLElement>(
@@ -265,18 +304,10 @@ export function Card({
   const fitContentHeight = () => {
     const el = cardRef.current;
     if (!el) return;
-    const title = el.querySelector(".owb-card-title, .owb-card-header") as HTMLElement | null;
-    const inner = el.querySelector(
-      ".orca-block, .orca-block-editor-blocks, .owb-card-excerpt",
-    ) as HTMLElement | null;
-    const body = el.querySelector(".owb-card-body") as HTMLElement | null;
-    const contentH =
-      inner?.scrollHeight ?? body?.scrollHeight ?? MIN_CARD_HEIGHT;
-    const nextH = Math.max(
-      MIN_CARD_HEIGHT,
-      (title?.offsetHeight ?? 0) + contentH + 16,
-    );
+    const nextH = measureCardFitHeight(el);
     if (nextH === card.h) return;
+    liveRef.current = { ...liveRef.current, h: nextH };
+    applyCardBox(el, liveRef.current);
     onPatchCard(card.blockId, { w: card.w, h: nextH });
   };
 
