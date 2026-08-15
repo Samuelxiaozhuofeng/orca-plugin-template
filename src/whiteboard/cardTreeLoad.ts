@@ -1,5 +1,9 @@
 import type { Block, DbId } from "../orca.d.ts";
 import {
+  chunkIds,
+  GET_BLOCKS_BATCH_SIZE,
+} from "./pageBoardPlan.ts";
+import {
   CARD_TREE_LOAD_MAX_DEPTH,
   CARD_TREE_LOAD_MAX_NODES,
   cardRootsWithHoles,
@@ -9,6 +13,13 @@ import {
   type CardLoadCause,
   type CardLoadScope,
 } from "./cardTreeQueue.ts";
+
+export function planGetBlocksBatches(
+  ids: readonly DbId[],
+  batchSize = GET_BLOCKS_BATCH_SIZE,
+): DbId[][] {
+  return chunkIds(ids, batchSize);
+}
 
 export {
   CARD_TREE_LOAD_MAX_DEPTH,
@@ -173,14 +184,18 @@ async function fetchAndCacheBlocks(ids: readonly DbId[]): Promise<number> {
     });
     for (const id of need) inflight.set(id, task);
     try {
-      const result = await orca.invokeBackend("get-blocks", need);
-      cached = cacheFetchedBlocks(result, need);
-    } catch (error) {
-      console.error("[whiteboard] failed to load card blocks", error);
-      for (const id of need) {
-        if (orca.state.blocks[id] == null) {
-          retryableIds.add(id);
-          goneIds.delete(id);
+      for (const batch of planGetBlocksBatches(need)) {
+        try {
+          const result = await orca.invokeBackend("get-blocks", batch);
+          cached += cacheFetchedBlocks(result, batch);
+        } catch (error) {
+          console.error("[whiteboard] failed to load card blocks", error);
+          for (const id of batch) {
+            if (orca.state.blocks[id] == null) {
+              retryableIds.add(id);
+              goneIds.delete(id);
+            }
+          }
         }
       }
     } finally {

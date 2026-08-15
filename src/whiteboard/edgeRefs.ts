@@ -2,9 +2,8 @@ import type { Block, DbId } from "../orca.d.ts";
 import { useWatchedValue } from "./blockWatch";
 import type { WhiteboardCard } from "./cards";
 import { pairKey, type WhiteboardEdge } from "./edges";
-import { collectBlockTreeIds } from "./viewTransform";
 
-const { useMemo } = window.React;
+const { useMemo, useRef } = window.React;
 
 export const REF_TYPE_INLINE = 1;
 export const REF_WALK_MAX_BLOCKS = 2000;
@@ -80,24 +79,86 @@ function liveBlocks(): { [id: number]: Block | undefined } {
   return orca.state.blocks as { [id: number]: Block | undefined };
 }
 
+export type CardRelationSnap = {
+  key: string;
+  slices: string;
+  watchIds: DbId[];
+};
+
+export type RelationKeyStats = {
+  walked: number;
+};
+
+function relationSlice(
+  id: DbId,
+  block: Block | undefined,
+  owner: DbId | undefined,
+): string {
+  const children = block?.children?.join(",") ?? "";
+  const refs = (block?.refs ?? [])
+    .filter((ref) => ref.type === REF_TYPE_INLINE)
+    .map((ref) => String(ref.to))
+    .join(",");
+  return `${id}>${owner ?? ""}:${children}:${refs}`;
+}
+
+function slicesOf(watchIds: readonly DbId[], blocks: { [id: number]: Block | undefined }): string {
+  return watchIds.map((id) => relationSlice(id, blocks[id], undefined)).join("|");
+}
+
+export function cardRelationDirty(
+  prev: CardRelationSnap,
+  blocks: { [id: number]: Block | undefined },
+): boolean {
+  return slicesOf(prev.watchIds, blocks) !== prev.slices;
+}
+
+export function cardRelationSnap(
+  rootId: DbId,
+  blocks: { [id: number]: Block | undefined },
+): CardRelationSnap {
+  const { owner } = buildOwnerMap(
+    [{ blockId: rootId, kind: "block", x: 0, y: 0, w: 1, h: 1 }],
+    blocks,
+  );
+  const watchIds = [...owner.keys()].sort((a, b) => a - b);
+  const parts: string[] = [];
+  for (const id of watchIds) {
+    parts.push(relationSlice(id, blocks[id], owner.get(id)));
+  }
+  return {
+    key: parts.join("|"),
+    slices: slicesOf(watchIds, blocks),
+    watchIds,
+  };
+}
+
 /** Fingerprint of children + inline refs in the card forest. Text is ignored. */
 export function referenceRelationKey(
   cards: readonly WhiteboardCard[],
   blocks: { [id: number]: Block | undefined },
+  cache?: Map<DbId, CardRelationSnap>,
+  stats?: RelationKeyStats,
 ): string {
-  const { owner } = buildOwnerMap(cards, blocks);
-  const ids = [...owner.keys()].sort((a, b) => a - b);
-  const parts: string[] = [];
-  for (const id of ids) {
-    const block = blocks[id];
-    const children = block?.children?.join(",") ?? "";
-    const refs = (block?.refs ?? [])
-      .filter((ref) => ref.type === REF_TYPE_INLINE)
-      .map((ref) => String(ref.to))
-      .join(",");
-    parts.push(`${id}>${owner.get(id)}:${children}:${refs}`);
+  if (cache != null) {
+    const live = new Set(cards.map((card) => card.blockId));
+    for (const id of [...cache.keys()]) {
+      if (!live.has(id)) cache.delete(id);
+    }
   }
-  return parts.join("|");
+  const parts: string[] = [];
+  for (const card of cards) {
+    const prev = cache?.get(card.blockId);
+    if (prev != null && !cardRelationDirty(prev, blocks)) {
+      parts.push(prev.key);
+      continue;
+    }
+    if (stats != null) stats.walked += 1;
+    const snap = cardRelationSnap(card.blockId, blocks);
+    cache?.set(card.blockId, snap);
+    parts.push(snap.key);
+  }
+  return parts.join("||");
 }
 
 export function useReferenceEdges(
@@ -105,6 +166,7 @@ export function useReferenceEdges(
   drawn: readonly WhiteboardEdge[],
   enabled: boolean,
 ): ReferenceEdgesResult {
+  const cacheRef = useRef(new Map<DbId, CardRelationSnap>());
   const cardKey = cards.map((card) => card.blockId).join(",");
   const drawnKey = drawn
     .map((edge) => pairKey(edge.from, edge.to))
@@ -113,16 +175,24 @@ export function useReferenceEdges(
   const relationKey = useWatchedValue(
     () => {
       if (!enabled || cards.length === 0) return "";
-      return referenceRelationKey(cards, liveBlocks());
+      return referenceRelationKey(cards, liveBlocks(), cacheRef.current);
     },
     () => {
       if (!enabled || cards.length === 0) return [];
-      return collectBlockTreeIds(
-        cards.map((card) => card.blockId),
-        liveBlocks(),
-        REF_WALK_MAX_BLOCKS,
-        REF_WALK_MAX_DEPTH,
-      );
+      const blocks = liveBlocks();
+      referenceRelationKey(cards, blocks, cacheRef.current);
+      const ids: DbId[] = [];
+      const seen = new Set<DbId>();
+      for (const card of cards) {
+        const snap = cacheRef.current.get(card.blockId);
+        if (snap == null) continue;
+        for (const id of snap.watchIds) {
+          if (seen.has(id)) continue;
+          seen.add(id);
+          ids.push(id);
+        }
+      }
+      return ids;
     },
     [enabled, cardKey],
   );

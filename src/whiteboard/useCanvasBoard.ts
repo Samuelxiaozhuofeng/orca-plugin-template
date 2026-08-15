@@ -7,7 +7,6 @@ import {
   isWhiteboardShortcutTarget,
 } from "./canvasKeys";
 import { GRID_GAP, type WhiteboardCard } from "./data";
-import { CARD_MOUNT_CAP } from "./layout";
 import type { DrawDropEmpty } from "./edgeGestures";
 import type { EdgeLayerApi } from "./EdgeLayer";
 import type { WhiteboardEdge } from "./edges";
@@ -26,8 +25,7 @@ import { useCanvasAreas } from "./useCanvasAreas";
 import type { CardPatchEntry, PatchCardsFn } from "./useCanvasPointer";
 import {
   isLodSimplified,
-  pickMountedCards,
-  visibleCards,
+  planShownCards,
   type CanvasView,
 } from "./viewTransform";
 import {
@@ -163,23 +161,11 @@ export function useCanvasBoard({
     }
   }, [edges, selectedEdge]);
 
-  const pinned = useMemo(() => {
-    const ids = new Set(selected);
-    if (editingId != null) ids.add(editingId);
-    return ids;
-  }, [editingId, selected]);
-
   const lodSimplified = isLodSimplified(view.scale);
-  const shownPlan = useMemo(() => {
-    const visible = visibleCards(cards, view, viewportSize, pinned);
-    return pickMountedCards(visible, {
-      cap: CARD_MOUNT_CAP,
-      editingId,
-      selectedIds: selected,
-      view,
-      viewport: viewportSize,
-    });
-  }, [cards, editingId, pinned, selected, view, viewportSize]);
+  const shownPlan = useMemo(
+    () => planShownCards(cards, view, viewportSize, { editingId }),
+    [cards, editingId, view, viewportSize],
+  );
   const shownCards = shownPlan.cards;
   const hiddenCardCount = shownPlan.hiddenCount;
   const selectedSet = useMemo(() => new Set(selected), [selected]);

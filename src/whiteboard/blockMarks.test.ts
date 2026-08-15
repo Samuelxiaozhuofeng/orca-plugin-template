@@ -35,6 +35,7 @@ register(
 );
 
 const {
+  applyBoardCardIndex,
   buildBlockMarkCss,
   collectCardBoards,
   markLabelFor,
@@ -124,5 +125,23 @@ check(
 );
 check(markLabelFor(undefined) === null, "missing names are unmarked");
 check(markLabelFor([]) === null, "empty names are unmarked");
+
+const incremental = new Map();
+applyBoardCardIndex(incremental, null, { name: "Alpha", cardIds: [1, 2] });
+applyBoardCardIndex(incremental, null, { name: "Beta", cardIds: [1] });
+check(
+  incremental.get(1)?.join(",") === "Alpha,Beta",
+  "incremental add keeps cross-board names",
+);
+applyBoardCardIndex(
+  incremental,
+  { name: "Alpha", cardIds: [1, 2] },
+  { name: "Alpha", cardIds: [2, 3] },
+);
+check(incremental.get(1)?.join(",") === "Beta", "removing a card from one board keeps the other");
+check(incremental.get(2)?.join(",") === "Alpha", "kept card stays marked");
+check(incremental.get(3)?.join(",") === "Alpha", "newly added card is marked");
+applyBoardCardIndex(incremental, { name: "Beta", cardIds: [1] }, null);
+check(incremental.has(1) === false, "last board drop clears the mark");
 
 console.log("blockMarks.test.ts ok");

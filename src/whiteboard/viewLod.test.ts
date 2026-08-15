@@ -1,9 +1,17 @@
 import { CARD_LOD_SCALE, CARD_MOUNT_CAP, MIN_SCALE } from "./layout.ts";
-import { cardTreeLoadIds, planCardTreeQueue } from "./cardTreeLoad.ts";
 import {
+  CARD_TREE_LOAD_MAX_DEPTH,
+  CARD_TREE_LOAD_MAX_NODES,
+  cardTreeLoadIds,
+  planCardTreeQueue,
+} from "./cardTreeLoad.ts";
+import {
+  cachedBlockPlainText,
+  collectBlockTreeIds,
   isLodSimplified,
   marginScreensForScale,
   pickMountedCards,
+  planShownCards,
   visibleCards,
   type CanvasView,
 } from "./viewTransform.ts";
@@ -141,6 +149,76 @@ check(lodPlan.queue.length === 0, "lod queue stays empty even after failures");
 check(
   lodPlan.failedRoots.length === 0,
   "lod does not surface load-failure state",
+);
+
+const manySpread: WhiteboardCard[] = [];
+for (let i = 0; i < 1000; i++) {
+  manySpread.push(
+    card(i + 1, (i % 40) * 400, Math.floor(i / 40) * 300),
+  );
+}
+const allIds = manySpread.map((item) => item.blockId);
+const shownViewport = planShownCards(manySpread, viewAt(1), viewport);
+const pinnedIfSelected = visibleCards(manySpread, viewAt(1), viewport, allIds);
+check(
+  pinnedIfSelected.length === 1000,
+  "old pin-selected path would keep every card",
+);
+check(
+  shownViewport.cards.length < 80,
+  `select-all mount set stays viewport-sized (got ${shownViewport.cards.length})`,
+);
+check(
+  shownViewport.cards.length <= CARD_MOUNT_CAP,
+  "mount set never exceeds the cap",
+);
+check(
+  shownViewport.cards.every((item) =>
+    visibleCards([item], viewAt(1), viewport, null).length === 1,
+  ),
+  "every mounted card intersects the viewport",
+);
+const shownAgain = planShownCards(manySpread, viewAt(1), viewport, {
+  editingId: null,
+});
+check(
+  shownAgain.cards.map((item) => item.blockId).join(",") ===
+    shownViewport.cards.map((item) => item.blockId).join(","),
+  "selection size is not an input to the mount set",
+);
+
+const farEdit = card(9001, 50_000, 50_000);
+const withEditor = planShownCards([...manySpread, farEdit], viewAt(1), viewport, {
+  editingId: 9001,
+});
+check(
+  withEditor.cards.some((item) => item.blockId === 9001),
+  "the card being edited stays mounted even off-screen",
+);
+
+const deep: Record<number, { children: number[]; text: string }> = {};
+for (let i = 1; i <= 20; i++) {
+  deep[i] = { children: i < 20 ? [i + 1] : [], text: i === 20 ? "leaf" : "" };
+}
+const watchIds = collectBlockTreeIds(
+  [1],
+  deep,
+  CARD_TREE_LOAD_MAX_NODES,
+  CARD_TREE_LOAD_MAX_DEPTH,
+);
+check(watchIds.length === CARD_TREE_LOAD_MAX_DEPTH + 1, "watch depth matches load cap");
+check(
+  watchIds[watchIds.length - 1] === CARD_TREE_LOAD_MAX_DEPTH + 1,
+  "watch walk stops at the load depth cap",
+);
+check(
+  cachedBlockPlainText(1, deep, CARD_TREE_LOAD_MAX_NODES, CARD_TREE_LOAD_MAX_DEPTH) ===
+    "",
+  "excerpt does not walk past the load cap to a distant leaf",
+);
+check(
+  cachedBlockPlainText(1, deep) === "leaf",
+  "default excerpt depth still reaches a depth-19 leaf",
 );
 
 console.log("viewLod.test.ts ok");

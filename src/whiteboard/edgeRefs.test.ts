@@ -44,6 +44,7 @@ register(
 
 const {
   collectReferenceEdges,
+  referenceRelationKey,
   REF_TYPE_INLINE,
   REF_WALK_MAX_BLOCKS,
 } = await import("./edgeRefs.ts");
@@ -127,5 +128,36 @@ for (const id of overMaxChildren) {
 }
 const overMax = collectReferenceEdges([card(1)], overMaxBlocks, noneDrawn);
 check(overMax.truncated === true, "one block past the walk budget is truncated");
+
+const cache = new Map();
+const forest = [card(1), card(2), card(3)];
+const stats1 = { walked: 0 };
+const key1 = referenceRelationKey(forest, linkedBlocks, cache, stats1);
+check(stats1.walked === 3, "cold fingerprint walks each card once");
+const stats2 = { walked: 0 };
+const key2 = referenceRelationKey(forest, linkedBlocks, cache, stats2);
+check(key2 === key1, "cached fingerprint is stable");
+check(stats2.walked === 0, "unchanged cards are not walked again");
+
+const textOnly = {
+  1: { children: [], refs: [inlineRef(2)], text: "edited" },
+  2: { children: [], refs: [] },
+  3: { children: [], refs: [inlineRef(1)] },
+};
+const stats3 = { walked: 0 };
+const key3 = referenceRelationKey(forest, textOnly, cache, stats3);
+check(key3 === key1, "text edits do not change the relation fingerprint");
+check(stats3.walked === 0, "text edits do not re-walk the forest");
+
+const childChanged = {
+  1: { children: [4], refs: [inlineRef(2)] },
+  2: { children: [], refs: [] },
+  3: { children: [], refs: [inlineRef(1)] },
+  4: { children: [], refs: [] },
+};
+const stats4 = { walked: 0 };
+const key4 = referenceRelationKey(forest, childChanged, cache, stats4);
+check(key4 !== key1, "child-list changes invalidate the fingerprint");
+check(stats4.walked === 1, "only the dirty card is walked");
 
 console.log("edgeRefs.test.ts ok");

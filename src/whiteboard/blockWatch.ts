@@ -1,5 +1,10 @@
 import type { DbId } from "../orca.d.ts";
 import {
+  CARD_TREE_LOAD_MAX_DEPTH,
+  CARD_TREE_LOAD_MAX_NODES,
+} from "./cardTreeQueue";
+import { idsReplacedIn, registerBlockPresence } from "./blockPresence";
+import {
   cachedBlockPlainText,
   cardExcerpt,
   collectBlockTreeIds,
@@ -52,21 +57,24 @@ function sameList(
   return true;
 }
 
-function idsReplaced(
-  ids: readonly DbId[],
-  lastById: Map<DbId, object | undefined>,
-): boolean {
-  if (ids.length !== lastById.size) return true;
-  for (const id of ids) {
-    if (orca.state.blocks[id] !== lastById.get(id)) return true;
-  }
-  return false;
+export function cardBlockWatchIds(
+  blockId: DbId,
+  blocks: {
+    [id: number]: { text?: string; children?: DbId[] } | undefined;
+  } = liveBlocks(),
+): DbId[] {
+  return collectBlockTreeIds(
+    [blockId],
+    blocks,
+    CARD_TREE_LOAD_MAX_NODES,
+    CARD_TREE_LOAD_MAX_DEPTH,
+  );
 }
 
 /**
  * Re-render only when `compute()` changes. Watches the listed blocks
- * in-place, plus identity replace/delete of those keys on the map.
- * Unrelated notes do not call `setState`.
+ * in-place, plus identity replace/delete of those keys via the shared
+ * blocks-map detector. Unrelated notes do not call `setState`.
  */
 export function useWatchedValue<T>(
   compute: () => T,
@@ -99,14 +107,15 @@ export function useWatchedValue<T>(
     let unsubs: (() => void)[] = [];
     let idList: DbId[] = [];
     const lastById = new Map<DbId, object | undefined>();
+    const presence = registerBlockPresence(() => refresh());
 
-    const detach = () => {
+    const detachBlocks = () => {
       for (const unsub of unsubs) unsub();
       unsubs = [];
     };
 
     const attach = (ids: DbId[]) => {
-      detach();
+      detachBlocks();
       idList = ids;
       lastById.clear();
       for (const id of ids) {
@@ -115,21 +124,15 @@ export function useWatchedValue<T>(
         const unsub = trySubscribe(block, refresh);
         if (unsub) unsubs.push(unsub);
       }
-      if (ids.length === 0) return;
-      const unsubMap = trySubscribe(orca.state.blocks, () => {
-        for (const id of idList) {
-          if (orca.state.blocks[id] !== lastById.get(id)) {
-            refresh();
-            return;
-          }
-        }
-      });
-      if (unsubMap) unsubs.push(unsubMap);
+      presence.setIds(ids);
     };
 
     const refresh = () => {
       const ids = [...watchIdsRef.current()];
-      if (!sameList(ids, idList) || idsReplaced(ids, lastById)) {
+      if (
+        !sameList(ids, idList) ||
+        idsReplacedIn(ids, lastById, orca.state.blocks)
+      ) {
         attach(ids);
       }
       const next = computeRef.current();
@@ -140,7 +143,10 @@ export function useWatchedValue<T>(
 
     attach([...watchIdsRef.current()]);
     refresh();
-    return detach;
+    return () => {
+      detachBlocks();
+      presence.dispose();
+    };
   }, deps);
 
   return current;
@@ -152,7 +158,14 @@ export function readCardBlockView(blockId: DbId): CardBlockView {
     exists: block != null,
     text: block?.text,
     childCount: block?.children?.length ?? 0,
-    excerpt: cardExcerpt(cachedBlockPlainText(blockId, liveBlocks())),
+    excerpt: cardExcerpt(
+      cachedBlockPlainText(
+        blockId,
+        liveBlocks(),
+        CARD_TREE_LOAD_MAX_NODES,
+        CARD_TREE_LOAD_MAX_DEPTH,
+      ),
+    ),
   };
 }
 
@@ -171,13 +184,7 @@ export function cardBlockViewEqual(
 export function useCardBlockView(blockId: DbId, epoch = 0): CardBlockView {
   return useWatchedValue(
     () => readCardBlockView(blockId),
-    () =>
-      collectBlockTreeIds(
-        [blockId],
-        liveBlocks(),
-        Number.POSITIVE_INFINITY,
-        Number.POSITIVE_INFINITY,
-      ),
+    () => cardBlockWatchIds(blockId),
     [blockId, epoch],
     cardBlockViewEqual,
   );

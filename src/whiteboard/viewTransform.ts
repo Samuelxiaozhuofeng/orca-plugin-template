@@ -210,6 +210,10 @@ function sortByViewportCenter<T extends WhiteboardCard>(
 /**
  * Cap how many visible cards actually mount. Editing is never dropped;
  * selected cards fill next; the rest are the nearest to the viewport centre.
+ *
+ * The live canvas does not pass `selectedIds` — select-all must not steal
+ * the mount budget from the viewport. Prefer-selected remains for callers
+ * that already culled to the window.
  */
 export function pickMountedCards<T extends WhiteboardCard>(
   visible: readonly T[],
@@ -255,6 +259,26 @@ export function pickMountedCards<T extends WhiteboardCard>(
   return { cards, hiddenCount: Math.max(0, visible.length - cards.length) };
 }
 
+/**
+ * Cards that actually mount. Only the viewport (plus the card being edited)
+ * may pin; selection never does.
+ */
+export function planShownCards<T extends WhiteboardCard>(
+  cards: T[],
+  view: CanvasView,
+  viewport: { width: number; height: number },
+  opts: { cap?: number; editingId?: DbId | null } = {},
+): MountedCards<T> {
+  const editingId = opts.editingId ?? null;
+  const visible = visibleCards(cards, view, viewport, editingId);
+  return pickMountedCards(visible, {
+    cap: opts.cap,
+    editingId,
+    view,
+    viewport,
+  });
+}
+
 export const BLOCK_TREE_MAX_NODES = 2000;
 export const BLOCK_TREE_MAX_DEPTH = 30;
 
@@ -287,11 +311,16 @@ export function collectBlockTreeIds(
 export function cachedBlockPlainText(
   blockId: DbId,
   blocks: BlockTextLookup,
+  maxNodes = BLOCK_TREE_MAX_NODES,
+  maxDepth = BLOCK_TREE_MAX_DEPTH,
 ): string {
   const seen = new Set<DbId>();
-  const walk = (id: DbId): string => {
+  let nodes = 0;
+  const walk = (id: DbId, depth: number): string => {
+    if (nodes >= maxNodes || depth > maxDepth) return "";
     if (seen.has(id)) return "";
     seen.add(id);
+    nodes += 1;
     const block = blocks[id];
     if (block == null) return "";
     if (typeof block.text === "string" && block.text.trim() !== "") {
@@ -299,12 +328,12 @@ export function cachedBlockPlainText(
     }
     const parts: string[] = [];
     for (const childId of block.children ?? []) {
-      const piece = walk(childId);
+      const piece = walk(childId, depth + 1);
       if (piece) parts.push(piece);
     }
     return parts.join("\n");
   };
-  return walk(blockId);
+  return walk(blockId, 0);
 }
 
 export function cardExcerpt(text: string | undefined): string {

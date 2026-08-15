@@ -157,6 +157,52 @@ function uniqueIds(ids: readonly DbId[]): DbId[] {
   return [...new Set(ids)];
 }
 
+const INLINE_BOARD_ID_TTL_MS = 60_000;
+
+let inlineIdCache: { ids: DbId[]; fetchedAt: number } | null = null;
+let inlineIdInflight: Promise<DbId[]> | null = null;
+
+function inlineBoardIdsFresh(now: number): boolean {
+  return (
+    inlineIdCache != null && now - inlineIdCache.fetchedAt < INLINE_BOARD_ID_TTL_MS
+  );
+}
+
+async function inlineBoardIdsForList(now: number): Promise<DbId[]> {
+  if (inlineBoardIdsFresh(now)) return [...(inlineIdCache?.ids ?? [])];
+  if (inlineIdInflight != null) return inlineIdInflight;
+  inlineIdInflight = (async () => {
+    try {
+      const ids = await queryBlockIds({
+        kind: 9,
+        types: { op: 5, value: [WHITEBOARD_TYPE] },
+      });
+      inlineIdCache = { ids, fetchedAt: Date.now() };
+      return ids;
+    } catch (err: unknown) {
+      console.warn("[whiteboard] type query for inline boards failed", err);
+      return inlineIdCache?.ids ?? [];
+    } finally {
+      inlineIdInflight = null;
+    }
+  })();
+  return inlineIdInflight;
+}
+
+/** Keep a warm type-id cache in sync when a board is touched incrementally. */
+export function rememberInlineBoardId(id: DbId): void {
+  if (inlineIdCache == null) return;
+  if (inlineIdCache.ids.includes(id)) return;
+  inlineIdCache = {
+    ids: [...inlineIdCache.ids, id],
+    fetchedAt: inlineIdCache.fetchedAt,
+  };
+}
+
+export async function ensureBlocksLoaded(ids: readonly DbId[]): Promise<void> {
+  await loadMissingBlocks(ids);
+}
+
 let pageIdDiscover: { epoch: number; task: Promise<DbId[]> } | null = null;
 
 async function discoverPageBoardIds(): Promise<DbId[]> {
@@ -218,19 +264,17 @@ function blocksForIds(ids: readonly DbId[]): Block[] {
  * ids; QueryBlock has no custom-property field (query-types.md / QueryBlock2).
  */
 export async function fetchWhiteboardBlocks(): Promise<Block[]> {
+  const now = Date.now();
   let typeIds: DbId[] = [];
   try {
-    typeIds = await queryBlockIds({
-      kind: 9,
-      types: { op: 5, value: [WHITEBOARD_TYPE] },
-    });
+    typeIds = await inlineBoardIdsForList(now);
   } catch (err: unknown) {
     console.warn("[whiteboard] type query for inline boards failed", err);
   }
 
   let pageIds: DbId[] = [];
   try {
-    pageIds = await pageBoardIdsForList(Date.now());
+    pageIds = await pageBoardIdsForList(now);
   } catch (err: unknown) {
     console.warn("[whiteboard] page-board id list failed", err);
     pageIds = collectKnownPageBoardIds();
