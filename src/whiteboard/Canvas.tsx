@@ -45,7 +45,6 @@ type Props = {
   ) => Promise<boolean>;
   onUndo: () => void;
   onRedo: () => void;
-  onRestoreExtract: (cardBlockId: DbId) => Promise<boolean>;
   edges: WhiteboardEdge[];
   onViewportWidth: (width: number) => void;
   /** Opens the journal dialog with cards landing at this canvas point. */
@@ -67,7 +66,6 @@ export function Canvas({
   onCommitEdges,
   onUndo,
   onRedo,
-  onRestoreExtract,
   edges,
   onViewportWidth,
   onPlaceJournalsAt,
@@ -132,7 +130,6 @@ export function Canvas({
     closeEdgeDrop,
     createBlankAt,
     extractRow,
-    restoreExtracted,
     shownCards,
     selectedSet,
   } = useCanvasBoard({
@@ -155,7 +152,6 @@ export function Canvas({
     onCommitEdges,
     onUndo,
     onRedo,
-    onRestoreExtract,
   });
 
   const {
@@ -297,7 +293,6 @@ export function Canvas({
               onMoveFrame={onMoveFrame}
               edgeApiRef={edgeApiRef}
               onExtractRow={extractRow}
-              onRestoreExtract={restoreExtracted}
             />
           </div>
           <div ref={guidesRef} className="owb-guides" />

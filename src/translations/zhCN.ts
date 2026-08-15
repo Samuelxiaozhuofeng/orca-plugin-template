@@ -65,21 +65,9 @@ const zhCN = {
   "No notes this day": "这天还没有写日记",
   "Double-click to edit": "双击进入编辑",
   "Extract as card": "提取为卡片",
-  "Move back to source card": "放回原卡片",
-  "Drag to extract as a card": "拖到画布空白处，提取为独立卡片",
-  "Failed to extract this block from the note": "无法把这块从笔记里抽出来",
-  "Pulled out of the source card": "已从原卡片抽出",
-  "Original notes were moved onto the whiteboard. References were left in their place.":
-    "原文已移到白板，原位留下引用",
-  "Failed to move this card back to the source card":
-    "无法把这张卡片放回原来的卡片",
-  "Could not undo the note change for this action":
-    "无法撤销这次抽出对应的笔记改动",
-  "Could not redo the note change for this action":
-    "无法重做这次抽出对应的笔记改动",
-  "The note change was applied but the board could not be restored":
-    "笔记已经改回去了，但白板上的卡片没能一起还原",
-  "This card can no longer be moved back": "这张卡片已经无法放回原来的位置",
+  "Drag to extract as a card": "拖到画布空白处，在白板上单独成卡",
+  "Extracted as a card": "已提取为卡片",
+  "Added as a separate card on the whiteboard": "已在白板上单独成卡",
   Editing: "编辑中",
   "Drag to resize": "拖动调整大小",
   "Fit content height": "适应内容高度",

@@ -74,7 +74,6 @@ export default function BoardPanel({ panelId, blockId }: Props) {
     onRemoveCards,
     onUndo,
     onRedo,
-    onRestoreExtract,
     confirmPlace,
   } = useBoardCommands({
     blockId,
@@ -198,7 +197,6 @@ export default function BoardPanel({ panelId, blockId }: Props) {
         onCommitEdges={onCommitEdges}
         onUndo={onUndo}
         onRedo={onRedo}
-        onRestoreExtract={onRestoreExtract}
         onViewportWidth={setViewportWidth}
         onPlaceJournalsAt={(origin: CanvasOrigin) => {
           setPlaceOrigin(origin);

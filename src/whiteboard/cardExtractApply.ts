@@ -9,11 +9,7 @@ import {
   findVacantCardPosition,
   parseExtractSource,
   planExtractEdge,
-  planExtractMoves,
 } from "./cardExtract";
-import { type ExtractRestoreInfo } from "./cardExtractModel";
-import { moveBlockOutAsExtract } from "./cardExtractMove";
-import { makeExtractNoteAction } from "./cardExtractRestore";
 import {
   dropMessage,
   parseDroppedBlockIds,
@@ -25,41 +21,24 @@ import { fetchBlock } from "./newCard";
 
 const ANCESTOR_WALK_MAX = 40;
 
-const EXTRACT_MOVED_MSG =
-  "Original notes were moved onto the whiteboard. References were left in their place.";
-
-function extractDropMessage(
-  result: DropBlocksResult,
-  movedCount: number,
-): string {
-  if (movedCount <= 0) return dropMessage(result);
-  const moved = t(EXTRACT_MOVED_MSG);
-  if (result.added > 0) {
-    return `${dropMessage(result)}${t(", ")}${moved}`;
+function extractDropMessage(result: DropBlocksResult): string {
+  if (result.added <= 0) return dropMessage(result);
+  const parts = [t("Added as a separate card on the whiteboard")];
+  if (result.skippedExisting > 0) {
+    parts.push(
+      t("skipped ${existing} already on the board", {
+        existing: String(result.skippedExisting),
+      }),
+    );
   }
-  return moved;
-}
-
-function createExtractRollback(note: { undo: () => Promise<void> }): {
-  run: (moved: boolean) => Promise<void>;
-} {
-  let attempted = false;
-  return {
-    run: async (moved: boolean) => {
-      if (attempted) return;
-      attempted = true;
-      if (!moved) return;
-      try {
-        await note.undo();
-      } catch (rollbackError) {
-        console.error(
-          "[whiteboard] failed to roll back extract notes",
-          rollbackError,
-        );
-        throw rollbackError;
-      }
-    },
-  };
+  if (result.skippedSelf > 0) {
+    parts.push(
+      t("skipped ${self} that would nest this board", {
+        self: String(result.skippedSelf),
+      }),
+    );
+  }
+  return parts.join(t(", "));
 }
 
 export async function extractBlocksToBoard(opts: {
@@ -87,16 +66,7 @@ export async function extractBlocksToBoard(opts: {
     boardBlockId: opts.boardBlockId,
   });
 
-  await ensureParentChainCached(opts.ids);
-  const cardIds = new Set(opts.existing.map((card) => card.blockId));
-  const movingIds = planExtractMoves(
-    opts.ids,
-    opts.boardBlockId,
-    orca.state.blocks,
-    cardIds,
-    opts.sourceCardId,
-  );
-  if (result.incoming.length === 0 && movingIds.length === 0) {
+  if (result.incoming.length === 0) {
     orca.notify("info", dropMessage(result));
     return [];
   }
@@ -106,17 +76,10 @@ export async function extractBlocksToBoard(opts: {
     return [];
   }
 
-  const incomingIds = new Set(result.incoming.map((card) => card.blockId));
-  const edgeTargets = [
-    ...result.incoming,
-    ...movingIds
-      .filter((blockId) => !incomingIds.has(blockId))
-      .map((blockId) => ({ blockId })),
-  ];
   const edgesToAdd: WhiteboardEdge[] = [];
   if (opts.sourceCardId != null) {
     let planned: WhiteboardEdge[] = [...opts.existingEdges];
-    for (const card of edgeTargets) {
+    for (const card of result.incoming) {
       const edge = planExtractEdge(opts.sourceCardId, card.blockId, planned);
       if (edge == null) continue;
       edgesToAdd.push(edge);
@@ -124,85 +87,31 @@ export async function extractBlocksToBoard(opts: {
     }
   }
 
-  const infos: ExtractRestoreInfo[] = [];
-  const note = makeExtractNoteAction(infos);
-  const rollback = createExtractRollback(note);
-
   const savedIncoming = await runAsHistoryStep(
     opts.boardBlockId,
     { cards: [...opts.existing], edges: [...opts.existingEdges] },
     async () => {
-      try {
-        for (const blockId of movingIds) {
-          const sourceCardId =
-            opts.sourceCardId ?? (await loadOwningCardId(blockId, cardIds));
-          infos.push(
-            await moveBlockOutAsExtract({
-              blockId,
-              sourceCardId,
-              boardBlockId: opts.boardBlockId,
-            }),
-          );
-        }
-        if (result.incoming.length > 0) {
-          const saved = await opts.addCards(result.incoming);
-          if (!saved) {
-            await rollback.run(infos.length > 0);
-            discardLastRecord(opts.boardBlockId);
-            return false;
-          }
-        }
-        if (edgesToAdd.length > 0) {
-          const ok = await opts.commitEdges([
-            ...opts.existingEdges,
-            ...edgesToAdd,
-          ]);
-          if (!ok) {
-            orca.notify("error", t("Failed to save connections"));
-          }
-        }
-        return true;
-      } catch (error) {
-        try {
-          await rollback.run(infos.length > 0);
-        } catch (rollbackError) {
-          discardLastRecord(opts.boardBlockId);
-          throw rollbackError;
-        }
+      const saved = await opts.addCards(result.incoming);
+      if (!saved) {
         discardLastRecord(opts.boardBlockId);
-        throw error;
+        return false;
       }
+      if (edgesToAdd.length > 0) {
+        const ok = await opts.commitEdges([
+          ...opts.existingEdges,
+          ...edgesToAdd,
+        ]);
+        if (!ok) {
+          orca.notify("error", t("Failed to save connections"));
+        }
+      }
+      return true;
     },
-    note,
   );
 
   if (!savedIncoming) return [];
-  orca.notify("success", extractDropMessage(result, infos.length));
+  orca.notify("success", extractDropMessage(result));
   return result.incoming;
-}
-
-async function ensureParentChainCached(ids: readonly DbId[]): Promise<void> {
-  for (const id of ids) {
-    let currentId: DbId | null = id;
-    const seen = new Set<DbId>();
-    for (let i = 0; i < ANCESTOR_WALK_MAX; i++) {
-      if (currentId == null || seen.has(currentId)) break;
-      seen.add(currentId);
-      let block = orca.state.blocks[currentId] as
-        | { parent?: DbId | null }
-        | undefined;
-      if (block == null) {
-        try {
-          block = await fetchBlock(currentId);
-        } catch {
-          break;
-        }
-      }
-      const parent = block.parent;
-      currentId =
-        typeof parent === "number" && Number.isFinite(parent) ? parent : null;
-    }
-  }
 }
 
 async function loadOwningCardId(

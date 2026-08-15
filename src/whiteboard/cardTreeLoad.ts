@@ -40,7 +40,6 @@ export function collectMissingCardTreeIds(
     let nodes = 0;
     const walk = (id: DbId, depth: number) => {
       if (nodes >= maxNodes || depth > maxDepth) return;
-      if (depth > 0 && promoted?.has(id)) return;
       if (seen.has(id)) return;
       seen.add(id);
       nodes += 1;
@@ -50,6 +49,8 @@ export function collectMissingCardTreeIds(
         missing.push(id);
         return;
       }
+      // Placeholder excerpt needs this block; do not walk its subtree.
+      if (depth > 0 && promoted?.has(id)) return;
       // Outline fold is `_repr.fold` and does not remove children ids.
       for (const child of block.children ?? []) {
         walk(child, depth + 1);

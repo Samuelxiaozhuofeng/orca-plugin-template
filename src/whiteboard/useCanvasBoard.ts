@@ -9,7 +9,6 @@ import type { DrawDropEmpty } from "./edgeGestures";
 import type { EdgeLayerApi } from "./EdgeLayer";
 import type { WhiteboardEdge } from "./edges";
 import { extractBlocksToBoard } from "./cardExtractApply";
-import { readExtractRestore } from "./cardExtractModel";
 import { addBlankCardToBoard } from "./newCard";
 import { applyCardBox, cardHasLiveGesture } from "./cardGestures";
 import {
@@ -51,7 +50,6 @@ type Args = {
   ) => Promise<boolean>;
   onUndo: () => void;
   onRedo: () => void;
-  onRestoreExtract: (cardBlockId: DbId) => Promise<boolean>;
 };
 
 export function useCanvasBoard({
@@ -74,7 +72,6 @@ export function useCanvasBoard({
   onCommitEdges,
   onUndo,
   onRedo,
-  onRestoreExtract,
 }: Args) {
   const [editingId, setEditingId] = useState<DbId | null>(null);
   const [selected, setSelected] = useState<DbId[]>([]);
@@ -242,38 +239,6 @@ export function useCanvasBoard({
     [boardBlockId, onAddCards, onCommitEdges, selectCards],
   );
 
-  const restoreExtracted = useCallback(
-    (card: WhiteboardCard) => {
-      const info = readExtractRestore(orca.state.blocks[card.blockId]);
-      const sourceId = info?.sourceCardId ?? null;
-      void onRestoreExtract(card.blockId)
-        .then((ok) => {
-          if (!ok) return;
-          if (editingRef.current === card.blockId) setEditingId(null);
-          if (
-            sourceId != null &&
-            cardsRef.current.some(
-              (item: WhiteboardCard) => item.blockId === sourceId,
-            )
-          ) {
-            selectCards([sourceId]);
-            return;
-          }
-          selectCards([]);
-        })
-        .catch((error: unknown) => {
-          console.error("[whiteboard] restore extract failed", error);
-          orca.notify(
-            "error",
-            error instanceof Error
-              ? error.message
-              : t("Failed to move this card back to the source card"),
-          );
-        });
-    },
-    [onRestoreExtract, selectCards],
-  );
-
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape" && editingRef.current != null) {
@@ -357,7 +322,6 @@ export function useCanvasBoard({
     closeEdgeDrop,
     createBlankAt,
     extractRow,
-    restoreExtracted,
     shownCards,
     selectedSet,
   };

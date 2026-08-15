@@ -132,9 +132,9 @@ check(
     80,
     new Set([2]),
   )
-    .map((node) => node.id)
-    .join(",") === "1,3",
-  "plan skips a promoted subtree",
+    .map((node) => `${node.id}${node.promoted ? "p" : ""}`)
+    .join(",") === "1,2p,3",
+  "plan keeps a promoted node without its subtree",
 );
 
 console.log("cardTreeLoad.test.ts ok");

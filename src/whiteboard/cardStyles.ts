@@ -226,6 +226,15 @@ export const CARD_CSS = `
   min-width: 0;
 }
 
+.owb-card-ref-row {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
 /* Stamped cinnabar ink-drop extract bullet */
 .owb-extract-bullet {
   flex: 0 0 7px;

@@ -16,7 +16,11 @@ import {
   CARD_TREE_LOAD_MAX_DEPTH,
   CARD_TREE_LOAD_MAX_NODES,
 } from "./cardTreeLoad";
-import { collectBlockTreeIds } from "./viewTransform";
+import {
+  cachedBlockPlainText,
+  cardExcerpt,
+  collectBlockTreeIds,
+} from "./viewTransform";
 
 type Props = {
   panelId: string;
@@ -71,14 +75,14 @@ export function CardBlockTree({
           key={node.id}
           className="owb-card-block-node"
           data-depth={node.depth}
-          data-block-id={node.id}
+          data-block-id={node.promoted ? undefined : node.id}
           style={
             node.depth > 0
               ? { paddingLeft: node.depth * CARD_CHILD_INDENT_PX }
               : undefined
           }
         >
-          {isExtractableDepth(node.depth) ? (
+          {isExtractableDepth(node.depth) && !node.promoted ? (
             <span
               className={EXTRACT_BULLET_CLASS}
               title={t("Drag to extract as a card")}
@@ -97,20 +101,31 @@ export function CardBlockTree({
               onDoubleClick={(event) => event.stopPropagation()}
             />
           ) : (
-            /* The root row is the card itself, so it cannot be extracted,
-               but it still gets a bullet so the outline reads evenly. */
+            /* Root and already-extracted rows keep a static bullet so the
+               left edge stays aligned. */
             <span
               className={`${EXTRACT_BULLET_CLASS} is-root`}
               aria-hidden="true"
             />
           )}
-          <orca.components.Block
-            panelId={panelId}
-            blockId={node.id}
-            blockLevel={node.depth}
-            indentLevel={node.depth}
-            renderingMode={node.hostOwn ? "normal" : "simple"}
-          />
+          {node.promoted ? (
+            <span
+              className="orca-inline owb-card-ref-row"
+              data-type="r"
+              data-ref={node.id}
+            >
+              {cardExcerpt(cachedBlockPlainText(node.id, liveBlocks())) ||
+                t("Extracted as a card")}
+            </span>
+          ) : (
+            <orca.components.Block
+              panelId={panelId}
+              blockId={node.id}
+              blockLevel={node.depth}
+              indentLevel={node.depth}
+              renderingMode={node.hostOwn ? "normal" : "simple"}
+            />
+          )}
         </div>
       ))}
     </div>

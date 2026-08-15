@@ -28,6 +28,8 @@ export type CardTreeNode = {
   id: DbId;
   depth: number;
   hostOwn: boolean;
+  /** Other card on this board: show a one-line ref, do not walk children. */
+  promoted: boolean;
 };
 
 export function blockRepr(
@@ -62,7 +64,12 @@ export function cardTreePlanEqual(
   for (let i = 0; i < left.length; i++) {
     const a = left[i];
     const b = right[i];
-    if (a.id !== b.id || a.depth !== b.depth || a.hostOwn !== b.hostOwn) {
+    if (
+      a.id !== b.id ||
+      a.depth !== b.depth ||
+      a.hostOwn !== b.hostOwn ||
+      a.promoted !== b.promoted
+    ) {
       return false;
     }
   }
@@ -73,7 +80,8 @@ export function cardTreePlanEqual(
  * Depth-first nodes to show on a read-only card. Ignores `_repr.fold`
  * so a folded outline still lists children. Does not walk into types
  * that render their own children. `promoted` ids (other cards on this
- * board) are omitted with their subtrees so a block is only shown once.
+ * board) become a one-line placeholder; their subtrees are not walked.
+ * The root is never a placeholder, even if listed in `promoted`.
  */
 export function planCardBlockTree(
   rootId: DbId,
@@ -87,12 +95,16 @@ export function planCardBlockTree(
 
   const walk = (id: DbId, depth: number) => {
     if (out.length >= maxNodes || depth > maxDepth) return;
-    if (depth > 0 && promoted?.has(id)) return;
     if (seen.has(id)) return;
+    if (depth > 0 && promoted?.has(id)) {
+      seen.add(id);
+      out.push({ id, depth, promoted: true, hostOwn: false });
+      return;
+    }
     seen.add(id);
     const block = blocks[id];
     const hostOwn = hostDrawsOwnChildren(block);
-    out.push({ id, depth, hostOwn });
+    out.push({ id, depth, hostOwn, promoted: false });
     if (hostOwn || block == null) return;
     for (const child of block.children ?? []) {
       walk(child, depth + 1);

@@ -19,12 +19,6 @@ export function isExtractableDepth(depth: number): boolean {
   return depth > 0;
 }
 
-export function hasExtractOrigin(
-  block: { parent?: DbId | null } | null | undefined,
-): boolean {
-  return typeof block?.parent === "number" && Number.isFinite(block.parent);
-}
-
 export function cardIdsKey(cards: readonly { blockId: DbId }[]): string {
   return cards
     .map((card) => card.blockId)
@@ -121,82 +115,6 @@ export function findOwningCardId(
     parentId = blocks[parentId]?.parent ?? null;
   }
   return null;
-}
-
-/** Parent is already the whiteboard block, so this note was extracted. */
-export function isParentBoardBlock(
-  block: { parent?: DbId | null } | null | undefined,
-  boardBlockId: DbId,
-): boolean {
-  return block?.parent === boardBlockId;
-}
-
-/** True when an ancestor of `blockId` is also in `ids` (same drop/extract set). */
-export function hasAncestorInIds(
-  blockId: DbId,
-  ids: ReadonlySet<DbId>,
-  blocks: { [id: number]: { parent?: DbId | null } | undefined },
-): boolean {
-  let parentId = blocks[blockId]?.parent ?? null;
-  const seen = new Set<DbId>([blockId]);
-  while (typeof parentId === "number" && Number.isFinite(parentId)) {
-    if (seen.has(parentId)) break;
-    if (ids.has(parentId)) return true;
-    seen.add(parentId);
-    parentId = blocks[parentId]?.parent ?? null;
-  }
-  return false;
-}
-
-export function shouldExtractMove(opts: {
-  blockId: DbId;
-  boardBlockId: DbId;
-  dragIds: ReadonlySet<DbId>;
-  cardIds: ReadonlySet<DbId>;
-  sourceCardId?: DbId | null;
-  block: { parent?: DbId | null } | null | undefined;
-  blocks: { [id: number]: { parent?: DbId | null } | undefined };
-}): boolean {
-  if (opts.blockId === opts.boardBlockId) return false;
-  if (!hasExtractOrigin(opts.block)) return false;
-  if (isParentBoardBlock(opts.block, opts.boardBlockId)) return false;
-  if (hasAncestorInIds(opts.blockId, opts.dragIds, opts.blocks)) return false;
-  if (findOwningCardId(opts.blockId, opts.cardIds, opts.blocks) != null) {
-    return true;
-  }
-  // Right-click extract passes the source card; use it if the ancestor walk missed cache.
-  return (
-    opts.sourceCardId != null &&
-    opts.cardIds.has(opts.sourceCardId) &&
-    opts.sourceCardId !== opts.blockId
-  );
-}
-
-export function planExtractMoves(
-  ids: readonly DbId[],
-  boardBlockId: DbId,
-  blocks: { [id: number]: { parent?: DbId | null } | undefined },
-  cardIds: ReadonlySet<DbId>,
-  sourceCardId?: DbId | null,
-): DbId[] {
-  const dragIds = new Set(ids);
-  const moving: DbId[] = [];
-  for (const id of ids) {
-    if (
-      shouldExtractMove({
-        blockId: id,
-        boardBlockId,
-        dragIds,
-        cardIds,
-        sourceCardId,
-        block: blocks[id],
-        blocks,
-      })
-    ) {
-      moving.push(id);
-    }
-  }
-  return moving;
 }
 
 export function rectsOverlap(a: CardRectLike, b: CardRectLike): boolean {
