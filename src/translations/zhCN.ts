@@ -170,7 +170,7 @@ const zhCN = {
   "Tidy all cards up to grid": "把所有卡片理成网格",
   "Zoom to fit": "缩放到全部内容",
   "Search notes": "搜索笔记",
-  "Type to search your notes.": "输入关键词搜索笔记。",
+  "Type to search your notes.": "输入关键词，匹配任意块的正文或标题。",
   "Searching…": "正在搜索…",
   "No matching notes": "没有匹配的笔记",
   "Failed to search notes": "搜索笔记失败",

@@ -26,13 +26,107 @@ function blockLabel(block: Block): string {
   return `${flat.slice(0, PREVIEW_CHARS)}…`;
 }
 
+function asBlockId(value: unknown): DbId | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  return null;
+}
+
+function collectIds(result: unknown): DbId[] {
+  if (!Array.isArray(result)) return [];
+  const ids: DbId[] = [];
+  const seen = new Set<DbId>();
+  for (const item of result) {
+    const id =
+      typeof item === "number"
+        ? asBlockId(item)
+        : item != null && typeof item === "object" && "id" in item
+          ? asBlockId((item as { id: unknown }).id)
+          : null;
+    if (id == null || seen.has(id)) continue;
+    seen.add(id);
+    ids.push(id);
+  }
+  return ids;
+}
+
+function aliasNames(result: unknown): string[] {
+  if (!Array.isArray(result)) return [];
+  const names: string[] = [];
+  for (const item of result) {
+    if (typeof item === "string" && item !== "") {
+      names.push(item);
+      continue;
+    }
+    if (item != null && typeof item === "object") {
+      const record = item as { name?: unknown; alias?: unknown };
+      const name =
+        typeof record.name === "string"
+          ? record.name
+          : typeof record.alias === "string"
+            ? record.alias
+            : "";
+      if (name !== "") names.push(name);
+    }
+  }
+  return names;
+}
+
+function idsFromAliasMap(result: unknown): DbId[] {
+  if (result == null || typeof result !== "object") return [];
+  if (Array.isArray(result)) return collectIds(result);
+  const ids: DbId[] = [];
+  for (const value of Object.values(result as Record<string, unknown>)) {
+    const id = asBlockId(value);
+    if (id != null) ids.push(id);
+  }
+  return ids;
+}
+
+async function loadBlocks(ids: DbId[]): Promise<Block[]> {
+  if (ids.length === 0) return [];
+  const fetched =
+    ((await orca.invokeBackend("get-blocks", ids)) as Block[] | null) ?? [];
+  if (!Array.isArray(fetched)) return [];
+  const byId = new Map(fetched.map((block) => [block.id, block]));
+  const out: Block[] = [];
+  for (const id of ids) {
+    const block = byId.get(id);
+    if (block == null) continue;
+    orca.state.blocks[block.id] = block;
+    out.push(block);
+  }
+  return out;
+}
+
+/** Match every block whose body text or page title contains the keyword. */
 async function searchNotes(keyword: string): Promise<Block[]> {
-  const found = (await orca.invokeBackend(
-    "search-blocks-by-text",
-    keyword,
-  )) as Block[] | null;
-  if (!Array.isArray(found)) return [];
-  return found.slice(0, MAX_RESULTS);
+  const [textResult, aliases] = await Promise.all([
+    orca.invokeBackend("query", {
+      q: {
+        kind: 1,
+        conditions: [{ kind: 8, text: keyword, raw: true }],
+      },
+      sort: [["_modified", "DESC"]],
+      pageSize: MAX_RESULTS,
+    }),
+    orca.invokeBackend("search-aliases", keyword),
+  ]);
+
+  const names = aliasNames(aliases);
+  const aliasIds =
+    names.length === 0
+      ? []
+      : idsFromAliasMap(await orca.invokeBackend("get-aliases-ids", names));
+
+  const ids = collectIds(textResult);
+  const seen = new Set(ids);
+  for (const id of aliasIds) {
+    if (ids.length >= MAX_RESULTS) break;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    ids.push(id);
+  }
+  return loadBlocks(ids.slice(0, MAX_RESULTS));
 }
 
 type Props = {
