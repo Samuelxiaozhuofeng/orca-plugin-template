@@ -313,18 +313,6 @@ export function Canvas({
             onCommitEdges={onCommitEdges}
             onClose={closeEdgeDrop}
           />
-          {addNoteAt != null && (
-            <AddNoteCard
-              boardBlockId={boardBlockId}
-              at={addNoteAt}
-              cardsRef={cardsRef}
-              onAddCards={onAddCards}
-              onFocusCard={(cardBlockId: DbId) => {
-                focusApiRef.current?.focusCard(cardBlockId);
-              }}
-              onClose={() => setAddNoteAt(null)}
-            />
-          )}
           {cards.length === 0 && (
             <div className="owb-canvas-empty">
               <i className="ti ti-layout-grid owb-canvas-empty-icon" />
@@ -339,8 +327,20 @@ export function Canvas({
             </div>
           )}
         </div>
+      {addNoteAt != null ? (
+        <AddNoteCard
+          boardBlockId={boardBlockId}
+          at={addNoteAt}
+          cardsRef={cardsRef}
+          onAddCards={onAddCards}
+          onFocusCard={(cardBlockId: DbId) => {
+            focusApiRef.current?.focusCard(cardBlockId);
+          }}
+          onClose={() => setAddNoteAt(null)}
+        />
+      ) : null}
       <BoardContextMenu
-        at={boardMenuAt}
+        at={addNoteAt == null ? boardMenuAt : null}
         onClose={() => setBoardMenuAt(null)}
         opts={{
           selected,
@@ -349,7 +349,10 @@ export function Canvas({
           selectCards,
           applyArrange,
           onNewCard: () => void createBlankAt(menuPointRef.current, true),
-          onAddFromNote: () => setAddNoteAt(menuPointRef.current),
+          onAddFromNote: () => {
+            setBoardMenuAt(null);
+            setAddNoteAt(menuPointRef.current);
+          },
           onPlaceJournals: () => onPlaceJournalsAt(menuPointRef.current),
           onFitAll: () => {
             focusApiRef.current?.fitAll();

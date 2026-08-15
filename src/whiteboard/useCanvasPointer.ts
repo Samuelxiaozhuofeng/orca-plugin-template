@@ -11,6 +11,8 @@ import { abortMarquees, startMarquee } from "./marquee";
 import { toggleId } from "./selection";
 import type { CardRect } from "./selection";
 import type { WhiteboardSettings } from "./settings";
+import { isEditableTarget } from "./canvasKeys";
+import { isHostOverlayTarget } from "./hostOverlay";
 import type { CanvasView } from "./viewTransform";
 
 const { useEffect, useRef } = window.React;
@@ -149,6 +151,7 @@ export function useCanvasPointer(opts: {
 
   const onViewportMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement | null;
+    if (isHostOverlayTarget(target) || isEditableTarget(target)) return;
     if (target?.closest(".owb-card, .owb-edge-hit, .owb-edge-editor")) return;
     focusViewport();
 

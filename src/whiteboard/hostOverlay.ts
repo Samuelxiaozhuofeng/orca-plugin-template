@@ -22,6 +22,7 @@ const HOST_OVERLAY_SELECTOR = [
   ".orca-modal",
   ".orca-modal-content",
   ".orca-tooltip",
+  ".owb-dialog",
   '[role="menu"]',
   '[role="listbox"]',
   '[role="dialog"]',

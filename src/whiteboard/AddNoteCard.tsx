@@ -58,6 +58,15 @@ export function AddNoteCard({
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<DbId | null>(null);
   const runIdRef = useRef(0);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    const el = inputRef.current;
+    if (el == null) return;
+    el.focus();
+    const timer = window.setTimeout(() => el.focus(), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     const keyword = query.trim();
@@ -136,14 +145,20 @@ export function AddNoteCard({
 
   return (
     <orca.components.ModalOverlay visible canClose onClose={onClose}>
-      <div className="owb-dialog" role="dialog">
+      <div
+        className="owb-dialog"
+        role="dialog"
+        onMouseDown={(event: React.MouseEvent) => event.stopPropagation()}
+      >
         <div className="owb-dialog-title">{t("Add a note as a card…")}</div>
         <input
+          ref={inputRef}
           className="owb-board-search"
           type="search"
           value={query}
           autoFocus
           placeholder={t("Search notes")}
+          onMouseDown={(event: React.MouseEvent) => event.stopPropagation()}
           onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
             setQuery(event.target.value)
           }
