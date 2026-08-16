@@ -5,6 +5,11 @@ import {
 } from "./cardTreeQueue";
 import { idsReplacedIn, registerBlockPresence } from "./blockPresence";
 import {
+  boardCardInfoEqual,
+  readBoardCardInfo,
+  type BoardCardInfo,
+} from "./boardCardView";
+import {
   cachedBlockPlainText,
   cardExcerpt,
   collectBlockTreeIds,
@@ -24,6 +29,8 @@ export type CardBlockView = {
   text: string | undefined;
   childCount: number;
   excerpt: string;
+  /** Null when the hosted block is not a whiteboard. */
+  board: BoardCardInfo | null;
 };
 
 function liveBlocks(): {
@@ -166,6 +173,7 @@ export function readCardBlockView(blockId: DbId): CardBlockView {
         CARD_TREE_LOAD_MAX_DEPTH,
       ),
     ),
+    board: readBoardCardInfo(block),
   };
 }
 
@@ -177,7 +185,8 @@ export function cardBlockViewEqual(
     a.exists === b.exists &&
     a.text === b.text &&
     a.childCount === b.childCount &&
-    a.excerpt === b.excerpt
+    a.excerpt === b.excerpt &&
+    boardCardInfoEqual(a.board, b.board)
   );
 }
 

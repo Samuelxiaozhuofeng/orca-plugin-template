@@ -3,6 +3,7 @@ import { AREA_CSS } from "./areaStyles";
 import { BOARD_TITLE_CSS } from "./boardTitleStyles";
 import { CANVAS_CSS } from "./canvasStyles";
 import { CARD_EDITOR_CSS } from "./cardEditorStyles";
+import { BOARD_CARD_CSS } from "./boardCardStyles";
 import { CARD_CSS } from "./cardStyles";
 import { CARD_ROW_ON_BOARD_CSS } from "./cardRowOnBoard";
 import { CARD_BACK_CSS } from "./cardParentOnBoard";
@@ -33,6 +34,7 @@ const SHELL_CSS = [
 export const WHITEBOARD_CSS = [
   SHELL_CSS,
   CARD_CSS,
+  BOARD_CARD_CSS,
   CARD_ROW_ON_BOARD_CSS,
   CARD_BACK_CSS,
   CARD_EDITOR_CSS,

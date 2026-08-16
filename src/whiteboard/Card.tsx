@@ -20,7 +20,7 @@ import { type WhiteboardCard } from "./data";
 import type { ArrangeAction } from "./selection";
 import { isHostOverlayTarget } from "./hostOverlay";
 import { useCardBlockView } from "./blockWatch";
-import { CardBlockTree } from "./CardBlockTree";
+import { CardBody, openBoardFromCardEvent } from "./BoardCardBody";
 import { CARD_ROW_FOCUS_CLASS } from "./cardRowOnBoard";
 import {
   CARD_BACK_CLASS,
@@ -28,7 +28,6 @@ import {
   flashCardRow,
 } from "./cardParentOnBoard";
 import { parseIdKey } from "./cardExtract";
-import { CardLoadNotice } from "./CardLoadNotice";
 import { peekCardLoadNotice } from "./cardTreeLoad";
 import {
   blockIdFromCardEventTarget,
@@ -39,7 +38,6 @@ import {
   measureCardFitHeight,
   shouldLockCardHeight,
 } from "./cardFitHeight";
-import { CardEditor } from "./CardEditor";
 import { useCardAutoHeight } from "./useCardAutoHeight";
 
 const { useEffect, useLayoutEffect, useRef } = window.React;
@@ -144,6 +142,8 @@ export function Card({
   }
 
   const hosted = useCardBlockView(card.blockId, treeRev);
+  const isBoardCard = hosted.board != null;
+  const liveEditing = editing && !isBoardCard;
   /** Set when this card was extracted from another card on this board. */
   const parentCardId = findParentCardOnBoard(
     card.blockId,
@@ -186,9 +186,9 @@ export function Card({
     if (target?.closest(".owb-card-handle") && event.button === 0) return;
     if (target?.closest(".owb-card-load-error")) return;
     if (isExtractPointerTarget(target)) return;
-    if (target?.closest(".owb-card-floating-toolbar")) return;
+    if (target?.closest(".owb-card-floating-toolbar, .owb-board-card-open")) return;
     if (target?.closest(`.${CARD_ROW_FOCUS_CLASS}, .${CARD_BACK_CLASS}`)) return;
-    if (editing && target?.closest(".owb-card-body")) return;
+    if (liveEditing && target?.closest(".owb-card-body")) return;
     if (isOnCardScrollbar(event.target, event.clientX, event.clientY)) return;
     onCardMouseDown(event, card);
   };
@@ -250,7 +250,7 @@ export function Card({
   };
 
   useCardAutoHeight({
-    enabled: editing,
+    enabled: liveEditing,
     locked: card.hLock === true,
     lockedRef: heightLockRef,
     cardRef,
@@ -259,7 +259,7 @@ export function Card({
     onHeight: applyContentHeight,
   });
 
-  useCardClickCaret(editing, card.blockId, cardRef);
+  useCardClickCaret(liveEditing, card.blockId, cardRef);
 
   const fitContentHeight = () => {
     const el = cardRef.current;
@@ -287,16 +287,17 @@ export function Card({
     shownNotice.scope === "empty";
 
   useEffect(() => {
-    if (!editing || !noteGone) return;
+    if (!liveEditing || !noteGone) return;
     orca.notify("info", t("This note is gone"));
     onEndEdit();
-  }, [editing, noteGone, onEndEdit]);
+  }, [liveEditing, noteGone, onEndEdit]);
 
   const className = [
     "owb-card",
-    editing ? "is-editing" : "",
+    liveEditing ? "is-editing" : "",
     selected ? "is-selected" : "",
     simplified ? "is-simplified" : "",
+    isBoardCard ? "is-board" : "",
     card.color ? `owb-card-theme-${card.color}` : "",
   ]
     .filter(Boolean)
@@ -376,7 +377,6 @@ export function Card({
           style={{ left: box.x, top: box.y, width: box.w, height: box.h }}
           onMouseDown={onRootMouseDown}
           onDoubleClick={(event: React.MouseEvent<HTMLDivElement>) => {
-            if (!simplified || editing) return;
             const target = event.target as HTMLElement | null;
             if (
               target?.closest(
@@ -385,6 +385,11 @@ export function Card({
             ) {
               return;
             }
+            if (isBoardCard) {
+              openBoardFromCardEvent(event, card.blockId, panelId);
+              return;
+            }
+            if (!simplified || editing) return;
             if (noteGone) {
               orca.notify("info", t("This note is gone"));
               return;
@@ -394,7 +399,7 @@ export function Card({
           onContextMenu={(event) => {
             // Editing: do not intercept. The hosted Orca editor owns
             // contextmenu (and Canvas already skips .owb-card).
-            if (editing) return;
+            if (liveEditing) return;
             if (!selected) onSelectOnly(card.blockId);
             const rowId = blockIdFromCardEventTarget(event.target);
             extractRowRef.current =
@@ -408,7 +413,7 @@ export function Card({
             onPatchCard={onPatchCard}
             onStartConnect={onStartConnect}
           />
-          <CardTitle card={card} editing={editing} />
+          <CardTitle card={card} editing={liveEditing} isBoard={isBoardCard} />
           {parentCardId != null ? (
             <button
               type="button"
@@ -431,55 +436,22 @@ export function Card({
             </button>
           ) : null}
           {simplified ? null : (
-            <div
-              className="owb-card-body"
-              title={editing ? undefined : t("Click to edit")}
-              onDoubleClick={(event) => {
-                if (editing) return;
-                if (
-                  (event.target as HTMLElement | null)?.closest(
-                    `.${CARD_ROW_FOCUS_CLASS}`,
-                  )
-                ) {
-                  return;
-                }
-                if (noteGone) {
-                  orca.notify("info", t("This note is gone"));
-                  return;
-                }
-                onStartEdit(card.blockId);
-              }}
-            >
-              {editing && !noteGone ? (
-                <CardEditor panelId={panelId} blockId={card.blockId} />
-              ) : fillLoadError && shownNotice != null ? (
-                <CardLoadNotice
-                  scope={shownNotice.scope}
-                  cause={shownNotice.cause}
-                  fill
-                  retrying={loadRetrying}
-                  onRetry={() => onRetryLoad?.(card.blockId)}
-                />
-              ) : isEmptyJournal ? (
-                <div className="owb-card-empty">{t("No notes this day")}</div>
-              ) : (
-                <CardBlockTree
-                  key={treeRev}
-                  panelId={panelId}
-                  blockId={card.blockId}
-                  promotedKey={promotedKey}
-                  onFocusCard={onFocusCard}
-                />
-              )}
-              {shownNotice != null && !fillLoadError ? (
-                <CardLoadNotice
-                  scope={shownNotice.scope}
-                  cause={shownNotice.cause}
-                  retrying={loadRetrying}
-                  onRetry={() => onRetryLoad?.(card.blockId)}
-                />
-              ) : null}
-            </div>
+            <CardBody
+              panelId={panelId}
+              card={card}
+              treeRev={treeRev}
+              hosted={hosted}
+              editing={liveEditing}
+              noteGone={noteGone}
+              fillLoadError={fillLoadError}
+              shownNotice={shownNotice}
+              loadRetrying={loadRetrying}
+              isEmptyJournal={isEmptyJournal}
+              promotedKey={promotedKey}
+              onStartEdit={onStartEdit}
+              onRetryLoad={onRetryLoad}
+              onFocusCard={onFocusCard}
+            />
           )}
           {showResize
             ? RESIZE_HANDLES.map((handle) => (

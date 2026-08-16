@@ -30,6 +30,7 @@ import {
   blurCardEditor,
   cardEditorFlushDelayMs,
 } from "./cardEditorFlush";
+import { isWhiteboardBlock } from "./pageBoardPlan";
 
 const { useCallback, useEffect, useMemo, useRef, useState } = window.React;
 
@@ -281,6 +282,7 @@ export function useCanvasBoard({
   }, []);
 
   const startEdit = useCallback((blockId: DbId) => {
+    if (isWhiteboardBlock(orca.state.blocks[blockId])) return;
     edgeApiRef.current?.hideToolbar();
     const apply = () => {
       setEditingId(blockId);

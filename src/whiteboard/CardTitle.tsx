@@ -51,13 +51,20 @@ function JournalBadge({ date }: { date: string }) {
   );
 }
 
-function BlockTitle({ blockId }: { blockId: DbId }) {
+function BlockTitle({
+  blockId,
+  isBoard,
+}: {
+  blockId: DbId;
+  isBoard: boolean;
+}) {
   const { blocks } = useSnapshot(orca.state);
   const title = blockCardTitle(blockId, blocks);
+  const icon = isBoard ? "ti ti-chalkboard" : "ti ti-file-text";
   return (
     <div className="owb-card-header">
       <span className="owb-card-title-main">
-        <i className="ti ti-file-text owb-card-page-icon" />
+        <i className={`${icon} owb-card-page-icon`} />
         <span className="owb-card-page">{title}</span>
       </span>
     </div>
@@ -66,12 +73,14 @@ function BlockTitle({ blockId }: { blockId: DbId }) {
 
 export function CardTitle({
   card,
+  isBoard = false,
 }: {
   card: WhiteboardCard;
   editing: boolean;
+  isBoard?: boolean;
 }) {
   if (card.kind === "journal" && typeof card.date === "string") {
     return <JournalBadge date={card.date} />;
   }
-  return <BlockTitle blockId={card.blockId} />;
+  return <BlockTitle blockId={card.blockId} isBoard={isBoard} />;
 }
