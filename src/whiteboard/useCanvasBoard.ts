@@ -31,6 +31,11 @@ import {
   cardEditorFlushDelayMs,
 } from "./cardEditorFlush";
 import { isWhiteboardBlock } from "./pageBoardPlan";
+import {
+  collectSelectedIntoBoard,
+  registerCollectSelectedAction,
+} from "./collectIntoBoardApply";
+import { dropCardsOntoBoard } from "./dropOntoBoardApply";
 
 const { useCallback, useEffect, useMemo, useRef, useState } = window.React;
 
@@ -364,6 +369,36 @@ export function useCanvasBoard({
     [boardBlockId, onAddCards, onCommitEdges, selectCards],
   );
 
+  const collectSelected = useCallback(() => {
+    void collectSelectedIntoBoard({
+      boardBlockId,
+      selectedIds: selectedRef.current,
+      cards: cardsRef.current,
+      edges: edgesRef.current,
+      areas: areasRef.current,
+      selectCards,
+    });
+  }, [boardBlockId, selectCards]);
+
+  const dropOntoBoard = useCallback(
+    (targetBoardId: DbId, movingIds: readonly DbId[]) =>
+      dropCardsOntoBoard({
+        boardBlockId,
+        targetBoardId,
+        movingIds,
+        cards: cardsRef.current,
+        edges: edgesRef.current,
+        areas: areasRef.current,
+        selectCards,
+      }),
+    [boardBlockId, selectCards],
+  );
+
+  useEffect(
+    () => registerCollectSelectedAction(panelId, collectSelected),
+    [panelId, collectSelected],
+  );
+
   useCanvasKeys({
     panelId,
     boardBlockId,
@@ -416,6 +451,7 @@ export function useCanvasBoard({
     closeEdgeDrop,
     createBlankAt,
     extractRow,
+    dropOntoBoard,
     shownCards,
     hiddenCardCount,
     lodSimplified,

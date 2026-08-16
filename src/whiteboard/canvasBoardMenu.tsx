@@ -19,6 +19,8 @@ export type BoardMenuOptions = {
   applyArrange: (action: ArrangeAction, ids?: readonly DbId[]) => void;
   /** New blank card at the point that was right-clicked. */
   onNewCard: () => void;
+  /** New nested whiteboard card at the right-clicked point. */
+  onNewSubBoard: () => void;
   /** Search an existing note and drop it at the right-clicked point. */
   onAddFromNote: () => void;
   /** Journal placement dialog, anchored at the right-clicked point. */
@@ -47,6 +49,11 @@ export function boardMenu(close: () => void, opts: BoardMenuOptions) {
         title={t("New card here")}
         preIcon="ti ti-square-plus"
         onClick={run(opts.onNewCard)}
+      />
+      <orca.components.MenuText
+        title={t("New sub-whiteboard")}
+        preIcon="ti ti-chalkboard"
+        onClick={run(opts.onNewSubBoard)}
       />
       <orca.components.MenuText
         title={t("Add a note as a card…")}

@@ -187,6 +187,15 @@ export function startRightButtonSession(opts: {
   window.addEventListener("mouseup", onUp);
 }
 
+export type MoveCardsEnd = {
+  moves: ReadonlyArray<{ blockId: DbId; x: number; y: number }>;
+  /** True when the pointer crossed the click threshold (a real drag). */
+  dragged: boolean;
+  clientX: number;
+  clientY: number;
+  world: { x: number; y: number };
+};
+
 export function startMoveCards(opts: {
   startX: number;
   startY: number;
@@ -197,8 +206,8 @@ export function startMoveCards(opts: {
   others: readonly CardRect[];
   pointerToWorld: (clientX: number, clientY: number) => { x: number; y: number };
   view: () => CanvasView;
-  onEnd: (moves: ReadonlyArray<{ blockId: DbId; x: number; y: number }>) => void;
-  onFrame?: (boxes: Map<DbId, CardRect>) => void;
+  onEnd: (end: MoveCardsEnd) => void;
+  onFrame?: (boxes: Map<DbId, CardRect>, world: { x: number; y: number }) => void;
   /** Fires on mouseup when the pointer never crossed the click threshold. */
   onClick?: (event: MouseEvent) => void;
 }): void {
@@ -249,7 +258,7 @@ export function startMoveCards(opts: {
           h: card.h,
         });
       }
-      opts.onFrame(boxes);
+      opts.onFrame(boxes, now);
     }
   };
 
@@ -298,22 +307,22 @@ export function startMoveCards(opts: {
     detach();
     if (started) paint(event.clientX, event.clientY, event.altKey);
     finishVisual();
-    if (!started) {
-      opts.onClick?.(event);
-      opts.onEnd([]);
-      return;
-    }
-    if (lastDx === 0 && lastDy === 0) {
-      opts.onEnd([]);
-      return;
-    }
-    opts.onEnd(
-      opts.moving.map((card) => ({
-        blockId: card.blockId,
-        x: card.x + lastDx,
-        y: card.y + lastDy,
-      })),
-    );
+    if (!started) opts.onClick?.(event);
+    const moved =
+      started && (lastDx !== 0 || lastDy !== 0)
+        ? opts.moving.map((card) => ({
+            blockId: card.blockId,
+            x: card.x + lastDx,
+            y: card.y + lastDy,
+          }))
+        : [];
+    opts.onEnd({
+      moves: moved,
+      dragged: started,
+      clientX: event.clientX,
+      clientY: event.clientY,
+      world: opts.pointerToWorld(event.clientX, event.clientY),
+    });
   };
 
   const tracked = trackCardGesture(opts.canvas, () => {

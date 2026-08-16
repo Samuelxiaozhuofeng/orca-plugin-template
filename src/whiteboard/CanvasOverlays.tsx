@@ -13,6 +13,7 @@ import type { WhiteboardEdge } from "./edges";
 import type { ArrangeAction } from "./selection";
 import { CardFilterBanner } from "./CardFilterPopover";
 import { SelectionToolbar } from "./SelectionToolbar";
+import { placeNewSubBoardOnBoard } from "./collectIntoBoardApply";
 
 const { useCallback, useEffect, useRef, useState } = window.React;
 
@@ -239,6 +240,16 @@ export function CanvasHostOverlays({
           selectCards,
           applyArrange,
           onNewCard: () => void createBlankAt(menuPointRef.current, true),
+          onNewSubBoard: () => {
+            const at = menuPointRef.current;
+            void placeNewSubBoardOnBoard({
+              boardBlockId,
+              x: at.x,
+              y: at.y,
+              addCards: onAddCards,
+              selectCards,
+            });
+          },
           onAddFromNote: () => {
             setBoardMenuAt(null);
             setAddNoteAt(menuPointRef.current);

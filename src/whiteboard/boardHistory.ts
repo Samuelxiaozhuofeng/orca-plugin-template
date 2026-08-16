@@ -1,7 +1,7 @@
 import type { DbId } from "../orca.d.ts";
 import { areasEqual, type WhiteboardArea } from "./areas.ts";
-import type { WhiteboardCard } from "./cards.ts";
-import { bendsEqual, type WhiteboardEdge } from "./edges.ts";
+import { cardsEqual, type WhiteboardCard } from "./cards.ts";
+import { bendsEqual, edgesEqual, type WhiteboardEdge } from "./edges.ts";
 
 export const HISTORY_LIMIT = 50;
 
@@ -190,6 +190,37 @@ export function restoreFailedRedo(boardId: DbId, next?: BoardSnapshot): void {
   const back = next ?? pushed;
   if (back == null) return;
   history.future.push(back);
+}
+
+export type SnapshotWriteMode = "cards-and-areas" | "board" | "areas" | "none";
+
+export type SnapshotWritePlan = {
+  mode: SnapshotWriteMode;
+  cards: WhiteboardCard[];
+  edges: WhiteboardEdge[];
+  areas: WhiteboardArea[];
+};
+
+/** Which persist lane(s) undo/redo must write to restore `next`. */
+export function planSnapshotWrite(
+  next: BoardSnapshot,
+  current: BoardSnapshot,
+): SnapshotWritePlan {
+  const nextEdges = preserveLinked(next.edges, current.edges);
+  const nextAreas = next.areas ?? current.areas ?? [];
+  const currentAreas = current.areas ?? [];
+  const cardsChanged = !cardsEqual(next.cards, current.cards);
+  const edgesChanged = !edgesEqual(nextEdges, current.edges);
+  const areaChanged = !areasEqual(nextAreas, currentAreas);
+  const mode: SnapshotWriteMode =
+    cardsChanged && areaChanged && !edgesChanged
+      ? "cards-and-areas"
+      : cardsChanged || edgesChanged
+        ? "board"
+        : areaChanged
+          ? "areas"
+          : "none";
+  return { mode, cards: next.cards, edges: nextEdges, areas: nextAreas };
 }
 
 /** Keep live `linked` on edges that still exist. Deleted edges follow the snapshot. */

@@ -267,6 +267,28 @@ const zhCN = {
   "Unify size": "统一尺寸",
   "Match widest": "按最宽的",
   "Match narrowest": "按最窄的",
+  "New sub-whiteboard": "新建子白板",
+  "Collect into new whiteboard": "收进新白板",
+  "Create as": "建成",
+  "As a page": "建成页面",
+  "As a block": "建成块",
+  "Searchable, and you can link to it with [[name]].":
+    "能搜到、能用 [[名字]] 链过去",
+  "Stays under this whiteboard and does not appear in the page list.":
+    "藏在这块白板底下，不占页面列表",
+  'Collected into "${name}". Undo will not remove the new whiteboard.':
+    "已收进「${name}」。撤销不会清掉新建的白板。",
+  "This board was not changed, but the new whiteboard already exists and has a copy of the cards.":
+    "这块白板没有改动，但新白板已经建好了，里面有一份卡片。",
+  'Moved ${count} cards into "${name}".':
+    "已把 ${count} 张卡片移入「${name}」。",
+  "This board was not changed, but the cards are already on the other whiteboard.":
+    "这块白板没有改动，但卡片已经进了子白板。",
+  "Could not add the cards to that whiteboard.": "没能把卡片写进那块白板。",
+  'Could not create a whiteboard page from the canvas. Create it with the "New whiteboard page" command, then drag it onto this board.':
+    "没能在白板里直接新建白板页面。请先用「新建白板页面」命令建好，再把它拖到这块白板上。",
+  "Created the whiteboard but could not save it as a card. The new whiteboard is still in the notes.":
+    "白板已经建好，但没能当成卡片写进这块白板。新白板还在笔记里，不会丢。",
 };
 
 export default zhCN;

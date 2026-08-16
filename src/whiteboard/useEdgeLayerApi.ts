@@ -20,6 +20,7 @@ import {
   type WhiteboardEdge,
 } from "./edges";
 import type { ReferenceEdge } from "./edgeRefs";
+import { reconcileLiveBoxes } from "./edgeLiveBoxes";
 
 const { useLayoutEffect, useRef } = window.React;
 
@@ -202,18 +203,7 @@ export function useEdgeLayerApi(opts: {
   };
 
   useLayoutEffect(() => {
-    for (const card of cards) {
-      const live = liveRef.current.get(card.blockId);
-      if (live == null) continue;
-      if (
-        live.x === card.x &&
-        live.y === card.y &&
-        live.w === card.w &&
-        live.h === card.h
-      ) {
-        liveRef.current.delete(card.blockId);
-      }
-    }
+    reconcileLiveBoxes(liveRef.current, cards);
   }, [cards]);
 
   useLayoutEffect(() => {

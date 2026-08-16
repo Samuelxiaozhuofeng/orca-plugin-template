@@ -16,6 +16,13 @@ export const BOARD_CARD_CSS = `
   border-color: var(--orca-color-primary-5, #00a896);
 }
 
+.owb-card.is-board.is-board-drop {
+  border-color: var(--orca-color-primary-5, #00a896);
+  box-shadow: 0 0 0 3px
+    color-mix(in oklab, var(--orca-color-primary-5, #00a896) 40%, transparent);
+  z-index: 3;
+}
+
 .owb-card.is-board .owb-card-body,
 .owb-viewport[data-mouse-scheme="mouse"] .owb-card.is-board:not(.is-editing) .owb-card-body {
   cursor: default;

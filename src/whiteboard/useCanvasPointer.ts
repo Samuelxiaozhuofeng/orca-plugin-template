@@ -5,6 +5,7 @@ import {
   startDrawArea,
   startMoveArea,
 } from "./areaGestures";
+import { createBoardDropHover } from "./boardDropHover";
 import {
   abortCardGestures,
   startMoveCards,
@@ -72,6 +73,7 @@ type Refs = {
 
 export function useCanvasPointer(opts: {
   refs: Refs;
+  boardBlockId: DbId;
   pointerToWorld: (clientX: number, clientY: number) => { x: number; y: number };
   startPan: (startX: number, startY: number) => void;
   setSelected: (next: DbId[]) => void;
@@ -83,6 +85,10 @@ export function useCanvasPointer(opts: {
   onMoveFrame?: (boxes: Map<DbId, CardRect>) => void;
   onStartEdit: (blockId: DbId) => void;
   onDismissEdgeToolbar?: () => void;
+  onDropOntoBoard?: (
+    targetBoardId: DbId,
+    movingIds: readonly DbId[],
+  ) => Promise<boolean>;
 }): {
   onViewportMouseDown: (event: React.MouseEvent<HTMLDivElement>) => void;
   onCardMouseDown: (
@@ -103,11 +109,14 @@ export function useCanvasPointer(opts: {
     onMoveFrame,
     onStartEdit,
     onDismissEdgeToolbar,
+    boardBlockId,
+    onDropOntoBoard,
   } = opts;
   const dismissEdgeToolbar = () => onDismissEdgeToolbar?.();
   const mountedRef = useRef(true);
   const abortCanvasRef = useRef<HTMLElement | null>(null);
   const abortViewportRef = useRef<HTMLElement | null>(null);
+  const dropHoverRef = useRef<{ dispose: () => void } | null>(null);
 
   useEffect(() => {
     if (refs.canvas.current) abortCanvasRef.current = refs.canvas.current;
@@ -118,6 +127,8 @@ export function useCanvasPointer(opts: {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      dropHoverRef.current?.dispose();
+      dropHoverRef.current = null;
       abortCardGestures(abortCanvasRef.current);
       abortCardGestures(abortViewportRef.current);
       abortMarquees(abortCanvasRef.current);
@@ -178,6 +189,25 @@ export function useCanvasPointer(opts: {
     const others = refs.cards.current.filter(
       (item: WhiteboardCard) => !movingIds.has(item.blockId),
     );
+    dropHoverRef.current?.dispose();
+    const hover = createBoardDropHover({
+      canvas,
+      cards: () => refs.cards.current,
+      movingIds,
+      currentBoardId: boardBlockId,
+    });
+    dropHoverRef.current = hover;
+    const applyMoves = (
+      moves: ReadonlyArray<{ blockId: DbId; x: number; y: number }>,
+    ) => {
+      if (!mountedRef.current || moves.length === 0) return;
+      onPatchCards(
+        moves.map((item) => ({
+          blockId: item.blockId,
+          patch: { x: item.x, y: item.y },
+        })),
+      );
+    };
     startMoveCards({
       startX,
       startY,
@@ -188,16 +218,23 @@ export function useCanvasPointer(opts: {
       others,
       pointerToWorld,
       view: () => refs.liveView.current,
-      onFrame: onMoveFrame,
+      onFrame: (boxes, world) => {
+        onMoveFrame?.(boxes);
+        hover.onPointerWorld(world);
+      },
       onClick,
-      onEnd: (moves) => {
-        if (!mountedRef.current || moves.length === 0) return;
-        onPatchCards(
-          moves.map((item) => ({
-            blockId: item.blockId,
-            patch: { x: item.x, y: item.y },
-          })),
-        );
+      onEnd: (end) => {
+        const target = hover.armedTarget();
+        hover.dispose();
+        if (dropHoverRef.current === hover) dropHoverRef.current = null;
+        if (!mountedRef.current) return;
+        if (end.dragged && target != null && onDropOntoBoard != null) {
+          void onDropOntoBoard(target, [...movingIds]).then((handled) => {
+            if (!handled) applyMoves(end.moves);
+          });
+          return;
+        }
+        applyMoves(end.moves);
       },
     });
   };

@@ -4,7 +4,7 @@ import {
   cardPatchesChange,
   edgesMatchIgnoringLinked,
   holdHistory,
-  preserveLinked,
+  planSnapshotWrite,
   recordBefore,
   discardLastRecord,
   restoreFailedRedo,
@@ -14,11 +14,9 @@ import {
   takeUndo,
   type BoardSnapshot,
 } from "./boardHistory";
-import { areasEqual, type WhiteboardArea } from "./areas";
+import { type WhiteboardArea } from "./areas";
 import { type WhiteboardCard } from "./cards";
 import {
-  cardsEqual,
-  edgesEqual,
   placeJournalCards,
   viewportOrigin,
   type CanvasOrigin,
@@ -193,20 +191,15 @@ export function useBoardCommands(opts: {
 
   const applySnapshot = useCallback(
     async (next: BoardSnapshot, current: BoardSnapshot): Promise<boolean> => {
-      const nextEdges = preserveLinked(next.edges, current.edges);
-      const nextAreas = next.areas ?? current.areas ?? [];
-      const currentAreas = current.areas ?? [];
-      const cardsChanged = !cardsEqual(next.cards, current.cards);
-      const edgesChanged = !edgesEqual(nextEdges, current.edges);
-      const areaChanged = !areasEqual(nextAreas, currentAreas);
-      if (cardsChanged && areaChanged && !edgesChanged) {
-        const ok = await commitCardsAndAreas(next.cards, nextAreas);
+      const plan = planSnapshotWrite(next, current);
+      if (plan.mode === "cards-and-areas") {
+        const ok = await commitCardsAndAreas(plan.cards, plan.areas);
         if (!ok) return false;
-      } else if (cardsChanged || edgesChanged) {
-        const ok = await commitBoard(next.cards, nextEdges);
+      } else if (plan.mode === "board") {
+        const ok = await commitBoard(plan.cards, plan.edges);
         if (!ok) return false;
-      } else if (areaChanged) {
-        const ok = await commitAreas(nextAreas);
+      } else if (plan.mode === "areas") {
+        const ok = await commitAreas(plan.areas);
         if (!ok) return false;
       }
       const removed = current.cards.filter(

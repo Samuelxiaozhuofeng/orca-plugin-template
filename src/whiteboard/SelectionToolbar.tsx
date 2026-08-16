@@ -10,8 +10,34 @@ import type { UnifySizeMode } from "./cardBatch";
 import type { WhiteboardCard } from "./data";
 import { selectedCards } from "./selection";
 import type { ArrangeAction } from "./selection";
+import { invokeCollectSelectedOnActivePanel } from "./collectIntoBoardApply";
 
 const { useEffect, useRef, useState } = window.React;
+
+function CollectBoardIcon() {
+  return (
+    <svg width={16} height={16} viewBox="0 0 16 16" fill="none" aria-hidden>
+      <rect
+        x="1.5"
+        y="2.5"
+        width="8.5"
+        height="6.2"
+        rx="1.2"
+        stroke="currentColor"
+        strokeWidth="1.3"
+      />
+      <rect
+        x="6"
+        y="7.3"
+        width="8.5"
+        height="6.2"
+        rx="1.2"
+        stroke="currentColor"
+        strokeWidth="1.3"
+      />
+    </svg>
+  );
+}
 
 function stopBarMouseDown(event: { stopPropagation(): void }) {
   event.stopPropagation();
@@ -167,6 +193,15 @@ export function SelectionToolbar({
         onClick={onWrapSelected}
       >
         <WrapSectionIcon />
+      </button>
+      <button
+        type="button"
+        className="owb-selection-icon"
+        title={t("Collect into new whiteboard")}
+        aria-label={t("Collect into new whiteboard")}
+        onClick={invokeCollectSelectedOnActivePanel}
+      >
+        <CollectBoardIcon />
       </button>
     </div>
   );

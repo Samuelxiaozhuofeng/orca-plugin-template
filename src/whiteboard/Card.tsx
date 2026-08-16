@@ -38,6 +38,7 @@ import {
   shouldLockCardHeight,
 } from "./cardFitHeight";
 import { useCardAutoHeight } from "./useCardAutoHeight";
+import { invokeCollectSelectedOnActivePanel } from "./collectIntoBoardApply";
 
 const { useEffect, useLayoutEffect, useRef } = window.React;
 
@@ -97,6 +98,7 @@ export function Card({
   simplified = false,
   selected,
   showResize,
+  selectedCount,
   pointerToWorld,
   onStartEdit,
   onEndEdit,
@@ -340,6 +342,15 @@ export function Card({
               />
             );
           })()}
+          {selected && selectedCount >= 2 ? (
+            <orca.components.MenuText
+              title={t("Collect into new whiteboard")}
+              onClick={() => {
+                close();
+                invokeCollectSelectedOnActivePanel();
+              }}
+            />
+          ) : null}
           <orca.components.MenuSeparator />
           <orca.components.MenuText
             title={t("Fit content height")}

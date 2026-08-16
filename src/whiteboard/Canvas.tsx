@@ -168,6 +168,7 @@ export function Canvas({
     closeEdgeDrop,
     createBlankAt,
     extractRow,
+    dropOntoBoard,
     shownCards,
     hiddenCardCount,
     lodSimplified,
@@ -250,6 +251,8 @@ export function Canvas({
   }, []);
 
   const { onViewportMouseDown, onCardMouseDown } = useCanvasPointer({
+    boardBlockId,
+    onDropOntoBoard: dropOntoBoard,
     refs: {
       viewport: viewportRef,
       canvas: canvasRef,
