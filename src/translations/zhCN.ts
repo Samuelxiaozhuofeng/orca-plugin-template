@@ -69,6 +69,7 @@ const zhCN = {
   "No journals found for this week": "本周没有可放入的日记",
   "Added ${count} journal cards": "已放入 ${count} 张日记卡片",
   "${count} cards": "${count} 张卡片",
+  "No cards yet": "还没有卡片",
   "This board is empty": "这块白板还是空的",
   "Use the toolbar to place journals, or drag blocks here from a note.":
     "点工具栏的「放入日记…」，或从笔记里把块拖进来。",

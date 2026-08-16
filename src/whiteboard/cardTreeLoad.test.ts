@@ -7,7 +7,7 @@ import {
   planCardTreeQueue,
   planGetBlocksBatches,
 } from "./cardTreeLoad.ts";
-import { GET_BLOCKS_BATCH_SIZE } from "./pageBoardPlan.ts";
+import { GET_BLOCKS_BATCH_SIZE, isWhiteboardBlock } from "./pageBoardPlan.ts";
 import {
   hostDrawsOwnChildren,
   isBlockFolded,
@@ -70,6 +70,59 @@ check(
     keep: 2,
   }).join(",") === "2",
   "editing card still loads while others are simplified",
+);
+
+// skip: only drop roots already loaded *and* confirmed as whiteboards.
+const skipBlocks: Record<
+  number,
+  { properties?: { name: string; value?: unknown }[] } | undefined
+> = {
+  10: {
+    properties: [{ name: "_repr", value: { type: "whiteboard.canvas" } }],
+  },
+  11: { properties: [{ name: "_repr", value: { type: "text" } }] },
+  // 12 is absent — block not loaded yet
+};
+const skipLoadedWhiteboard = (id: number) => isWhiteboardBlock(skipBlocks[id]);
+
+check(
+  cardTreeLoadIds([{ blockId: 10 }], { skip: skipLoadedWhiteboard }).join(
+    ",",
+  ) === "",
+  "loaded whiteboard root is skipped",
+);
+check(
+  cardTreeLoadIds([{ blockId: 11 }], { skip: skipLoadedWhiteboard }).join(
+    ",",
+  ) === "11",
+  "loaded non-whiteboard root is not skipped",
+);
+check(
+  cardTreeLoadIds([{ blockId: 12 }], { skip: skipLoadedWhiteboard }).join(
+    ",",
+  ) === "12",
+  "unloaded root is not skipped",
+);
+check(
+  cardTreeLoadIds(
+    [{ blockId: 10 }, { blockId: 11 }, { blockId: 12 }],
+    { skip: skipLoadedWhiteboard },
+  ).join(",") === "11,12",
+  "skip drops only loaded whiteboard roots from a mixed list",
+);
+check(
+  cardTreeLoadIds(
+    [{ blockId: 10 }, { blockId: 11 }],
+    { simplified: true, keep: 11, skip: skipLoadedWhiteboard },
+  ).join(",") === "11",
+  "simplified keep still loads the editing non-whiteboard card",
+);
+check(
+  cardTreeLoadIds(
+    [{ blockId: 10 }, { blockId: 11 }],
+    { simplified: true, keep: 10 },
+  ).join(",") === "10",
+  "simplified keep without skip is unchanged",
 );
 check(CARD_TREE_LOAD_MAX_DEPTH === 4, "depth cap");
 check(CARD_TREE_LOAD_MAX_NODES === 80, "node cap");

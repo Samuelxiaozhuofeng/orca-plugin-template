@@ -7,6 +7,7 @@ import type { CardPatchEntry } from "./useCanvasPointer";
 import type { EdgeLayerApi } from "./EdgeLayer";
 import { cardIdsKey } from "./cardExtract";
 import { cardTreeLoadIds, useVisibleCardTrees } from "./cardTreeLoad";
+import { isWhiteboardBlock } from "./pageBoardPlan";
 
 type Props = {
   panelId: string;
@@ -63,6 +64,9 @@ export function CanvasCards({
     cardTreeLoadIds(shownCards, {
       simplified: lodSimplified,
       keep: editingId,
+      // Only skip roots already loaded *and* confirmed as whiteboards.
+      // An unloaded block makes isWhiteboardBlock false, so it still loads.
+      skip: (id) => isWhiteboardBlock(orca.state.blocks[id]),
     }),
     promotedKey,
   );

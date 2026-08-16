@@ -29,6 +29,12 @@ export type CardLoadNotice = {
 export type CardTreeQueueOptions = {
   simplified?: boolean;
   keep?: DbId | null;
+  /**
+   * Drop roots that do not need a subtree fetch. Callers must only skip
+   * ids already loaded and classified — an unloaded root still has to
+   * be fetched before it can be recognized (e.g. as a whiteboard).
+   */
+  skip?: (blockId: DbId) => boolean;
   retryable?: ReadonlySet<DbId>;
   gone?: ReadonlySet<DbId>;
   retry?: ReadonlySet<DbId>;
@@ -120,17 +126,27 @@ export function cardRootsWithHoles(
 /**
  * Roots whose block trees should be fetched. Far-zoom LOD cards are
  * skipped; the card being edited is kept so it can stay fully rendered.
+ * `skip` is applied last and only drops ids the caller already knows
+ * do not need a tree. Unloaded blocks must not be skipped.
  */
 export function cardTreeLoadIds(
   shown: readonly { blockId: DbId }[],
-  options?: { simplified?: boolean; keep?: DbId | null },
+  options?: {
+    simplified?: boolean;
+    keep?: DbId | null;
+    skip?: (blockId: DbId) => boolean;
+  },
 ): DbId[] {
+  let ids: DbId[];
   if (options?.simplified !== true) {
-    return shown.map((card) => card.blockId);
+    ids = shown.map((card) => card.blockId);
+  } else {
+    const keep = options.keep ?? null;
+    ids =
+      keep != null && shown.some((card) => card.blockId === keep) ? [keep] : [];
   }
-  const keep = options.keep ?? null;
-  if (keep == null) return [];
-  return shown.some((card) => card.blockId === keep) ? [keep] : [];
+  const skip = options?.skip;
+  return skip == null ? ids : ids.filter((id) => !skip(id));
 }
 
 export function inspectCardTreeIssue(

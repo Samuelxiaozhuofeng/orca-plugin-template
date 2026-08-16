@@ -1,11 +1,16 @@
 import type { DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n";
-import type { WhiteboardCard } from "./data";
+import { openBoard, PANEL_TYPE, type WhiteboardCard } from "./data";
+import { isWhiteboardBlock } from "./pageBoardPlan";
 
 const { useEffect, useRef } = window.React;
 
 export function openCardInSidePanel(blockId: DbId): void {
   try {
+    if (isWhiteboardBlock(orca.state.blocks[blockId])) {
+      orca.nav.openInLastPanel(PANEL_TYPE, { blockId });
+      return;
+    }
     orca.nav.openInLastPanel("block", { blockId });
   } catch (err) {
     console.error("Failed to open block in side panel", err);
@@ -14,6 +19,10 @@ export function openCardInSidePanel(blockId: DbId): void {
 
 export function openCardInThisPanel(blockId: DbId, panelId: string): void {
   try {
+    if (isWhiteboardBlock(orca.state.blocks[blockId])) {
+      openBoard(blockId, panelId, false);
+      return;
+    }
     orca.nav.goTo("block", { blockId }, panelId);
   } catch (err) {
     console.error("Failed to open block in this panel", err);

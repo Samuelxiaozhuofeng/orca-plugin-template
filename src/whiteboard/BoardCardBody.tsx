@@ -46,7 +46,9 @@ export function BoardCardBody({
       >
         {countError
           ? t("Data unreadable")
-          : t("${count} cards", { count: String(board.count) })}
+          : board.count === 0
+            ? t("No cards yet")
+            : t("${count} cards", { count: String(board.count) })}
       </span>
       <span
         className="owb-board-card-open"
