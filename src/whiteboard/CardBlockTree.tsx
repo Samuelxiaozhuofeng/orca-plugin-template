@@ -28,6 +28,7 @@ import {
 } from "./viewTransform";
 import { CardErrorBoundary } from "./CardErrorBoundary";
 import { attachCardRefHoverPreview } from "./hoverPreview";
+import { attachMediaRefJump } from "./mediaRefJump";
 
 const { useEffect, useRef } = window.React;
 
@@ -61,7 +62,12 @@ export function CardBlockTree({
   useEffect(() => {
     const el = treeRef.current;
     if (el == null) return;
-    return attachCardRefHoverPreview(el);
+    const detachPreview = attachCardRefHoverPreview(el);
+    const detachJump = attachMediaRefJump(el);
+    return () => {
+      detachJump();
+      detachPreview();
+    };
   }, []);
 
   const plan = useWatchedValue(
