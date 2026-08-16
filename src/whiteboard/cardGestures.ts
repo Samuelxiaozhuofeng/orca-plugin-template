@@ -16,10 +16,13 @@ export type ResizeHandle = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
 
 export const RESIZE_HANDLES: ResizeHandle[] = [
   "n",
+  "s",
   "e",
   "w",
   "ne",
   "nw",
+  "se",
+  "sw",
 ];
 
 export function applyCardBox(el: HTMLElement | null, box: CardRect): void {
