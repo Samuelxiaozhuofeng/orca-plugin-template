@@ -11,6 +11,7 @@ import {
   useCanvasFocusApi,
   type CanvasFocusApi,
 } from "./cardFocus";
+import { isMediaHighlightRefClick } from "./mediaRefJump";
 import {
   CanvasHostOverlays,
   CanvasViewportOverlays,
@@ -354,6 +355,7 @@ export function Canvas({
             cardsRef.current,
             (cardBlockId) =>
               focusApiRef.current?.focusCard(cardBlockId) ?? false,
+            isMediaHighlightRefClick,
           );
         }}
         onContextMenu={(event) => {

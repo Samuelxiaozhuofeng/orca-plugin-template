@@ -1,5 +1,6 @@
 import {
   findOpenMediaReaderPanel,
+  isMediaHighlightRefClick,
   isMediaReaderBlock,
   resolveMediaRefVArgs,
   writeMediaReaderAnchor,
@@ -240,3 +241,156 @@ function blocksWith(
     "missing viewState does not throw",
   );
 }
+
+// --- isMediaHighlightRefClick ----------------------------------------------
+
+type FakeElInit = {
+  className?: string;
+  attrs?: Record<string, string>;
+};
+
+class FakeEl {
+  parent: FakeEl | null = null;
+  children: FakeEl[] = [];
+  className: string;
+  attrs: Record<string, string>;
+  dataset: Record<string, string> = {};
+
+  constructor(init: FakeElInit = {}) {
+    this.className = init.className ?? "";
+    this.attrs = { ...(init.attrs ?? {}) };
+    for (const [key, value] of Object.entries(this.attrs)) {
+      if (!key.startsWith("data-")) continue;
+      const camel = key
+        .slice(5)
+        .replace(/-([a-z])/g, (_, ch: string) => ch.toUpperCase());
+      this.dataset[camel] = value;
+    }
+  }
+
+  append(child: FakeEl): FakeEl {
+    child.parent = this;
+    this.children.push(child);
+    return child;
+  }
+
+  getAttribute(name: string): string | null {
+    return this.attrs[name] ?? null;
+  }
+
+  closest(sel: string): FakeEl | null {
+    let cur: FakeEl | null = this;
+    while (cur != null) {
+      if (fakeMatches(cur, sel)) return cur;
+      cur = cur.parent;
+    }
+    return null;
+  }
+
+  querySelectorAll(sel: string): FakeEl[] {
+    const out: FakeEl[] = [];
+    const walk = (node: FakeEl): void => {
+      for (const child of node.children) {
+        if (fakeMatches(child, sel)) out.push(child);
+        walk(child);
+      }
+    };
+    walk(this);
+    return out;
+  }
+}
+
+function fakeMatches(el: FakeEl, sel: string): boolean {
+  return sel.split(",").some((part) => fakeMatchesOne(el, part.trim()));
+}
+
+function fakeMatchesOne(el: FakeEl, sel: string): boolean {
+  const tokenRe =
+    /(\.[A-Za-z0-9_-]+)|\[([A-Za-z0-9_-]+)(?:=['"]?([^\]'"]*)['"]?)?\]/g;
+  let matched = false;
+  let token: RegExpExecArray | null;
+  while ((token = tokenRe.exec(sel)) != null) {
+    matched = true;
+    if (token[1] != null) {
+      const cls = token[1].slice(1);
+      if (!el.className.split(/\s+/).includes(cls)) return false;
+    } else if (token[2] != null) {
+      const value = el.attrs[token[2]];
+      if (token[3] != null) {
+        if (value !== token[3]) return false;
+      } else if (value == null) {
+        return false;
+      }
+    }
+  }
+  return matched;
+}
+
+function rowWithRef(mediaBlockId: number, sourceBlockId = 1): FakeEl {
+  const row = new FakeEl({
+    className: "owb-card-block-node",
+    attrs: { "data-block-id": String(sourceBlockId) },
+  });
+  const refEl = new FakeEl({
+    attrs: { "data-type": "r", "data-ref": String(mediaBlockId) },
+  });
+  const clickTarget = new FakeEl();
+  row.append(refEl);
+  refEl.append(clickTarget);
+  return clickTarget;
+}
+
+function installOrcaBlocks(blocks: MediaRefBlockMap): void {
+  const g = globalThis as typeof globalThis & {
+    orca?: { state: { blocks: MediaRefBlockMap } };
+  };
+  g.orca = { state: { blocks } };
+}
+
+{
+  const page3 = { page: 3, x: 0.21, y: 0.44 };
+  installOrcaBlocks({
+    1: source({
+      content: [{ t: "r", v: REF_A, a: "📌", vArgs: page3 }],
+      refs: [{ id: REF_A, to: PDF_ID }],
+    }),
+    [PDF_ID]: { _repr: { type: "pdf" } } as MediaRefSourceBlock,
+  });
+  check(
+    isMediaHighlightRefClick(rowWithRef(PDF_ID) as unknown as EventTarget) ===
+      true,
+    "PDF ref with vArgs is taken over by mediaRefJump",
+  );
+}
+
+{
+  installOrcaBlocks({
+    1: source({
+      content: [{ t: "r", v: REF_A }],
+      refs: [{ id: REF_A, to: PDF_ID }],
+    }),
+    [PDF_ID]: { _repr: { type: "pdf" } } as MediaRefSourceBlock,
+  });
+  check(
+    isMediaHighlightRefClick(rowWithRef(PDF_ID) as unknown as EventTarget) ===
+      false,
+    "PDF ref without vArgs is not a media highlight",
+  );
+}
+
+{
+  installOrcaBlocks({
+    1: source({
+      content: [{ t: "r", v: REF_A, a: "📌", vArgs: { page: 1, x: 0, y: 0 } }],
+      refs: [{ id: REF_A, to: 55 }],
+    }),
+    55: { _repr: { type: "text" } } as MediaRefSourceBlock,
+  });
+  check(
+    isMediaHighlightRefClick(rowWithRef(55) as unknown as EventTarget) ===
+      false,
+    "plain text block ref is not a media highlight",
+  );
+}
+
+console.log("mediaRefJump tests passed");

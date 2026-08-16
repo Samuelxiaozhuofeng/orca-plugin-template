@@ -128,6 +128,68 @@ export function isMediaReaderBlock(block: unknown): boolean {
   return type != null && MEDIA_TYPES.has(type);
 }
 
+export type MediaHighlightRefHit = {
+  mediaBlockId: number;
+  sourceBlockId: number;
+  vArgs: MediaRefVArgs;
+};
+
+/**
+ * Shared lookup used by both the click handler and the "should mediaRefJump
+ * take this click?" predicate. Null means the click is not a media highlight.
+ */
+export function resolveMediaHighlightRefClick(
+  target: EventTarget | null,
+  blocks: MediaRefBlockMap | null | undefined,
+): MediaHighlightRefHit | null {
+  try {
+    const el = asElement(target);
+    if (el == null) return null;
+
+    const refEl = el.closest<HTMLElement>(REF_EL_SELECTOR);
+    if (refEl == null) return null;
+
+    const mediaBlockId = Number(refEl.dataset.ref);
+    if (!Number.isFinite(mediaBlockId)) return null;
+
+    // Promoted rows omit data-block-id; do not walk up to the card wrapper.
+    const rowEl = refEl.closest<HTMLElement>(ROW_SELECTOR);
+    if (rowEl == null) return null;
+    const sourceBlockId = Number(rowEl.dataset.blockId);
+    if (!Number.isFinite(sourceBlockId)) return null;
+
+    if (blocks == null || typeof blocks !== "object") return null;
+
+    let mediaBlock: unknown;
+    try {
+      mediaBlock = (blocks as { [id: number]: unknown })[mediaBlockId];
+    } catch {
+      return null;
+    }
+    if (!isMediaReaderBlock(mediaBlock)) return null;
+
+    const index = indexOfMediaRefEl(rowEl, refEl, mediaBlockId);
+    if (index < 0) return null;
+
+    const vArgs = resolveMediaRefVArgs(
+      blocks,
+      sourceBlockId,
+      mediaBlockId,
+      index,
+    );
+    if (vArgs == null) return null;
+
+    return { mediaBlockId, sourceBlockId, vArgs };
+  } catch {
+    return null;
+  }
+}
+
+/** True when a click on `target` should be handled by mediaRefJump. */
+export function isMediaHighlightRefClick(target: EventTarget | null): boolean {
+  return resolveMediaHighlightRefClick(target, readBlocks()) != null;
+}
+
 /** Capture-phase click handler on one card tree. Returns a full teardown. */
 export function attachMediaRefJump(root: HTMLElement): () => void {
   let pollTimer = 0;
@@ -145,7 +207,7 @@ export function attachMediaRefJump(root: HTMLElement): () => void {
 
   const onClick = (event: MouseEvent): void => {
     try {
-      if (!tryHandleMediaRefClick(event, root, clearPoll, schedule)) return;
+      if (!tryHandleMediaRefClick(event, clearPoll, schedule)) return;
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation();
@@ -163,54 +225,13 @@ export function attachMediaRefJump(root: HTMLElement): () => void {
 
 function tryHandleMediaRefClick(
   event: MouseEvent,
-  root: HTMLElement,
   clearPoll: () => void,
   schedule: (fn: () => void, ms: number) => void,
 ): boolean {
   if (event.button != null && event.button !== 0) return false;
-  const target = event.target;
-  if (!(target instanceof Element)) return false;
 
-  const refEl = target.closest<HTMLElement>(REF_EL_SELECTOR);
-  if (refEl == null) return false;
-
-  const mediaBlockId = Number(refEl.dataset.ref);
-  if (!Number.isFinite(mediaBlockId)) return false;
-
-  // Promoted rows omit data-block-id; do not walk up to the card wrapper.
-  const rowEl = refEl.closest<HTMLElement>(ROW_SELECTOR);
-  if (rowEl == null) return false;
-  const sourceBlockId = Number(rowEl.dataset.blockId);
-  if (!Number.isFinite(sourceBlockId)) return false;
-
-  if (isCardOnThisCanvas(root, mediaBlockId)) return false;
-
-  let blocks: MediaRefBlockMap | undefined;
-  try {
-    blocks = orca.state?.blocks as MediaRefBlockMap | undefined;
-  } catch {
-    return false;
-  }
-  if (blocks == null) return false;
-
-  let mediaBlock: unknown;
-  try {
-    mediaBlock = (blocks as { [id: number]: unknown })[mediaBlockId];
-  } catch {
-    return false;
-  }
-  if (!isMediaReaderBlock(mediaBlock)) return false;
-
-  const index = indexOfMediaRefEl(rowEl, refEl, mediaBlockId);
-  if (index < 0) return false;
-
-  const vArgs = resolveMediaRefVArgs(
-    blocks,
-    sourceBlockId,
-    mediaBlockId,
-    index,
-  );
-  if (vArgs == null) return false;
+  const hit = resolveMediaHighlightRefClick(event.target, readBlocks());
+  if (hit == null) return false;
 
   let panels: unknown;
   try {
@@ -218,12 +239,12 @@ function tryHandleMediaRefClick(
   } catch {
     return false;
   }
-  const open = findOpenMediaReaderPanel(panels, mediaBlockId);
+  const open = findOpenMediaReaderPanel(panels, hit.mediaBlockId);
   if (open != null) {
     clearPoll();
-    return writeMediaReaderAnchor(open, mediaBlockId, vArgs);
+    return writeMediaReaderAnchor(open, hit.mediaBlockId, hit.vArgs);
   }
-  return openThenAnchor(mediaBlockId, vArgs, clearPoll, schedule);
+  return openThenAnchor(hit.mediaBlockId, hit.vArgs, clearPoll, schedule);
 }
 
 function openThenAnchor(
@@ -283,18 +304,6 @@ function indexOfMediaRefEl(
   return -1;
 }
 
-function isCardOnThisCanvas(from: HTMLElement, blockId: number): boolean {
-  try {
-    const canvas = from.closest(".owb-canvas");
-    if (canvas == null) return false;
-    return (
-      canvas.querySelector(`.owb-card[data-block-id="${blockId}"]`) != null
-    );
-  } catch {
-    return false;
-  }
-}
-
 function collectViewPanels(node: unknown, out: PanelLike[]): void {
   if (node == null || typeof node !== "object") return;
   const panel = node as PanelLike;
@@ -336,6 +345,20 @@ function sameId(a: unknown, b: unknown): boolean {
 
 function isVArgs(value: unknown): value is MediaRefVArgs {
   return value != null && typeof value === "object" && !Array.isArray(value);
+}
+
+function readBlocks(): MediaRefBlockMap | undefined {
+  try {
+    return orca.state?.blocks as MediaRefBlockMap | undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function asElement(target: EventTarget | null): Element | null {
+  if (target == null || typeof target !== "object") return null;
+  if (typeof (target as Element).closest !== "function") return null;
+  return target as Element;
 }
 
 function blockReprType(block: unknown): string | null {

@@ -80,15 +80,37 @@ const INLINE_REF_SELECTOR =
 export function cardBlockIdFromInlineRefTarget(
   target: EventTarget | null,
 ): DbId | null {
-  if (!(target instanceof Element)) return null;
-  const hit = target.closest(INLINE_REF_SELECTOR);
+  const el = asElement(target);
+  if (el == null) return null;
+  const hit = el.closest(INLINE_REF_SELECTOR);
   if (hit == null) return null;
   const host =
     hit.closest<HTMLElement>(".orca-inline[data-type='r']") ??
-    (hit instanceof HTMLElement ? hit : null);
+    asHtmlElement(hit);
   if (host == null) return null;
   const id = Number(host.getAttribute("data-ref"));
   return Number.isFinite(id) ? id : null;
+}
+
+function asElement(target: EventTarget | null): Element | null {
+  if (target == null || typeof target !== "object") return null;
+  if (typeof Element !== "undefined") {
+    return target instanceof Element ? target : null;
+  }
+  if (typeof (target as Element).closest === "function") {
+    return target as Element;
+  }
+  return null;
+}
+
+function asHtmlElement(value: Element): HTMLElement | null {
+  if (typeof HTMLElement !== "undefined") {
+    return value instanceof HTMLElement ? value : null;
+  }
+  if (typeof (value as HTMLElement).getAttribute === "function") {
+    return value as HTMLElement;
+  }
+  return null;
 }
 
 export function shouldInterceptRefClick(event: {
@@ -117,10 +139,12 @@ export function tryFocusCardFromRefClick(
   },
   cards: readonly { blockId: DbId }[],
   focusCard: ((cardBlockId: DbId) => boolean) | null | undefined,
+  skipFocus?: ((target: EventTarget | null) => boolean) | null,
 ): boolean {
   if (!shouldInterceptRefClick(event)) return false;
   const id = cardBlockIdFromInlineRefTarget(event.target);
   if (id == null) return false;
+  if (skipFocus?.(event.target) === true) return false;
   if (!cards.some((card) => card.blockId === id)) return false;
   if (focusCard == null || !focusCard(id)) return false;
   event.preventDefault();
