@@ -84,6 +84,7 @@ function remapCrossEdge(
   if (edge.color != null) next.color = edge.color;
   if (edge.style != null) next.style = edge.style;
   if (edge.linked === true) next.linked = true;
+  if (edge.linkRefId != null) next.linkRefId = edge.linkRefId;
   return next;
 }
 

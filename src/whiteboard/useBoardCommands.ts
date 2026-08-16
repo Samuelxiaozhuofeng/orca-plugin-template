@@ -32,6 +32,7 @@ import {
   noteIndependentMutation,
   restorePairedBoard,
 } from "./crossBoardHistory";
+import { writeEdgesAfterLinkSync } from "./edgeLinkSync";
 import { type WhiteboardEdge } from "./edges";
 import { type PlaceDialogValue } from "./PlaceDialog";
 import { type CanvasView } from "./viewTransform";
@@ -84,7 +85,6 @@ export function useBoardCommands(opts: {
   const {
     blockId,
     cards,
-    edges,
     cardsRef,
     edgesRef,
     areasRef,
@@ -164,10 +164,19 @@ export function useBoardCommands(opts: {
       next: WhiteboardEdge[],
       cardIds?: ReadonlySet<DbId>,
     ): Promise<boolean> => {
-      if (!edgesMatchIgnoringLinked(edgesRef.current, next)) record();
-      return commitEdges(next, cardIds);
+      const prev = edgesRef.current;
+      const changed = !edgesMatchIgnoringLinked(prev, next);
+      if (changed) record();
+      const ok = await writeEdgesAfterLinkSync(
+        prev,
+        next,
+        (edges) => commitEdges(edges, cardIds),
+        true, // user-edited lines: rehanging an endpoint must move the ref
+      );
+      if (!ok && changed && blockId != null) discardLastRecord(blockId);
+      return ok;
     },
-    [commitEdges, record],
+    [blockId, commitEdges, record],
   );
 
   const onRemoveCards = useCallback(
@@ -175,13 +184,19 @@ export function useBoardCommands(opts: {
       if (ids.length === 0) return true;
       const drop = new Set(ids);
       const next = cards.filter((card) => !drop.has(card.blockId));
-      const leftover = edges.filter(
+      const currentEdges = edgesRef.current;
+      const leftover = currentEdges.filter(
         (edge) => !drop.has(edge.from) && !drop.has(edge.to),
       );
       record();
       const release = blockId != null ? holdHistory(blockId) : holdHistory();
       try {
-        const saved = await commitBoard(next, leftover);
+        const saved = await writeEdgesAfterLinkSync(
+          currentEdges,
+          leftover,
+          (synced) => commitBoard(next, synced),
+          false, // card removal is not a rehang
+        );
         if (!saved) {
           if (blockId != null) discardLastRecord(blockId);
           return false;
@@ -198,7 +213,7 @@ export function useBoardCommands(opts: {
       );
       return true;
     },
-    [blockId, cards, commitBoard, edges, record],
+    [blockId, cards, commitBoard, record],
   );
 
   const applySnapshot = useCallback(
@@ -208,7 +223,12 @@ export function useBoardCommands(opts: {
         const ok = await commitCardsAndAreas(plan.cards, plan.areas);
         if (!ok) return false;
       } else if (plan.mode === "board") {
-        const ok = await commitBoard(plan.cards, plan.edges);
+        const ok = await writeEdgesAfterLinkSync(
+          current.edges,
+          plan.edges,
+          (edges) => commitBoard(plan.cards, edges),
+          false, // undo/redo must not treat collect/drop remaps as rehangs
+        );
         if (!ok) return false;
       } else if (plan.mode === "areas") {
         const ok = await commitAreas(plan.areas);

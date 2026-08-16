@@ -42,6 +42,7 @@ import {
   startPageBoardRedirect,
 } from "./whiteboard/pageBoardRedirect";
 import { flushAllCardWrites } from "./whiteboard/cardPersist";
+import { flushEdgeLinkWrites } from "./whiteboard/edgeLink";
 import { flushAllEdgeWrites } from "./whiteboard/edgePersist";
 import { abortAllEdgeGestures } from "./whiteboard/edgeGestures";
 import { abortAllCardGestures } from "./whiteboard/cardGestures";
@@ -270,6 +271,7 @@ export async function unload() {
   await flushAllRememberedViews();
   await flushAllCardWrites();
   await flushAllEdgeWrites();
+  await flushEdgeLinkWrites();
   if (pluginName) {
     await unassignShortcut(commandId(LOCATE_COMMAND));
     await unassignShortcut(commandId(WRAP_AREA_COMMAND));

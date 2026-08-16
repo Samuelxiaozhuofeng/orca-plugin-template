@@ -1,4 +1,8 @@
-import { planSnapshotWrite, resetAllHistory } from "./boardHistory.ts";
+import {
+  planSnapshotWrite,
+  preserveLinked,
+  resetAllHistory,
+} from "./boardHistory.ts";
 import type { WhiteboardArea } from "./areas.ts";
 import type { WhiteboardCard } from "./cards.ts";
 import {
@@ -176,6 +180,21 @@ check(
 check(
   missingAreas.edges[0]?.to === 2,
   "undefined-areas undo still restores A→B",
+);
+
+const snapPlain = [edge(1, 2)];
+const liveLinked = [edge(1, 2, { linked: true, linkRefId: 99 })];
+const kept = preserveLinked(snapPlain, liveLinked);
+check(kept[0].linked === true, "preserve live linked onto a snapshot edge");
+check(kept[0].linkRefId === 99, "preserve live linkRefId onto a snapshot edge");
+const deletedLive = preserveLinked(
+  [edge(1, 2, { linkRefId: 4 }), edge(2, 3, { linkRefId: 5 })],
+  [edge(1, 2, { linkRefId: 8 })],
+);
+check(deletedLive[0].linkRefId === 8, "live linkRefId wins over the snapshot");
+check(
+  deletedLive[1].linkRefId === 5,
+  "deleted edges keep the snapshot linkRefId",
 );
 
 resetAllHistory();

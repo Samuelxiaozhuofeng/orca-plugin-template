@@ -4,6 +4,7 @@ import type { DrawDropEmpty, EdgeEls } from "./edgeGestures";
 import { EdgeLabelLayer, EdgeMenuPopup } from "./EdgeOverlay";
 import { EdgeToolbar } from "./EdgeToolbar";
 import { nextEdgeToolbarOpen } from "./edgeToolbarLayout";
+import { edgeHasNoteLink } from "./edgeLink";
 import {
   type EdgeArrow,
   type WhiteboardEdge,
@@ -355,7 +356,7 @@ export function EdgeLayer({
               const className = [
                 "owb-edge",
                 selected ? "is-selected" : "",
-                edge.linked ? "is-linked" : "",
+                edgeHasNoteLink(edge) ? "is-linked" : "",
                 edge.color ? `owb-edge-color-${edge.color}` : "",
                 edge.style === "dashed" ? "is-dashed" : "",
               ]

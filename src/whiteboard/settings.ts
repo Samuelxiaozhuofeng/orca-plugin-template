@@ -9,6 +9,8 @@ export type { ControlsMode };
 
 export const DEFAULT_BOARD_TAG = "whiteboard";
 
+export type EdgeLinkMode = "property" | "child";
+
 export type WhiteboardSettings = {
   mouseScheme: ControlsMode;
   showAlignGuides: boolean;
@@ -17,6 +19,8 @@ export type WhiteboardSettings = {
   autoTagNewBoards: boolean;
   boardTag: string;
   openWhiteboardPagesAsCanvas: boolean;
+  autoLinkEdges: boolean;
+  edgeLinkMode: EdgeLinkMode;
 };
 
 const DEFAULTS: WhiteboardSettings = {
@@ -27,6 +31,8 @@ const DEFAULTS: WhiteboardSettings = {
   autoTagNewBoards: true,
   boardTag: DEFAULT_BOARD_TAG,
   openWhiteboardPagesAsCanvas: true,
+  autoLinkEdges: true,
+  edgeLinkMode: "property",
 };
 
 export { migrateControlsMode } from "./controlsMode";
@@ -107,6 +113,32 @@ export function whiteboardSettingsSchema(): PluginSettingsSchema {
       type: "boolean",
       defaultValue: DEFAULTS.openWhiteboardPagesAsCanvas,
     },
+    autoLinkEdges: {
+      label: t("Create a note reference when connecting cards"),
+      description: t(
+        "Automatically create a note reference when you draw an arrow. Turn this off to keep lines decorative.",
+      ),
+      type: "boolean",
+      defaultValue: DEFAULTS.autoLinkEdges,
+    },
+    edgeLinkMode: {
+      label: t("How to store the reference"),
+      description: t(
+        "Property: no extra text in the source note. Child block: insert a child under the source note (older method).",
+      ),
+      type: "singleChoice",
+      defaultValue: DEFAULTS.edgeLinkMode,
+      choices: [
+        {
+          label: t("Property on the source note"),
+          value: "property",
+        },
+        {
+          label: t("Child block under the source note"),
+          value: "child",
+        },
+      ],
+    },
   };
 }
 
@@ -121,6 +153,8 @@ export function readWhiteboardSettings(
     autoTagNewBoards: raw?.autoTagNewBoards !== false,
     boardTag: typeof raw?.boardTag === "string" ? raw.boardTag : DEFAULTS.boardTag,
     openWhiteboardPagesAsCanvas: raw?.openWhiteboardPagesAsCanvas !== false,
+    autoLinkEdges: raw?.autoLinkEdges !== false,
+    edgeLinkMode: raw?.edgeLinkMode === "child" ? "child" : "property",
   };
 }
 

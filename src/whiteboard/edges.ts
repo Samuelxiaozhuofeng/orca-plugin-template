@@ -27,6 +27,12 @@ export type WhiteboardEdge = {
   bend?: EdgeBend;
   /** True after this line was written into the notes as a real reference. */
   linked?: true;
+  /**
+   * Id of the property reference this plugin created on the source note
+   * (`whiteboard.link`). Distinct from `linked`, which marks the older
+   * child-block method. The two never replace each other.
+   */
+  linkRefId?: DbId;
   /** Present only when the user picked a colour. Omitted = default ink. */
   color?: EdgeColorId;
   /** Present only when dashed. Omitted = solid. */
@@ -124,6 +130,8 @@ export function normalizeEdge(value: unknown): WhiteboardEdge | null {
   const bend = parseBend(raw.bend);
   if (bend != null) edge.bend = bend;
   if (raw.linked === true) edge.linked = true;
+  const linkRefId = asDbId(raw.linkRefId);
+  if (linkRefId != null) edge.linkRefId = linkRefId;
   const color = edgeColorIfValid(raw.color);
   if (color != null) edge.color = color;
   const style = edgeStyleIfValid(raw.style);
@@ -196,6 +204,7 @@ function edgeEqual(left: WhiteboardEdge, right: WhiteboardEdge): boolean {
     left.fromSide === right.fromSide &&
     left.toSide === right.toSide &&
     left.linked === right.linked &&
+    left.linkRefId === right.linkRefId &&
     left.color === right.color &&
     left.style === right.style &&
     bendsEqual(left.bend, right.bend)

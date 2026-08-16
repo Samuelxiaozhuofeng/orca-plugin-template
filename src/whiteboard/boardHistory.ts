@@ -223,7 +223,7 @@ export function planSnapshotWrite(
   return { mode, cards: next.cards, edges: nextEdges, areas: nextAreas };
 }
 
-/** Keep live `linked` on edges that still exist. Deleted edges follow the snapshot. */
+/** Keep live `linked` / `linkRefId` on edges that still exist. Deleted edges follow the snapshot. */
 export function preserveLinked(
   snapshotEdges: readonly WhiteboardEdge[],
   currentEdges: readonly WhiteboardEdge[],
@@ -231,8 +231,10 @@ export function preserveLinked(
   const live = new Map(currentEdges.map((edge) => [edge.id, edge]));
   return snapshotEdges.map((edge) => {
     const now = live.get(edge.id);
-    if (now?.linked === true) return { ...edge, linked: true };
-    return { ...edge };
+    const next = { ...edge };
+    if (now?.linked === true) next.linked = true;
+    if (now?.linkRefId != null) next.linkRefId = now.linkRefId;
+    return next;
   });
 }
 

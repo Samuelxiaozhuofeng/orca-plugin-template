@@ -191,4 +191,44 @@ check(
   "normalize omits default color and solid style",
 );
 
+const withRef = tryParseEdges([edge(1, 2, { linkRefId: 77 })]);
+check(
+  isOk(withRef) && withRef.value[0].linkRefId === 77,
+  "linkRefId is kept",
+);
+const storedRef = preparedEdges(withRef.ok ? withRef.value : []);
+check(storedRef[0].linkRefId === 77, "write keeps linkRefId");
+check(
+  JSON.stringify(storedRef).includes('"linkRefId":77'),
+  "linkRefId is stored as a number",
+);
+const junkRef = tryParseEdges([edge(1, 2, { linkRefId: "77" })]);
+check(
+  isOk(junkRef) && junkRef.value[0].linkRefId === undefined,
+  "non-numeric linkRefId is dropped",
+);
+check(
+  isOk(junkRef) && !("linkRefId" in junkRef.value[0]),
+  "invalid linkRefId omits the key",
+);
+const linkedEdge: WhiteboardEdge = { ...plain, linked: true };
+const propLinked: WhiteboardEdge = { ...plain, linkRefId: 5 };
+check(!edgesEqual([plain], [propLinked]), "equality sees linkRefId");
+check(edgesEqual([propLinked], [{ ...propLinked }]), "same linkRefId compares equal");
+check(
+  edgesEqual([linkedEdge], [{ ...linkedEdge }]),
+  "linked still compares equal",
+);
+check(
+  !edgesEqual([linkedEdge], [propLinked]),
+  "linked and linkRefId are not interchangeable",
+);
+const bothMarks = tryParseEdges([edge(1, 2, { linked: true, linkRefId: 8 })]);
+check(
+  isOk(bothMarks) &&
+    bothMarks.value[0].linked === true &&
+    bothMarks.value[0].linkRefId === 8,
+  "linked and linkRefId can coexist",
+);
+
 console.log("edges.test.ts ok");

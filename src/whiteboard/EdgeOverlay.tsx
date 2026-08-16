@@ -1,3 +1,4 @@
+import { edgeHasNoteLink } from "./edgeLink";
 import type { WhiteboardEdge } from "./edges";
 import { EdgeMenuItems } from "./EdgeMenuItems";
 import type { EdgeEls } from "./edgeGestures";
@@ -68,7 +69,7 @@ export function EdgeLabelLayer(props: {
     <div className="owb-edge-labels">
       {edges.map((edge) => {
         if (edge.id === editingId) return null;
-        if (edge.label == null && !edge.linked) return null;
+        if (edge.label == null && !edgeHasNoteLink(edge)) return null;
         const curve = curveOf(edge);
         if (curve == null) return null;
         return (
@@ -80,7 +81,7 @@ export function EdgeLabelLayer(props: {
             }
             style={{ left: curve.label.x, top: curve.label.y }}
           >
-            {edge.linked ? (
+            {edgeHasNoteLink(edge) ? (
               <i className="ti ti-link owb-edge-link-icon" />
             ) : null}
             {edge.label}

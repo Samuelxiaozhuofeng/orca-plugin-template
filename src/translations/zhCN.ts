@@ -140,6 +140,20 @@ const zhCN = {
   "Show reference connections": "显示引用连线",
   "Draw faint dashed lines when a card's notes already reference another card on this board.":
     "当一张卡片的笔记里已经引用了板上另一张卡片时，自动画淡虚线。",
+  "Create a note reference when connecting cards": "画线时自动建立笔记引用",
+  "Automatically create a note reference when you draw an arrow. Turn this off to keep lines decorative.":
+    "从一张卡片拉出箭头时，自动在笔记里建立引用。关掉后箭头只是装饰线，不改笔记。",
+  "How to store the reference": "引用的落地方式",
+  "Property: no extra text in the source note. Child block: insert a child under the source note (older method).":
+    "「属性」：源笔记正文不变。「子块」：在源笔记下插入一条引用（旧做法）。",
+  "Property on the source note": "写在源笔记的属性里",
+  "Child block under the source note": "在源笔记下插入子块",
+  "Remove note reference": "取消引用",
+  "Removes the reference from the source note.": "从源笔记里去掉这条引用。",
+  "Creates a reference on the source note. Deleting this line later will remove it.":
+    "在源笔记里建立引用，正文不会多出内容。删掉这条线会一并取消引用。",
+  "Linked these cards in the notes.": "已在笔记里建立引用。",
+  "Failed to remove the note reference": "没能取消笔记引用",
   "Arrow to end": "箭头指向终点",
   "Arrows on both ends": "两端都有箭头",
   "No arrows": "无箭头",

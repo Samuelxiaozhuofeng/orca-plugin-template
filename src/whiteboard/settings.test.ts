@@ -1,7 +1,32 @@
-import {
+// @ts-nocheck — Node assertion script; tsc has no @types/node in this package.
+import { register } from "node:module";
+
+register(
+  `data:text/javascript,${encodeURIComponent(`
+    export async function resolve(specifier, context, nextResolve) {
+      try {
+        return await nextResolve(specifier, context);
+      } catch (err) {
+        if (
+          err?.code === "ERR_MODULE_NOT_FOUND" &&
+          typeof specifier === "string" &&
+          !specifier.endsWith(".ts") &&
+          (specifier.startsWith(".") || specifier.startsWith("/"))
+        ) {
+          return nextResolve(specifier + ".ts", context);
+        }
+        throw err;
+      }
+    }
+  `)}`,
+  import.meta.url,
+);
+
+const {
   controlsModeFromSettings,
   migrateControlsMode,
-} from "./controlsMode.ts";
+} = await import("./controlsMode.ts");
+const { readWhiteboardSettings } = await import("./settings.ts");
 
 function check(cond: boolean, message: string): void {
   if (!cond) throw new Error(message);
@@ -50,6 +75,31 @@ check(
 check(
   controlsModeFromSettings({ mouseScheme: 0 }) === "mouse",
   "read dirty non-string",
+);
+
+check(
+  readWhiteboardSettings(undefined).autoLinkEdges === true,
+  "auto-link defaults on",
+);
+check(
+  readWhiteboardSettings({}).autoLinkEdges === true,
+  "missing auto-link is on",
+);
+check(
+  readWhiteboardSettings({ autoLinkEdges: false }).autoLinkEdges === false,
+  "auto-link can be turned off",
+);
+check(
+  readWhiteboardSettings(undefined).edgeLinkMode === "property",
+  "link mode defaults to property",
+);
+check(
+  readWhiteboardSettings({ edgeLinkMode: "child" }).edgeLinkMode === "child",
+  "link mode can be the older child-block method",
+);
+check(
+  readWhiteboardSettings({ edgeLinkMode: "nope" }).edgeLinkMode === "property",
+  "unknown link mode falls back to property",
 );
 
 console.log("settings tests passed");

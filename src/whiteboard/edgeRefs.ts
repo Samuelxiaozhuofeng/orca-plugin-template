@@ -1,6 +1,10 @@
 import type { Block, DbId } from "../orca.d.ts";
 import { useWatchedValue } from "./blockWatch";
 import type { WhiteboardCard } from "./cards";
+import {
+  isPluginPropertyRef,
+  readEdgeLinkPropIds,
+} from "./edgeLink";
 import { pairKey, type WhiteboardEdge } from "./edges";
 
 const { useMemo, useRef } = window.React;
@@ -62,8 +66,12 @@ export function collectReferenceEdges(
   for (const [blockId, fromCard] of owner) {
     const block = blocks[blockId];
     if (block?.refs == null) continue;
+    const pluginPropIds = readEdgeLinkPropIds(block);
     for (const ref of block.refs) {
-      if (ref.type !== REF_TYPE_INLINE) continue;
+      const keep =
+        ref.type === REF_TYPE_INLINE ||
+        isPluginPropertyRef(ref, pluginPropIds);
+      if (!keep) continue;
       const toCard = owner.get(ref.to);
       if (toCard == null || toCard === fromCard) continue;
       const key = pairKey(fromCard, toCard);
@@ -95,11 +103,15 @@ function relationSlice(
   owner: DbId | undefined,
 ): string {
   const children = block?.children?.join(",") ?? "";
+  const pluginPropIds = readEdgeLinkPropIds(block);
   const refs = (block?.refs ?? [])
-    .filter((ref) => ref.type === REF_TYPE_INLINE)
-    .map((ref) => String(ref.to))
+    .filter(
+      (ref) =>
+        ref.type === REF_TYPE_INLINE || isPluginPropertyRef(ref, pluginPropIds),
+    )
+    .map((ref) => `${ref.type}:${ref.to}:${ref.id}`)
     .join(",");
-  return `${id}>${owner ?? ""}:${children}:${refs}`;
+  return `${id}>${owner ?? ""}:${children}:${refs}:${pluginPropIds.join(",")}`;
 }
 
 function slicesOf(watchIds: readonly DbId[], blocks: { [id: number]: Block | undefined }): string {

@@ -158,7 +158,7 @@ const created = planExtractEdge(1, 3, [existingEdge]);
 check(created != null && created.from === 1 && created.to === 3, "new edge");
 check(created != null && created.arrow === "end", "edge arrow is end");
 check(
-  created != null && !("linked" in created),
+  created != null && !("linked" in created) && !("linkRefId" in created),
   "extract edge is not linked",
 );
 check(planExtractEdge(1, 2, [existingEdge]) == null, "same pair skipped");

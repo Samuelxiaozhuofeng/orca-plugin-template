@@ -68,6 +68,7 @@ const remapped = mustPlan(
   [
     edge(1, 3, {
       linked: true,
+      linkRefId: 55,
       bend: { from: { along: 1, across: 0.2 }, to: { along: 1, across: -0.1 } },
       arrow: "both",
       color: "blue",
@@ -80,6 +81,7 @@ check(remapped.leftoverEdges.length === 1, "one remapped edge stays on A");
 check(remapped.leftoverEdges[0].from === SUB, "selected end remaps to the sub-board");
 check(remapped.leftoverEdges[0].to === 3, "unselected end stays");
 check(remapped.leftoverEdges[0].linked === true, "remapped edge keeps linked");
+check(remapped.leftoverEdges[0].linkRefId === 55, "remapped edge keeps linkRefId");
 check(remapped.leftoverEdges[0].bend == null, "remapped edge drops bend");
 check(remapped.leftoverEdges[0].arrow === "both", "remapped edge keeps arrow");
 check(remapped.leftoverEdges[0].color === "blue", "remapped edge keeps color");
@@ -87,12 +89,13 @@ check(remapped.leftoverEdges[0].style === "dashed", "remapped edge keeps style")
 
 const untouched = mustPlan(
   [card(1, { x: 0, y: 0 }), card(2, { x: 80, y: 0 }), card(3, { x: 400, y: 0 }), card(4, { x: 600, y: 0 })],
-  [edge(3, 4, { color: "green", linked: true })],
+  [edge(3, 4, { color: "green", linked: true, linkRefId: 61 })],
   [1, 2],
 );
 check(untouched.leftoverEdges.length === 1, "untouched edge stays on A");
 check(untouched.leftoverEdges[0].from === 3 && untouched.leftoverEdges[0].to === 4, "untouched pair unchanged");
 check(untouched.leftoverEdges[0].linked === true, "untouched linked flag kept");
+check(untouched.leftoverEdges[0].linkRefId === 61, "untouched linkRefId kept");
 check(untouched.leftoverEdges[0].color === "green", "untouched color kept");
 
 const a = card(1, { x: 120, y: 80, color: "coral", hLock: true });

@@ -48,6 +48,7 @@ const {
   REF_TYPE_INLINE,
   REF_WALK_MAX_BLOCKS,
 } = await import("./edgeRefs.ts");
+const { EDGE_LINK_PROP, REF_TYPE_PROPERTY } = await import("./edgeLink.ts");
 
 function check(cond: boolean, message: string): void {
   if (!cond) throw new Error(message);
@@ -159,5 +160,91 @@ const stats4 = { walked: 0 };
 const key4 = referenceRelationKey(forest, childChanged, cache, stats4);
 check(key4 !== key1, "child-list changes invalidate the fingerprint");
 check(stats4.walked === 1, "only the dirty card is walked");
+
+function propertyRef(id: number, to: number) {
+  return { type: REF_TYPE_PROPERTY, id, to };
+}
+
+const pluginLinked = {
+  1: {
+    children: [],
+    refs: [propertyRef(100, 2)],
+    properties: [{ name: EDGE_LINK_PROP, type: 2, value: [100] }],
+  },
+  2: { children: [], refs: [] },
+  3: { children: [], refs: [] },
+};
+const fromPlugin = collectReferenceEdges([cardA, cardB], pluginLinked, noneDrawn);
+check(fromPlugin.edges.length === 1, "plugin property refs become dashed edges");
+check(edgeKey(fromPlugin.edges[0]) === "1->2", "plugin property edge is A→B");
+
+const foreignProp = {
+  1: {
+    children: [],
+    refs: [propertyRef(200, 2)],
+    properties: [{ name: "other.rel", type: 2, value: [200] }],
+  },
+  2: { children: [], refs: [] },
+};
+const fromForeign = collectReferenceEdges([cardA, cardB], foreignProp, noneDrawn);
+check(fromForeign.edges.length === 0, "foreign property refs are not drawn");
+
+const orphanProp = {
+  1: {
+    children: [],
+    refs: [propertyRef(100, 2)],
+    properties: [{ name: EDGE_LINK_PROP, type: 2, value: [] }],
+  },
+  2: { children: [], refs: [] },
+};
+const fromOrphan = collectReferenceEdges([cardA, cardB], orphanProp, noneDrawn);
+check(fromOrphan.edges.length === 0, "property refs outside the plugin array are ignored");
+
+const alreadyDrawn = collectReferenceEdges(
+  [cardA, cardB],
+  pluginLinked,
+  new Set(["1:2"]),
+);
+check(alreadyDrawn.edges.length === 0, "drawn pair suppresses the implicit property edge");
+
+const bothKinds = {
+  1: {
+    children: [],
+    refs: [inlineRef(2), propertyRef(100, 3)],
+    properties: [{ name: EDGE_LINK_PROP, type: 2, value: [100] }],
+  },
+  2: { children: [], refs: [] },
+  3: { children: [], refs: [] },
+};
+const mixed = collectReferenceEdges([cardA, cardB, cardC], bothKinds, noneDrawn);
+check(mixed.edges.length === 2, "inline and plugin property refs can coexist");
+
+const propCache = new Map();
+const propForest = [card(1), card(2)];
+const propStats1 = { walked: 0 };
+const propKey1 = referenceRelationKey(propForest, pluginLinked, propCache, propStats1);
+check(propStats1.walked === 2, "property-ref forest walks each card");
+const propStats2 = { walked: 0 };
+const propKey2 = referenceRelationKey(propForest, pluginLinked, propCache, propStats2);
+check(propKey2 === propKey1, "unchanged property refs reuse the fingerprint");
+check(propStats2.walked === 0, "unchanged property refs are not walked again");
+
+const propArrayChanged = {
+  1: {
+    children: [],
+    refs: [propertyRef(100, 2)],
+    properties: [{ name: EDGE_LINK_PROP, type: 2, value: [] }],
+  },
+  2: { children: [], refs: [] },
+};
+const propStats3 = { walked: 0 };
+const propKey3 = referenceRelationKey(
+  propForest,
+  propArrayChanged,
+  propCache,
+  propStats3,
+);
+check(propKey3 !== propKey1, "plugin property array changes invalidate the fingerprint");
+check(propStats3.walked === 1, "only the dirty property-ref card is walked");
 
 console.log("edgeRefs.test.ts ok");
