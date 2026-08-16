@@ -81,7 +81,11 @@ export const CARD_EDITOR_CSS = `
 }
 
 .owb-card.is-editing .orca-block-drag-handle,
-.owb-card .orca-panel-drag-handle {
+.owb-card .orca-panel-drag-handle,
+.owb-card .orca-mermaid-resize-handle,
+.owb-card .orca-block-preview-resizer-bottom,
+.owb-card .orca-block-preview-resizer-bottom-left,
+.owb-card .orca-block-preview-resizer-bottom-right {
   display: none !important;
 }
 

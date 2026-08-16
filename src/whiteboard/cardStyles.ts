@@ -162,7 +162,8 @@ export const CARD_CSS = `
 .owb-card-body {
   flex: 1 1 auto;
   min-height: 0;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: 12px 14px;
   font-size: 14px;
   line-height: 1.6;
@@ -453,6 +454,13 @@ export const CARD_CSS = `
 
 .owb-card-handle-ne { top: 0; right: 0; cursor: nesw-resize; }
 .owb-card-handle-nw { top: 0; left: 0; cursor: nwse-resize; }
+
+/* Bottom edge: no visible drag bar (south handles stay unused). */
+.owb-card-handle-s,
+.owb-card-handle-se,
+.owb-card-handle-sw {
+  display: none !important;
+}
 
 @keyframes owb-card-focus-flash {
   0%, 50%, 100% {
