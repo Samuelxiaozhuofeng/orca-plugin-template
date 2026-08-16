@@ -16,11 +16,14 @@ import {
   relationMapWatchIds,
   relationSnippet,
   relationTitle,
+  type RelationDir,
   type RelationMapModel,
   type RelationNode,
 } from "./cardRelations";
 
 const { useCallback, useEffect, useMemo, useRef, useState } = window.React;
+
+type TabKey = "all" | "in" | "out";
 
 const EMPTY_MODEL: RelationMapModel = {
   total: 0,
@@ -75,9 +78,34 @@ function useCardRelationModel(
   }, [rootId, cacheKey, key]);
 }
 
-function rowLabel(node: RelationNode, blocks: { [id: number]: Block | undefined }): string {
+function rowLabel(
+  node: RelationNode,
+  blocks: { [id: number]: Block | undefined },
+): string {
   const title = relationTitle(node.blockId, blocks);
   return title === "" ? t("Untitled") : title;
+}
+
+function renderDirBadge(dir: RelationDir): React.ReactNode {
+  if (dir === "both") {
+    return (
+      <span className="owb-relmap-dir is-both" title={t("Two-way relation")}>
+        <i className="ti ti-arrows-exchange" />
+      </span>
+    );
+  }
+  if (dir === "in") {
+    return (
+      <span className="owb-relmap-dir is-in" title={t("References me")}>
+        <i className="ti ti-arrow-down-left" />
+      </span>
+    );
+  }
+  return (
+    <span className="owb-relmap-dir is-out" title={t("I reference")}>
+      <i className="ti ti-arrow-up-right" />
+    </span>
+  );
 }
 
 export function RelationMap(props: {
@@ -88,11 +116,18 @@ export function RelationMap(props: {
   selectCards: (ids: DbId[]) => void;
   focusApiRef: { current: CanvasFocusApi | null };
 }) {
-  const { boardBlockId, cards, selected, onAddCards, selectCards, focusApiRef } =
-    props;
+  const {
+    boardBlockId,
+    cards,
+    selected,
+    onAddCards,
+    selectCards,
+    focusApiRef,
+  } = props;
   const rootId = selected.length === 1 ? selected[0] : null;
   const model = useCardRelationModel(rootId, cards);
   const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState<TabKey>("all");
   const [hover, setHover] = useState<{
     node: RelationNode;
     section: "in" | "out";
@@ -104,6 +139,7 @@ export function RelationMap(props: {
   useEffect(() => {
     setOpen(false);
     setHover(null);
+    setTab("all");
   }, [rootId]);
 
   useEffect(() => {
@@ -155,6 +191,21 @@ export function RelationMap(props: {
     [boardBlockId, busy, cards, onAddCards, rootId, selectCards],
   );
 
+  const activeNodes = useMemo(() => {
+    if (tab === "in") return model.incoming;
+    if (tab === "out") return model.outgoing;
+    return model.shown;
+  }, [tab, model]);
+
+  const offBoardList = useMemo(
+    () => activeNodes.filter((node: RelationNode) => !node.onBoard),
+    [activeNodes],
+  );
+  const onBoardList = useMemo(
+    () => activeNodes.filter((node: RelationNode) => node.onBoard),
+    [activeNodes],
+  );
+
   if (rootId == null || model.total === 0) return null;
 
   void dataTick;
@@ -163,12 +214,16 @@ export function RelationMap(props: {
     hover == null ? "" : relationSnippet(hover.node, hover.section, blocks);
   const selfTitle = relationTitle(rootId, blocks);
 
-  const renderRow = (node: RelationNode, section: "in" | "out") => {
+  const renderNodeRow = (node: RelationNode) => {
     const kind = relationKind(blocks[node.blockId]);
+    const section: "in" | "out" =
+      tab === "out" ? "out" : tab === "in" ? "in" : node.dir === "out" ? "out" : "in";
+    const label = rowLabel(node, blocks);
+
     return (
       <div
-        key={`${section}-${node.blockId}`}
-        className={`owb-relmap-row${node.onBoard ? " is-on" : " is-off"}`}
+        key={`${node.blockId}-${node.dir}`}
+        className={`owb-relmap-item${node.onBoard ? " is-onboard" : " is-offboard"}`}
         onMouseEnter={() => setHover({ node, section })}
         onClick={() => {
           if (node.onBoard && node.ownerCardId != null) {
@@ -179,22 +234,33 @@ export function RelationMap(props: {
           if (!node.onBoard) void addIds([node.blockId]);
         }}
       >
-        <i className={relationKindIcon(kind)} />
-        <span className="owb-relmap-row-title">{rowLabel(node, blocks)}</span>
-        {node.onBoard ? null : (
-          <button
-            type="button"
-            className="owb-relmap-plus"
-            title={t("Add to the board")}
-            aria-label={t("Add to the board")}
-            onClick={(event: React.MouseEvent) => {
-              event.stopPropagation();
-              void addIds([node.blockId]);
-            }}
-          >
-            <i className="ti ti-plus" />
-          </button>
-        )}
+        <div className="owb-relmap-item-main">
+          <i className={`owb-relmap-kind-icon ${relationKindIcon(kind)}`} />
+          <span className="owb-relmap-item-title" title={label}>
+            {label}
+          </span>
+          {renderDirBadge(node.dir)}
+        </div>
+        <div className="owb-relmap-item-actions">
+          {node.onBoard ? (
+            <span className="owb-relmap-pill is-on" title={t("Locate card")}>
+              <i className="ti ti-target" />
+            </span>
+          ) : (
+            <button
+              type="button"
+              className="owb-relmap-action-btn"
+              title={t("Add to board")}
+              aria-label={t("Add to board")}
+              onClick={(event: React.MouseEvent) => {
+                event.stopPropagation();
+                void addIds([node.blockId]);
+              }}
+            >
+              <i className="ti ti-plus" />
+            </button>
+          )}
+        </div>
       </div>
     );
   };
@@ -206,71 +272,146 @@ export function RelationMap(props: {
       onDoubleClick={stopMapPointer}
       onWheel={(event: React.WheelEvent) => {
         event.stopPropagation();
-        event.preventDefault();
       }}
     >
       {open ? (
-        <div className="owb-relmap-panel">
-          <div className="owb-relmap-head">
-            <span>{t("Relations · ${count}", { count: String(model.total) })}</span>
-            <button
-              type="button"
-              className="owb-relmap-collapse"
-              title={t("Collapse")}
-              aria-label={t("Collapse")}
-              onClick={() => setOpen(false)}
-            >
-              <i className="ti ti-chevron-down" />
-            </button>
-          </div>
-          <div
-            className="owb-relmap-section"
-            onMouseLeave={() => setHover(null)}
-          >
-            <div className="owb-relmap-label">
-              {t("References me · ${count}", {
-                count: String(model.incomingTotal),
-              })}
+        <div className="owb-relmap-panel" onMouseLeave={() => setHover(null)}>
+          {/* Header */}
+          <div className="owb-relmap-header">
+            <div className="owb-relmap-header-title">
+              <i className="ti ti-affiliate owb-relmap-header-icon" />
+              <span className="owb-relmap-header-text">
+                {t("Relations · ${count}", { count: String(model.total) })}
+              </span>
             </div>
-            {model.incoming.map((node) => renderRow(node, "in"))}
-          </div>
-          <div className="owb-relmap-self">
-            {selfTitle === "" ? t("Untitled") : selfTitle}
-          </div>
-          <div
-            className="owb-relmap-section"
-            onMouseLeave={() => setHover(null)}
-          >
-            <div className="owb-relmap-label">
-              {t("I reference · ${count}", {
-                count: String(model.outgoingTotal),
-              })}
+            <div className="owb-relmap-header-actions">
+              {model.offBoard > 0 ? (
+                <button
+                  type="button"
+                  className="owb-relmap-add-all-btn"
+                  disabled={busy}
+                  onClick={() => void addIds(model.offBoardIds)}
+                  title={t("Add all to the board")}
+                >
+                  <i className="ti ti-plus" />
+                  <span>{t("Add all (${count})", { count: String(model.offBoard) })}</span>
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="owb-relmap-close-btn"
+                title={t("Collapse")}
+                aria-label={t("Collapse")}
+                onClick={() => setOpen(false)}
+              >
+                <i className="ti ti-x" />
+              </button>
             </div>
-            {model.outgoing.map((node) => renderRow(node, "out"))}
           </div>
-          <div className="owb-relmap-snippet">
-            {hover == null
-              ? t("Hover a row to see the line that made the link.")
-              : snippet}
-          </div>
-          <div className="owb-relmap-foot">
-            <span className="owb-relmap-stat">
-              {t("Off-board ${count}", { count: String(model.offBoard) })}
+
+          {/* Current Card Banner */}
+          <div className="owb-relmap-current-card">
+            <span className="owb-relmap-current-tag">{t("Current")}</span>
+            <span className="owb-relmap-current-title">
+              {selfTitle === "" ? t("Untitled") : selfTitle}
             </span>
+          </div>
+
+          {/* Segmented Control Tabs */}
+          <div className="owb-relmap-tabs" role="tablist">
             <button
               type="button"
-              className="owb-relmap-add"
-              disabled={busy || model.offBoard === 0}
-              onClick={() => void addIds(model.offBoardIds)}
+              role="tab"
+              aria-selected={tab === "all"}
+              className={`owb-relmap-tab${tab === "all" ? " is-active" : ""}`}
+              onClick={() => setTab("all")}
             >
-              {t("Add all to the board")}
+              <span>{t("All · ${count}", { count: String(model.total) })}</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === "in"}
+              className={`owb-relmap-tab${tab === "in" ? " is-active" : ""}`}
+              onClick={() => setTab("in")}
+            >
+              <span>{t("References me · ${count}", { count: String(model.incomingTotal) })}</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === "out"}
+              className={`owb-relmap-tab${tab === "out" ? " is-active" : ""}`}
+              onClick={() => setTab("out")}
+            >
+              <span>{t("I reference · ${count}", { count: String(model.outgoingTotal) })}</span>
             </button>
           </div>
-          {model.hidden > 0 ? (
-            <div className="owb-relmap-more">
-              {t("${count} more not shown", { count: String(model.hidden) })}
-            </div>
-          ) : null}
+
+          {/* Scrollable Content List */}
+          <div className="owb-relmap-body">
+            {activeNodes.length === 0 ? (
+              <div className="owb-relmap-empty">
+                <i className="ti ti-inbox" />
+                <span>{t("No relations found in this category.")}</span>
+              </div>
+            ) : (
+              <>
+                {offBoardList.length > 0 ? (
+                  <div className="owb-relmap-group">
+                    <div className="owb-relmap-group-title">
+                      <span className="owb-relmap-group-dot is-off" />
+                      <span>{t("Off-board (${count})", { count: String(offBoardList.length) })}</span>
+                    </div>
+                    <div className="owb-relmap-group-list">
+                      {offBoardList.map(renderNodeRow)}
+                    </div>
+                  </div>
+                ) : null}
+
+                {onBoardList.length > 0 ? (
+                  <div className="owb-relmap-group">
+                    <div className="owb-relmap-group-title">
+                      <span className="owb-relmap-group-dot is-on" />
+                      <span>{t("On-board (${count})", { count: String(onBoardList.length) })}</span>
+                    </div>
+                    <div className="owb-relmap-group-list">
+                      {onBoardList.map(renderNodeRow)}
+                    </div>
+                  </div>
+                ) : null}
+
+                {model.hidden > 0 ? (
+                  <div className="owb-relmap-more">
+                    {t("${count} more not shown", { count: String(model.hidden) })}
+                  </div>
+                ) : null}
+              </>
+            )}
+          </div>
+
+          {/* Dynamic Context Preview Snippet */}
+          <div className={`owb-relmap-preview${hover != null && snippet ? " is-active" : ""}`}>
+            <i className={`ti ${hover != null && snippet ? "ti-quote" : "ti-info-circle"}`} />
+            <span className="owb-relmap-preview-text">
+              {hover != null && snippet
+                ? snippet
+                : t("Hover a row to see the line that made the link.")}
+            </span>
+          </div>
+
+          {/* Footer Stats & Hints */}
+          <div className="owb-relmap-footer">
+            <span className="owb-relmap-stat-text">
+              {t("On board ${on}, Off board ${off}", {
+                on: String(model.onBoard),
+                off: String(model.offBoard),
+              })}
+            </span>
+            <span className="owb-relmap-hint-text">
+              {t("Double-click or click + to add to board")}
+            </span>
+          </div>
         </div>
       ) : (
         <button
@@ -280,7 +421,12 @@ export function RelationMap(props: {
           onClick={() => setOpen(true)}
         >
           <i className="ti ti-affiliate" />
-          <span className="owb-relmap-count">{model.total}</span>
+          <span className="owb-relmap-capsule-label">{t("Relations · ${count}", { count: String(model.total) })}</span>
+          {model.offBoard > 0 ? (
+            <span className="owb-relmap-capsule-badge" title={t("Off-board ${count}", { count: String(model.offBoard) })}>
+              +{model.offBoard}
+            </span>
+          ) : null}
         </button>
       )}
     </div>

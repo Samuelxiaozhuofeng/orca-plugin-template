@@ -426,8 +426,7 @@ export const CARD_CSS = `
   pointer-events: auto;
 }
 
-.owb-card-handle-n,
-.owb-card-handle-s {
+.owb-card-handle-n {
   left: 12px;
   right: 12px;
   height: 8px;
@@ -443,22 +442,17 @@ export const CARD_CSS = `
 }
 
 .owb-card-handle-n { top: 0; }
-.owb-card-handle-s { bottom: 0; }
 .owb-card-handle-e { right: 0; }
 .owb-card-handle-w { left: 0; }
 
 .owb-card-handle-ne,
-.owb-card-handle-nw,
-.owb-card-handle-se,
-.owb-card-handle-sw {
+.owb-card-handle-nw {
   width: 12px;
   height: 12px;
 }
 
 .owb-card-handle-ne { top: 0; right: 0; cursor: nesw-resize; }
 .owb-card-handle-nw { top: 0; left: 0; cursor: nwse-resize; }
-.owb-card-handle-se { bottom: 0; right: 0; cursor: nwse-resize; }
-.owb-card-handle-sw { bottom: 0; left: 0; cursor: nesw-resize; }
 
 @keyframes owb-card-focus-flash {
   0%, 50%, 100% {
