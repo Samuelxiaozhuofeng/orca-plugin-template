@@ -72,6 +72,8 @@ type SharedProps = {
   ) => Promise<boolean>;
   applyCardColor: (color: string | undefined) => void;
   applyUnifySize: (mode: UnifySizeMode) => void;
+  applyArrange: (action: ArrangeAction, ids?: readonly DbId[]) => void;
+  onWrapSelected: () => void;
   filterActive: boolean;
   filterTags: readonly string[];
   filterMatched: number;
@@ -98,6 +100,8 @@ export function CanvasViewportOverlays({
   onCloseEdgeDrop,
   applyCardColor,
   applyUnifySize,
+  applyArrange,
+  onWrapSelected,
   filterActive,
   filterTags,
   filterMatched,
@@ -174,6 +178,8 @@ export function CanvasViewportOverlays({
         selectedIds={selected}
         onColor={applyCardColor}
         onUnifySize={applyUnifySize}
+        onArrange={applyArrange}
+        onWrapSelected={onWrapSelected}
       />
     </>
   );
@@ -200,7 +206,6 @@ export function CanvasHostOverlays({
   onStartDrawArea: () => void;
   createBlankAt: (at: CanvasOrigin, edit: boolean) => Promise<void> | void;
   selectCards: (ids: DbId[]) => void;
-  applyArrange: (action: ArrangeAction, ids?: readonly DbId[]) => void;
 }) {
   const {
     menuPointRef,

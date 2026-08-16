@@ -59,31 +59,40 @@ export const CARD_BACK_CSS = `
   z-index: 5;
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
   max-width: 60%;
-  padding: 1px 6px;
-  border: none;
-  border-radius: 3px;
-  background: color-mix(in srgb, var(--orca-color-primary-5, #2F80ED) 14%, transparent);
-  color: var(--orca-color-primary-5, #2F80ED);
+  padding: 2px 8px;
+  border: 1px solid var(--orca-color-text-1, #1a1a1a);
+  border-radius: 6px;
+  box-shadow: 1.5px 1.5px 0px 0px color-mix(in srgb, var(--orca-color-text-1, #1a1a1a) 80%, transparent);
+  background: color-mix(in srgb, var(--orca-color-bg-2, #f5f5f7) 70%, var(--orca-color-bg-1, #fff));
+  color: var(--orca-color-text-1, #1a1a1a);
   font-size: 11px;
+  font-weight: 550;
   line-height: 1.5;
   white-space: nowrap;
   cursor: pointer;
   opacity: 0;
   pointer-events: none;
-  transition: opacity var(--owb-duration) var(--owb-ease);
+  transition: all 0.12s ease, opacity var(--owb-duration) var(--owb-ease);
 }
 
 .owb-card:hover .owb-card-back,
 .owb-card.is-selected .owb-card-back {
-  opacity: 0.9;
+  opacity: 1;
   pointer-events: auto;
 }
 
 .owb-card-back:hover {
-  opacity: 1;
-  background: color-mix(in srgb, var(--orca-color-primary-5, #2F80ED) 24%, transparent);
+  background: color-mix(in srgb, var(--orca-color-primary-5, #2F80ED) 10%, var(--orca-color-bg-1, #fff));
+  border-color: var(--orca-color-primary-5, #2F80ED);
+  color: var(--orca-color-primary-5, #2F80ED);
+  box-shadow: 2px 2px 0px 0px var(--orca-color-primary-5, #2F80ED);
+}
+
+.owb-card-back:active {
+  transform: translate(1.5px, 1.5px);
+  box-shadow: 0px 0px 0px 0px transparent;
 }
 
 .owb-card-block-node.is-row-flash {

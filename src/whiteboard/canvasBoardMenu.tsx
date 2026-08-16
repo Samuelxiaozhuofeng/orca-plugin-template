@@ -1,6 +1,5 @@
 import type { DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n";
-import { ArrangeMenuItems } from "./ArrangeMenu";
 import { COLOR_PRESETS } from "./CardToolbar";
 import type { UnifySizeMode } from "./cardBatch";
 import type { WhiteboardCard } from "./data";
@@ -35,8 +34,6 @@ export function boardMenu(close: () => void, opts: BoardMenuOptions) {
   const cards = opts.cardsRef.current;
   const allIds = () => cards.map((card: WhiteboardCard) => card.blockId);
   const hasCards = cards.length > 0;
-  // The arrange group already carries its own "tidy up to grid" for the
-  // selection, so the board-wide one only shows when that group is absent.
   const arranging = opts.selected.length >= 2;
 
   const run = (action: () => void) => () => {
@@ -77,17 +74,10 @@ export function boardMenu(close: () => void, opts: BoardMenuOptions) {
         disabled={!hasCards}
         onClick={run(() => opts.selectCards(allIds()))}
       />
-      {arranging ? null : (
-        <orca.components.MenuText
-          title={t("Tidy all cards up to grid")}
-          disabled={cards.length < 2}
-          onClick={run(() => opts.applyArrange("grid", allIds()))}
-        />
-      )}
-      <ArrangeMenuItems
-        close={close}
-        selectedCount={opts.selected.length}
-        onArrange={opts.applyArrange}
+      <orca.components.MenuText
+        title={t("Tidy all cards up to grid")}
+        disabled={cards.length < 2}
+        onClick={run(() => opts.applyArrange("grid", allIds()))}
       />
       {arranging ? (
         <>

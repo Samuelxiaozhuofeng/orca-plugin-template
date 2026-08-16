@@ -1,6 +1,5 @@
 import type { DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n";
-import { ArrangeMenuItems } from "./ArrangeMenu";
 import {
   applyCardBox,
   cardHasLiveGesture,
@@ -98,21 +97,18 @@ export function Card({
   simplified = false,
   selected,
   showResize,
-  selectedCount,
   pointerToWorld,
   onStartEdit,
   onEndEdit,
   onCardMouseDown,
   onPatchCard,
   onContentHeight,
-  onArrange,
   onSelectOnly,
   onStartConnect,
   onMoveFrame,
   promotedKey = "",
   onFocusCard,
   onExtractRow,
-  onWrapSelected,
 }: Props) {
   const cardRef = useRef<HTMLDivElement | null>(null);
   const extractRowRef = useRef<DbId | null>(null);
@@ -352,20 +348,6 @@ export function Card({
               fitContentHeight();
             }}
           />
-          <ArrangeMenuItems
-            close={close}
-            selectedCount={selected ? selectedCount : 1}
-            onArrange={onArrange}
-          />
-          {selected && selectedCount >= 2 && onWrapSelected != null ? (
-            <orca.components.MenuText
-              title={t("Group into section")}
-              onClick={() => {
-                close();
-                onWrapSelected();
-              }}
-            />
-          ) : null}
         </orca.components.Menu>
       )}
     >

@@ -292,6 +292,8 @@ export function Canvas({
     onCommitEdges,
     applyCardColor,
     applyUnifySize,
+    applyArrange,
+    onWrapSelected: wrapSelected,
     filterActive: filter.active,
     filterTags: filter.query.tags,
     filterMatched: filter.matchedCount,
@@ -437,7 +439,6 @@ export function Canvas({
         onStartDrawArea={onStartDrawArea}
         createBlankAt={createBlankAt}
         selectCards={selectCards}
-        applyArrange={applyArrange}
       />
     </>
   );

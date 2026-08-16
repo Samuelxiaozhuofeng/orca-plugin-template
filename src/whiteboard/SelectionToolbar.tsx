@@ -1,20 +1,118 @@
 import type { DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n";
+import {
+  AlignTriggerIcon,
+  ARRANGE_CELLS,
+  WrapSectionIcon,
+} from "./arrangeIcons";
 import { COLOR_PRESETS } from "./CardToolbar";
+import type { UnifySizeMode } from "./cardBatch";
 import type { WhiteboardCard } from "./data";
 import { selectedCards } from "./selection";
-import type { UnifySizeMode } from "./cardBatch";
+import type { ArrangeAction } from "./selection";
+
+const { useEffect, useRef, useState } = window.React;
+
+function stopBarMouseDown(event: { stopPropagation(): void }) {
+  event.stopPropagation();
+}
+
+function ArrangePopover({
+  selectedCount,
+  onArrange,
+}: {
+  selectedCount: number;
+  onArrange: (action: ArrangeAction) => void;
+}) {
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      setOpen(false);
+    };
+    const onPointer = (event: PointerEvent) => {
+      const root = wrapRef.current;
+      if (root == null) return;
+      if (event.target instanceof Node && root.contains(event.target)) return;
+      setOpen(false);
+    };
+    window.addEventListener("keydown", onKey, true);
+    window.addEventListener("pointerdown", onPointer, true);
+    return () => {
+      window.removeEventListener("keydown", onKey, true);
+      window.removeEventListener("pointerdown", onPointer, true);
+    };
+  }, [open]);
+
+  return (
+    <div ref={wrapRef} className="owb-align-wrap">
+      <button
+        type="button"
+        className={`owb-selection-icon${open ? " is-open" : ""}`}
+        title={t("Arrange")}
+        aria-label={t("Arrange")}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((next: boolean) => !next)}
+      >
+        <AlignTriggerIcon />
+      </button>
+      {open ? (
+        <div
+          className="owb-align-pop"
+          role="menu"
+          aria-label={t("Arrange")}
+          onMouseDown={stopBarMouseDown}
+          onPointerDown={stopBarMouseDown}
+        >
+          <div className="owb-align-grid">
+            {ARRANGE_CELLS.map((cell) => {
+              const disabled = selectedCount < cell.min;
+              return (
+                <button
+                  key={cell.action}
+                  type="button"
+                  className="owb-align-cell"
+                  role="menuitem"
+                  title={t(cell.title)}
+                  aria-label={t(cell.title)}
+                  disabled={disabled}
+                  onClick={() => {
+                    if (disabled) return;
+                    setOpen(false);
+                    onArrange(cell.action);
+                  }}
+                >
+                  <cell.Icon />
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 export function SelectionToolbar({
   cards,
   selectedIds,
   onColor,
   onUnifySize,
+  onArrange,
+  onWrapSelected,
 }: {
   cards: readonly WhiteboardCard[];
   selectedIds: readonly DbId[];
   onColor: (color: string | undefined) => void;
   onUnifySize: (mode: UnifySizeMode) => void;
+  onArrange: (action: ArrangeAction) => void;
+  onWrapSelected: () => void;
 }) {
   if (selectedIds.length < 2) return null;
   const picked = selectedCards(cards, new Set(selectedIds));
@@ -22,10 +120,7 @@ export function SelectionToolbar({
   const activeColor = colors.size === 1 ? [...colors][0] : null;
 
   return (
-    <div
-      className="owb-selection-bar"
-      onMouseDown={(event: React.MouseEvent) => event.stopPropagation()}
-    >
+    <div className="owb-selection-bar" onMouseDown={stopBarMouseDown}>
       <span className="owb-selection-bar-count">
         {t("${count} cards", { count: String(selectedIds.length) })}
       </span>
@@ -61,6 +156,17 @@ export function SelectionToolbar({
         onClick={() => onUnifySize("narrowest")}
       >
         {t("Match narrowest")}
+      </button>
+      <div className="owb-selection-bar-sep" />
+      <ArrangePopover selectedCount={selectedIds.length} onArrange={onArrange} />
+      <button
+        type="button"
+        className="owb-selection-icon"
+        title={t("Group into section")}
+        aria-label={t("Group into section")}
+        onClick={onWrapSelected}
+      >
+        <WrapSectionIcon />
       </button>
     </div>
   );
