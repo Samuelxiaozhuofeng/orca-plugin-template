@@ -296,6 +296,7 @@ export function Canvas({
     interactiveCards,
     cardsRef,
     selected,
+    selectCards,
     edges,
     focusApiRef,
     onAddCards,

@@ -137,6 +137,17 @@ const zhCN = {
   "Tidy up to grid": "整理成网格",
   "Removed ${count} cards from the board. Journals themselves were not deleted.":
     "已从白板移除 ${count} 张卡片。只是从白板拿掉，日记本身没有被删除。",
+  "Relations · ${count}": "关联 · ${count}",
+  "${count} relations": "${count} 条关联",
+  "References me · ${count}": "引用我的 · ${count}",
+  "I reference · ${count}": "我引用的 · ${count}",
+  "Hover a row to see the line that made the link.":
+    "悬停一行，看是哪一句建了这条关系。",
+  "Add to the board": "加到板上",
+  "Off-board ${count}": "板外 ${count} 条",
+  "Add all to the board": "全部加到板上",
+  "${count} more not shown": "另有 ${count} 条未显示",
+  Collapse: "收起",
   "Show reference connections": "显示引用连线",
   "Draw faint dashed lines when a card's notes already reference another card on this board.":
     "当一张卡片的笔记里已经引用了板上另一张卡片时，自动画淡虚线。",

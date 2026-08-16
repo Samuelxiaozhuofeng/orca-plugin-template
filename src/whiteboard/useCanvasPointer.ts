@@ -31,7 +31,7 @@ import { isHostOverlayTarget } from "./hostOverlay";
 import type { CanvasView } from "./viewTransform";
 
 const CANVAS_CHROME =
-  ".owb-card, .owb-edge-hit, .owb-edge-editor, .owb-edge-toolbar, .owb-area-title, .owb-area-handle, .owb-area-title-input, .owb-card-search, .owb-card-filter, .owb-filter-banner, .owb-selection-bar";
+  ".owb-card, .owb-edge-hit, .owb-edge-editor, .owb-edge-toolbar, .owb-area-title, .owb-area-handle, .owb-area-title-input, .owb-card-search, .owb-card-filter, .owb-filter-banner, .owb-selection-bar, .owb-relmap";
 
 const { useEffect, useRef } = window.React;
 

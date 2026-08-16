@@ -304,6 +304,7 @@ export function useCanvasView({
     ) {
       return;
     }
+    if (target?.closest(".owb-relmap")) return;
 
     const el = viewportRef.current;
     if (!el) return;

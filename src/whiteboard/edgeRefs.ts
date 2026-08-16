@@ -24,7 +24,7 @@ export type ReferenceEdgesResult = {
   truncated: boolean;
 };
 
-function buildOwnerMap(
+export function buildOwnerMap(
   cards: readonly WhiteboardCard[],
   blocks: { [id: number]: Block | undefined },
 ): { owner: Map<DbId, DbId>; truncated: boolean } {

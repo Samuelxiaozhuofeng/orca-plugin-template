@@ -14,6 +14,7 @@ import type { ArrangeAction } from "./selection";
 import { CardFilterBanner } from "./CardFilterPopover";
 import { SelectionToolbar } from "./SelectionToolbar";
 import { placeNewSubBoardOnBoard } from "./collectIntoBoardApply";
+import { RelationMap } from "./RelationMap";
 
 const { useCallback, useEffect, useRef, useState } = window.React;
 
@@ -64,6 +65,7 @@ type SharedProps = {
   interactiveCards: WhiteboardCard[];
   cardsRef: { current: WhiteboardCard[] };
   selected: DbId[];
+  selectCards: (ids: DbId[]) => void;
   edges: WhiteboardEdge[];
   focusApiRef: { current: CanvasFocusApi | null };
   onAddCards: (cards: WhiteboardCard[]) => Promise<boolean>;
@@ -90,6 +92,7 @@ export function CanvasViewportOverlays({
   viewCards,
   interactiveCards,
   selected,
+  selectCards,
   edges,
   edgeDrop,
   hiddenCardCount,
@@ -187,6 +190,14 @@ export function CanvasViewportOverlays({
         onArrange={applyArrange}
         onWrapSelected={onWrapSelected}
       />
+      <RelationMap
+        boardBlockId={boardBlockId}
+        cards={cards}
+        selected={selected}
+        onAddCards={onAddCards}
+        selectCards={selectCards}
+        focusApiRef={focusApiRef}
+      />
     </>
   );
 }
@@ -211,7 +222,6 @@ export function CanvasHostOverlays({
   onPlaceJournalsAt: (origin: CanvasOrigin) => void;
   onStartDrawArea: () => void;
   createBlankAt: (at: CanvasOrigin, edit: boolean) => Promise<void> | void;
-  selectCards: (ids: DbId[]) => void;
 }) {
   const {
     menuPointRef,
