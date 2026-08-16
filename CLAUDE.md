@@ -13,12 +13,12 @@ Runtime is Orca itself: React and Valtio are **not bundled**, they arrive as `wi
 ```bash
 npm run build
 ```
-Runs `tsc` (typecheck, `noEmit`) then the Vite library build, then `scripts/deploy-dist.mjs` copies `dist/` into the local Orca plugins folder so the plugin can be reloaded in Orca. Override the destination with `ORCA_PLUGIN_DIR`; the copy is skipped without failing when the folder is absent.
+Runs `tsc` (typecheck, `noEmit`) then the Vite library build, then `scripts/deploy-dist.mjs` copies `dist/` into the local Orca plugins folder so the plugin can be reloaded in Orca. Set `ORCA_PLUGIN_DIR` to the destination folder; the copy is skipped without failing when the variable is unset or the folder is absent.
 
 ```bash
 npm test
 ```
-Runs `src/whiteboard/cardTreeLoad.test.ts` via `node --experimental-strip-types` — plain assertion script, no framework. Pure-logic tests only (card-tree planning/loading). Add new pure-utility tests the same way and extend the `test` script.
+Runs `src/whiteboard/*.test.ts` via `node --experimental-strip-types` — plain assertion scripts, no framework. Pure-logic tests only. Add new pure-utility tests the same way; the `test` script already includes every `*.test.ts` in that folder.
 
 `npm run dev` / `npm run preview` exist but are of limited use: the plugin only renders inside Orca. Real verification is `npm run build` + reload the plugin in Orca.
 

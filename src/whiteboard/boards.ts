@@ -5,6 +5,8 @@ import type {
   RowPanel,
   ViewPanel,
 } from "../orca.d.ts";
+import { commitCardsOn } from "./boardPersistQueue";
+import { getBoardSession, sessionCanAcceptCards } from "./boardSession";
 import {
   boardName,
   PANEL_TYPE,
@@ -76,6 +78,35 @@ export function getOpenBoard(id: DbId): OpenBoard | null {
       return false;
     },
   };
+}
+
+/**
+ * Prefer a live panel (undo-aware append). If the panel is gone but the
+ * shared session is still flushing, write through the session instead of
+ * the on-disk snapshot.
+ */
+export function getOpenOrSessionBoard(id: DbId): OpenBoard | null {
+  const open = getOpenBoard(id);
+  if (open != null) return open;
+  const session = getBoardSession(id);
+  if (!sessionCanAcceptCards(session)) return null;
+  return {
+    getCards: () => session.cards,
+    appendCards: async (incoming) => {
+      const occupied = new Set(session.cards.map((card) => card.blockId));
+      const fresh = incoming.filter((card) => !occupied.has(card.blockId));
+      if (fresh.length === 0) return true;
+      return commitCardsOn(session, [...session.cards, ...fresh]);
+    },
+    focusCard: () => false,
+  };
+}
+
+export function resetOpenBoardCaches(): void {
+  openBoards.clear();
+  inlineIdCache = null;
+  inlineIdInflight = null;
+  pageIdDiscover = null;
 }
 
 function asBlockId(value: unknown): DbId | null {

@@ -226,12 +226,7 @@ export function AddNoteCard({
       if (saved) onClose();
     } catch (err: unknown) {
       console.error("[whiteboard] add note card failed", err);
-      orca.notify(
-        "error",
-        err instanceof Error
-          ? err.message
-          : t("Failed to add blocks to the board"),
-      );
+      orca.notify("error", t("Failed to add blocks to the board"));
     } finally {
       setBusyId(null);
     }

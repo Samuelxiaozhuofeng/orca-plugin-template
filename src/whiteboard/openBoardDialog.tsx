@@ -39,9 +39,7 @@ function OpenBoardDialog(props: { onClose: () => void }): React.ReactNode {
       .catch((err: unknown) => {
         console.error("[whiteboard] failed to list whiteboards", err);
         if (!cancelled) {
-          setError(
-            err instanceof Error ? err.message : t("Failed to list whiteboards"),
-          );
+          setError(t("Failed to list whiteboards"));
         }
       });
     return () => {
@@ -53,7 +51,7 @@ function OpenBoardDialog(props: { onClose: () => void }): React.ReactNode {
     <BoardPicker
       title={t("Open whiteboard…")}
       emptyHint={t(
-        "No whiteboards yet. Use the slash command to create one in a note.",
+        "No whiteboards yet. In a note, type / and pick New whiteboard (stays in this note) or New whiteboard page (its own page).",
       )}
       error={error}
       items={error != null ? [] : boards}

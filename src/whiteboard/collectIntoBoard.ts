@@ -83,6 +83,7 @@ function remapCrossEdge(
   if (edge.toSide != null) next.toSide = edge.toSide;
   if (edge.color != null) next.color = edge.color;
   if (edge.style != null) next.style = edge.style;
+  if (edge.linked === true) next.linked = true;
   return next;
 }
 
@@ -99,7 +100,9 @@ function splitEdgesForMove(
     if (fromOn && toOn) {
       movedEdges.push({ ...edge });
     } else if (fromOn || toOn) {
-      stayEdges.push(remapCrossEdge(edge, movingIds, remapTo));
+      const remapped = remapCrossEdge(edge, movingIds, remapTo);
+      if (remapped.from === remapped.to) continue;
+      stayEdges.push(remapped);
     } else {
       stayEdges.push({ ...edge });
     }

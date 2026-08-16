@@ -37,10 +37,31 @@ import {
   unregisterPageBoardCommands,
 } from "./whiteboard/PageBoardMenu";
 import { resetPageBoardIdCache } from "./whiteboard/pageBoardListCache";
-import { startPageBoardRedirect } from "./whiteboard/pageBoardRedirect";
+import {
+  resetPageBoardRedirectState,
+  startPageBoardRedirect,
+} from "./whiteboard/pageBoardRedirect";
 import { flushAllCardWrites } from "./whiteboard/cardPersist";
 import { flushAllEdgeWrites } from "./whiteboard/edgePersist";
 import { abortAllEdgeGestures } from "./whiteboard/edgeGestures";
+import { abortAllCardGestures } from "./whiteboard/cardGestures";
+import { abortAllMarquees } from "./whiteboard/marquee";
+import { abortAllAreaGestures } from "./whiteboard/areaGestures";
+import { abortAllEdgeHandleGestures } from "./whiteboard/edgeHandleGestures";
+import { resetBoardSessions } from "./whiteboard/boardSession";
+import { resetAllHistory } from "./whiteboard/boardHistory";
+import { resetPersistSeq } from "./whiteboard/boardPersistSeq";
+import { resetBoardWriteState } from "./whiteboard/boardWrite";
+import {
+  flushAllRememberedViews,
+  resetViewMemory,
+} from "./whiteboard/viewMemory";
+import { resetCardTreeLoad } from "./whiteboard/cardTreeLoad";
+import { resetOpenBoardCaches } from "./whiteboard/boards";
+import {
+  flushCardEditorsAndWait,
+  resetCardEditorFlush,
+} from "./whiteboard/cardEditorFlush";
 import { tagNewWhiteboard } from "./whiteboard/boardTag";
 import {
   bindWhiteboardPlugin,
@@ -237,14 +258,23 @@ export async function load(_name: string) {
     </orca.components.Button>
   ));
   unmountOpenBoard = mountOpenBoardHost();
-
-  console.log(`${pluginName} loaded.`);
 }
 
 export async function unload() {
   abortAllEdgeGestures();
+  abortAllEdgeHandleGestures();
+  abortAllCardGestures();
+  abortAllMarquees();
+  abortAllAreaGestures();
+  await flushCardEditorsAndWait();
+  await flushAllRememberedViews();
   await flushAllCardWrites();
   await flushAllEdgeWrites();
+  if (pluginName) {
+    await unassignShortcut(commandId(LOCATE_COMMAND));
+    await unassignShortcut(commandId(WRAP_AREA_COMMAND));
+    await unassignShortcut(commandId(FIND_CARD_COMMAND));
+  }
   orca.panels.unregisterPanel(PANEL_TYPE);
   orca.renderers.unregisterBlock(WHITEBOARD_TYPE);
   orca.converters.unregisterBlock("plain", WHITEBOARD_TYPE);
@@ -278,7 +308,16 @@ export async function unload() {
   unmountPageBoard = null;
   stopPageBoardRedirect?.();
   stopPageBoardRedirect = null;
+  resetPageBoardRedirectState();
   resetPageBoardIdCache();
+  resetOpenBoardCaches();
+  resetBoardSessions();
+  resetAllHistory();
+  resetPersistSeq();
+  resetBoardWriteState();
+  resetViewMemory();
+  resetCardTreeLoad();
+  resetCardEditorFlush();
   clearAllPendingCardFocus();
   stopBlockMarks();
   stopCardEditorToolbar();
@@ -287,6 +326,12 @@ export async function unload() {
 
 function assignLocateShortcutIfFree(locateId: string): Promise<void> {
   return assignShortcutIfFree(locateId, LOCATE_SHORTCUT);
+}
+
+function unassignShortcut(id: string): Promise<void> {
+  return orca.shortcuts.assign("", id).catch((err: unknown) => {
+    console.error("[whiteboard] failed to unassign shortcut", id, err);
+  });
 }
 
 function assignShortcutIfFree(commandId: string, combo: string): Promise<void> {

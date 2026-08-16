@@ -70,7 +70,8 @@ export async function ensureBlocksCached(ids: DbId[]): Promise<void> {
   const fetched =
     ((await orca.invokeBackend("get-blocks", missing)) as Block[] | null) ?? [];
   if (!Array.isArray(fetched)) {
-    throw new Error("get-blocks did not return an array");
+    console.error("[whiteboard] get-blocks did not return an array", fetched);
+    throw new Error(t("Failed to add blocks to the board"));
   }
   cacheBlocks(fetched);
 }

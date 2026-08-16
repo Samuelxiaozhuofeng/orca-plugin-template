@@ -31,6 +31,7 @@ import {
 } from "./useCanvasPointer";
 import { useCanvasView } from "./useCanvasView";
 import { type CanvasView } from "./viewTransform";
+import { blurCardEditor } from "./cardEditorFlush";
 
 export type { CanvasView, CardPatchEntry };
 
@@ -209,6 +210,12 @@ export function Canvas({
   useLayoutEffect(() => {
     paintFilterDim(canvasRef.current, extraHidden);
   }, [extraHidden, shownCards, lodSimplified]);
+
+  useLayoutEffect(() => {
+    return () => {
+      blurCardEditor(viewportRef.current);
+    };
+  }, []);
 
   const visible = visibleAfterCollapsedAreas(areas, cards, shownCards, edges);
   const { edges: refEdges, truncated: refEdgesTruncated } = useReferenceEdges(

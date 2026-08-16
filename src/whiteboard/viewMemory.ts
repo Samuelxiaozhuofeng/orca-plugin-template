@@ -112,3 +112,22 @@ export function flushRememberedView(boardId: DbId): void {
   pending.delete(boardId);
   void persistView(boardId, prev.view);
 }
+
+/** Write every queued viewport now so unload does not leave a timer behind. */
+export async function flushAllRememberedViews(): Promise<void> {
+  const jobs: Promise<void>[] = [];
+  for (const [boardId, item] of [...pending]) {
+    window.clearTimeout(item.timer);
+    pending.delete(boardId);
+    jobs.push(persistView(boardId, item.view));
+  }
+  await Promise.all(jobs);
+}
+
+export function resetViewMemory(): void {
+  for (const item of pending.values()) {
+    window.clearTimeout(item.timer);
+  }
+  pending.clear();
+  lastWritten.clear();
+}

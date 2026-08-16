@@ -79,7 +79,7 @@ export default function BoardBlock({
             }
           >
             {protect
-              ? t("Data unreadable")
+              ? t("Board data unreadable; saving stopped")
               : t("${count} cards", { count: String(cardsRead.value.length) })}
           </span>
           <orca.components.Button variant="soft" onClick={onOpen}>

@@ -1,9 +1,16 @@
 import type { DbId } from "../orca.d.ts";
+import {
+  abortAllCardGestures,
+  abortCardGestures,
+  trackCardGesture,
+} from "./cardGestureTrack";
 import { MIN_CARD_HEIGHT, MIN_CARD_WIDTH } from "./data";
 import { CLICK_THRESHOLD_PX } from "./marquee";
 import { unionRects, type CardRect } from "./selection";
 import { clearGuides, computeSnap, paintGuides } from "./snap";
 import type { CanvasView } from "./viewTransform";
+
+export { abortAllCardGestures, abortCardGestures };
 
 export type ResizeHandle = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
 
@@ -53,45 +60,21 @@ function cardEl(canvas: HTMLElement, blockId: DbId): HTMLElement | null {
   return canvas.querySelector(`[data-block-id="${blockId}"]`);
 }
 
-export const RIGHT_BUTTON_THRESHOLD_PX = 3;
-
-type TrackedGesture = {
-  abort: () => void;
-  untrack: () => void;
-};
-
-const cardGestureBuckets = new WeakMap<object, Set<TrackedGesture>>();
-
-function trackCardGesture(root: object, onAbort: () => void): TrackedGesture {
-  let open = true;
-  let bucket = cardGestureBuckets.get(root);
-  if (bucket == null) {
-    bucket = new Set();
-    cardGestureBuckets.set(root, bucket);
+export function restoreCardBoxes(
+  canvas: HTMLElement,
+  cards: ReadonlyArray<{ blockId: DbId } & CardRect>,
+): void {
+  for (const card of cards) {
+    applyCardBox(cardEl(canvas, card.blockId), {
+      x: card.x,
+      y: card.y,
+      w: card.w,
+      h: card.h,
+    });
   }
-  const entry: TrackedGesture = {
-    abort() {
-      if (!open) return;
-      open = false;
-      bucket!.delete(entry);
-      onAbort();
-    },
-    untrack() {
-      if (!open) return;
-      open = false;
-      bucket!.delete(entry);
-    },
-  };
-  bucket.add(entry);
-  return entry;
 }
 
-export function abortCardGestures(root: object | null | undefined): void {
-  if (root == null) return;
-  const bucket = cardGestureBuckets.get(root);
-  if (bucket == null) return;
-  for (const entry of [...bucket]) entry.abort();
-}
+export const RIGHT_BUTTON_THRESHOLD_PX = 3;
 
 function gestureRoot(el: HTMLElement | null | undefined): object | null {
   if (el == null) return null;
@@ -191,6 +174,7 @@ export type MoveCardsEnd = {
   moves: ReadonlyArray<{ blockId: DbId; x: number; y: number }>;
   /** True when the pointer crossed the click threshold (a real drag). */
   dragged: boolean;
+  altKey: boolean;
   clientX: number;
   clientY: number;
   world: { x: number; y: number };
@@ -207,7 +191,11 @@ export function startMoveCards(opts: {
   pointerToWorld: (clientX: number, clientY: number) => { x: number; y: number };
   view: () => CanvasView;
   onEnd: (end: MoveCardsEnd) => void;
-  onFrame?: (boxes: Map<DbId, CardRect>, world: { x: number; y: number }) => void;
+  onFrame?: (
+    boxes: Map<DbId, CardRect>,
+    world: { x: number; y: number },
+    alt: boolean,
+  ) => void;
   /** Fires on mouseup when the pointer never crossed the click threshold. */
   onClick?: (event: MouseEvent) => void;
 }): void {
@@ -258,7 +246,7 @@ export function startMoveCards(opts: {
           h: card.h,
         });
       }
-      opts.onFrame(boxes, now);
+      opts.onFrame(boxes, now, alt);
     }
   };
 
@@ -319,6 +307,7 @@ export function startMoveCards(opts: {
     opts.onEnd({
       moves: moved,
       dragged: started,
+      altKey: event.altKey,
       clientX: event.clientX,
       clientY: event.clientY,
       world: opts.pointerToWorld(event.clientX, event.clientY),

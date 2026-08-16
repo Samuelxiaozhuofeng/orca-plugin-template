@@ -3,6 +3,7 @@ import { t } from "../libs/l10n";
 import {
   cardPatchesChange,
   edgesMatchIgnoringLinked,
+  historyDepth,
   holdHistory,
   planSnapshotWrite,
   recordBefore,
@@ -21,6 +22,16 @@ import {
   viewportOrigin,
   type CanvasOrigin,
 } from "./data";
+import {
+  abandonCreatedSubBoardIfEmpty,
+  takeCreatedSubBoard,
+} from "./collectIntoBoardApply";
+import {
+  coupleForRedo,
+  coupleForUndo,
+  noteIndependentMutation,
+  restorePairedBoard,
+} from "./crossBoardHistory";
 import { type WhiteboardEdge } from "./edges";
 import { type PlaceDialogValue } from "./PlaceDialog";
 import { type CanvasView } from "./viewTransform";
@@ -108,6 +119,7 @@ export function useBoardCommands(opts: {
 
   const record = useCallback(() => {
     if (blockId == null) return;
+    noteIndependentMutation(blockId);
     recordBefore(blockId, snapshotNow());
     bumpHistory();
   }, [blockId, bumpHistory, snapshotNow]);
@@ -206,11 +218,18 @@ export function useBoardCommands(opts: {
         (card) =>
           !next.cards.some((item) => item.blockId === card.blockId),
       );
+      let removedShell = false;
+      for (const card of removed) {
+        if (!takeCreatedSubBoard(card.blockId)) continue;
+        if (await abandonCreatedSubBoardIfEmpty(card.blockId)) {
+          removedShell = true;
+        }
+      }
       const undidBlank = removed.some((card) => {
         const hosted = orca.state.blocks[card.blockId];
         return hosted?.parent === blockId;
       });
-      if (undidBlank && shouldTellBlankCardUndo()) {
+      if (undidBlank && !removedShell && shouldTellBlankCardUndo()) {
         orca.notify(
           "info",
           t(
@@ -226,10 +245,17 @@ export function useBoardCommands(opts: {
   const onUndo = useCallback(() => {
     if (blockId == null) return;
     const current = snapshotNow();
+    const undoneDepth = historyDepth(blockId);
     const prev = takeUndo(blockId, current);
     if (prev == null) return;
-    void applySnapshot(prev, current).then((ok: boolean) => {
-      if (!ok) restoreFailedUndo(blockId, prev);
+    const couple = coupleForUndo(blockId, undoneDepth);
+    void applySnapshot(prev, current).then(async (ok: boolean) => {
+      if (!ok) {
+        restoreFailedUndo(blockId, prev);
+        bumpHistory();
+        return;
+      }
+      if (couple != null) await restorePairedBoard(couple, blockId, "undo");
       bumpHistory();
     });
   }, [applySnapshot, blockId, bumpHistory, snapshotNow]);
@@ -239,8 +265,15 @@ export function useBoardCommands(opts: {
     const current = snapshotNow();
     const next = takeRedo(blockId, current);
     if (next == null) return;
-    void applySnapshot(next, current).then((ok: boolean) => {
-      if (!ok) restoreFailedRedo(blockId, next);
+    const redoneDepth = historyDepth(blockId);
+    const couple = coupleForRedo(blockId, redoneDepth);
+    void applySnapshot(next, current).then(async (ok: boolean) => {
+      if (!ok) {
+        restoreFailedRedo(blockId, next);
+        bumpHistory();
+        return;
+      }
+      if (couple != null) await restorePairedBoard(couple, blockId, "redo");
       bumpHistory();
     });
   }, [applySnapshot, blockId, bumpHistory, snapshotNow]);
@@ -268,21 +301,20 @@ export function useBoardCommands(opts: {
         setPlaceOpen(false);
         orca.notify(
           result.placed > 0 ? "success" : "info",
-          t(
-            "Added ${placed}, skipped ${existing} already on the board, filtered ${empty} empty journals",
-            {
-              placed: String(result.placed),
-              existing: String(result.skippedExisting),
-              empty: String(result.skippedEmpty),
-            },
-          ),
+          result.placed === 0
+            ? t("No journals in this date range")
+            : t(
+                "Added ${placed}, skipped ${existing} already on the board, filtered ${empty} empty journals",
+                {
+                  placed: String(result.placed),
+                  existing: String(result.skippedExisting),
+                  empty: String(result.skippedEmpty),
+                },
+              ),
         );
       } catch (error) {
         console.error("[whiteboard] failed to load journals", error);
-        orca.notify(
-          "error",
-          error instanceof Error ? error.message : t("Failed to load journals"),
-        );
+        orca.notify("error", t("Failed to load journals"));
       } finally {
         setBusy(false);
       }

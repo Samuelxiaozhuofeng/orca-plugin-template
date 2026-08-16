@@ -16,8 +16,6 @@ const zhCN = {
   "Failed to turn this block into a whiteboard": "无法把这个块转成白板",
   "Failed to turn this whiteboard back into an outline":
     "无法把这块白板转回大纲",
-  "Created the whiteboard but could not make it a page. You can add a page alias yourself.":
-    "白板已经建好，但没能做成页面。你可以自己给它加一个页面别名。",
   "Created the whiteboard but could not add a reference on the current block.":
     "白板已经建好，但没能在当前块上加上引用入口。",
   "Turn this whiteboard back into an outline? The canvas layout stays on this block, so you can turn it into a whiteboard again later.":
@@ -28,7 +26,6 @@ const zhCN = {
   "Open whiteboard pages as a canvas": "打开白板页面时直接进入画布",
   "When you open a page whose root block is a whiteboard, show the full canvas instead of the outline preview.":
     "打开根块是白板的页面时，直接显示整块画布，而不是大纲里的预览条。",
-  "Place this week's journals": "放入本周日记",
   "Place journals…": "放入日记…",
   "Place journals": "放入日记",
   Place: "放入",
@@ -54,25 +51,23 @@ const zhCN = {
   Whiteboard: "白板",
   Insert: "插入",
   Open: "打开",
-  "Reset view": "重置视图",
   "Place the cursor first": "请先把光标放在笔记里",
-  "Failed to load this week's journals": "加载本周日记失败",
   "Failed to load journals": "加载日记失败",
-  "Failed to save card positions": "保存卡片位置失败",
-  "Whiteboard cards were not saved": "卡片没有写进白板块，请看控制台日志",
+  "Failed to save card positions": "没保存成功，请再试一次",
+  "Whiteboard cards were not saved": "没保存成功，请再试一次",
   "Failed to open whiteboard panel": "无法打开白板面板",
   "Failed to create whiteboard": "无法创建白板",
   "Failed to load whiteboard": "无法加载白板",
   "Loading whiteboard…": "正在加载白板…",
   "Whiteboard is still loading": "白板还在加载，请等加载完成后再放内容",
   "Whiteboard not found": "找不到这块白板",
-  "No journals found for this week": "本周没有可放入的日记",
-  "Added ${count} journal cards": "已放入 ${count} 张日记卡片",
   "${count} cards": "${count} 张卡片",
   "No cards yet": "还没有卡片",
   "This board is empty": "这块白板还是空的",
-  "Use the toolbar to place journals, or drag blocks here from a note.":
-    "点工具栏的「放入日记…」，或从笔记里把块拖进来。",
+  "Right-click empty space and choose New card here. You can also place journals from the toolbar, or drag blocks here from a note.":
+    "在空白处右键，选「在这里新建卡片」。也可以点工具栏的「放入日记…」，或从笔记里把块拖进来。",
+  "Pan and zoom follow the mouse or trackpad mode in the plugin settings.":
+    "平移和缩放跟着操作模式走，可在插件设置里改成鼠标或触控板。",
   "Added ${added} cards": "已放入 ${added} 张",
   "skipped ${existing} already on the board": "跳过 ${existing} 张已在白板上",
   "skipped ${self} that would nest this board":
@@ -83,8 +78,8 @@ const zhCN = {
   Untitled: "未命名",
   "Select all": "全选",
   Controls: "操作模式",
-  "Mouse mode zooms with the wheel and pans with a right-drag. Trackpad mode pans with two fingers and zooms with a pinch.":
-    "鼠标模式用滚轮缩放、右键拖动平移；触控板模式用双指滑动平移、捏合缩放。",
+  "Switch this if pan and zoom feel wrong. Mouse mode zooms with the wheel and pans with a right-drag. Trackpad mode pans with two fingers and zooms with a pinch.":
+    "平移或缩放不对劲时改这里。鼠标模式用滚轮缩放、右键拖动平移；触控板模式用双指滑动平移、捏合缩放。",
   "Mouse: scroll to zoom, right-drag to pan":
     "鼠标模式：滚轮缩放，右键拖动平移",
   "Trackpad: two-finger pan, pinch to zoom":
@@ -99,8 +94,6 @@ const zhCN = {
   "Drag to extract as a card": "拖到画布空白处，在白板上单独成卡",
   "Extracted as a card": "已提取为卡片",
   "Added as a separate card on the whiteboard": "已在白板上单独成卡",
-  Editing: "编辑中",
-  "Drag to resize": "拖动调整大小",
   "Fit content height": "适应内容高度",
   "Connect to another card": "连到其他卡片",
   "Open in side panel": "在侧边面板打开",
@@ -131,7 +124,7 @@ const zhCN = {
   Yellow: "黄色",
   Coral: "珊瑚红",
   Purple: "紫色",
-  "Editor unavailable": "宿主编辑器不可用",
+  "Editor unavailable": "卡片编辑器现在用不了，请再试一次",
   Arrange: "排列",
   "Align left": "左对齐",
   "Align horizontal centers": "水平居中对齐",
@@ -157,7 +150,7 @@ const zhCN = {
   "Dashed line": "虚线",
   Delete: "删除",
   "Failed to save connections": "保存连线失败",
-  "Whiteboard connections were not saved": "连线没有写进白板块，请看控制台日志",
+  "Whiteboard connections were not saved": "没保存成功，请再试一次",
   "Create card and connect": "新建一张卡片并连上",
   "Connect to an existing block": "接到已有的块",
   "Create a note reference": "在笔记里建立引用",
@@ -184,8 +177,8 @@ const zhCN = {
   "Search whiteboards": "搜索白板",
   "Loading whiteboards…": "正在列出白板…",
   "Failed to list whiteboards": "无法列出白板",
-  "No whiteboards yet. Use the slash command to create one in a note.":
-    "还没有白板。在笔记里输入 / 新建白板。",
+  "No whiteboards yet. In a note, type / and pick New whiteboard (stays in this note) or New whiteboard page (its own page).":
+    "还没有白板。在笔记里输入 /，选「新建白板」（插在当前笔记里）或「新建白板页面」（单独成页）。",
   "No matching whiteboards": "没有匹配的白板",
   "Open whiteboard": "打开这块白板",
   "Open whiteboard…": "打开白板…",
@@ -213,7 +206,14 @@ const zhCN = {
     "有 ${count} 条连线读不出来，已停止保存以免覆盖，你现在做的改动不会被保留。",
   "${cards} cards and ${edges} connections could not be read. Saving has been stopped so nothing is overwritten. Changes you make now will not be kept.":
     "有 ${cards} 张卡片和 ${edges} 条连线读不出来，已停止保存以免覆盖，你现在做的改动不会被保留。",
-  "Data unreadable": "数据异常",
+  "Board data unreadable; saving stopped": "白板数据读不出来，已停止保存",
+  Sun: "周日",
+  Mon: "周一",
+  Tue: "周二",
+  Wed: "周三",
+  Thu: "周四",
+  Fri: "周五",
+  Sat: "周六",
   Retry: "重试",
   "Showing ${shown} of ${visible} cards. Zoom in to see all.":
     "这个缩放下只画了 ${shown} / ${visible} 张卡片，放大可看全部。",
@@ -289,6 +289,14 @@ const zhCN = {
     "没能在白板里直接新建白板页面。请先用「新建白板页面」命令建好，再把它拖到这块白板上。",
   "Created the whiteboard but could not save it as a card. The new whiteboard is still in the notes.":
     "白板已经建好，但没能当成卡片写进这块白板。新白板还在笔记里，不会丢。",
+  "A newer save already completed. This retry was skipped.":
+    "后来已经保存成功过了，这次重试跳过，不会覆盖新内容。",
+  "This card could not be opened": "这张卡片打不开",
+  "That would nest this whiteboard inside itself.":
+    "这样会把白板套进它自己里面，没法这么放。",
+  "Could not finish moving the cards. Nothing was changed.":
+    "没能把卡片移过去，两边都没有改动。",
+  "No journals in this date range": "这段时间没有可放入的日记",
 };
 
 export default zhCN;

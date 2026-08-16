@@ -1,12 +1,13 @@
 import type { Block, DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n";
 import {
-  getOpenBoard,
+  getOpenOrSessionBoard,
   type OpenBoard,
 } from "./boards";
 import {
   boardPropsReadable,
   formatProtectMessage,
+  loadBoardBlock,
   notifyBoardUnreadable,
 } from "./boardWrite";
 import { tryReadCards } from "./cards";
@@ -44,26 +45,24 @@ type BoardTarget = {
 };
 
 async function loadBoardTarget(boardId: DbId): Promise<BoardTarget> {
-  let block = orca.state.blocks[boardId];
-  if (block == null) block = await fetchBlock(boardId);
-  const live = getOpenBoard(boardId);
-  const existing = live != null ? live.getCards() : readCards(block);
-  return { live, cards: existing };
+  const live = getOpenOrSessionBoard(boardId);
+  if (live != null) return { live, cards: live.getCards() };
+  const block = (await loadBoardBlock(boardId)) ?? (await fetchBlock(boardId));
+  return { live: null, cards: readCards(block) };
 }
 
 async function loadWritableBoardTarget(boardId: DbId): Promise<BoardTarget> {
-  let block = orca.state.blocks[boardId];
-  if (block == null) block = await fetchBlock(boardId);
+  const live = getOpenOrSessionBoard(boardId);
+  if (live != null) return { live, cards: live.getCards() };
+  const block = (await loadBoardBlock(boardId)) ?? (await fetchBlock(boardId));
   if (!boardPropsReadable(block)) {
     notifyBoardUnreadable(boardId);
     throw new Error(
       formatProtectMessage(tryReadCards(block), tryReadEdges(block)),
     );
   }
-  const live = getOpenBoard(boardId);
   const parsed = tryReadCards(block);
-  const cards = live != null ? live.getCards() : parsed.ok ? parsed.value : [];
-  return { live, cards };
+  return { live: null, cards: parsed.ok ? parsed.value : [] };
 }
 
 async function commitIncoming(

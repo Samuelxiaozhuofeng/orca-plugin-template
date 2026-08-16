@@ -23,8 +23,8 @@ See `CLAUDE.md` for the architecture walkthrough (board state model, persistence
 ## Build, Test, and Development Commands
 
 - `npm install`: install development dependencies. React and Valtio are peer dependencies supplied by Orca at runtime.
-- `npm run build`: typecheck with `tsc`, produce the Vite library build, then deploy `dist/` into the local Orca plugin folder. Override the destination with `ORCA_PLUGIN_DIR`; the copy is skipped without failing when the folder does not exist.
-- `npm test`: run the pure-logic assertion script (`src/whiteboard/cardTreeLoad.test.ts`) via `node --experimental-strip-types`.
+- `npm run build`: typecheck with `tsc`, produce the Vite library build, then deploy `dist/` into the local Orca plugin folder. Set `ORCA_PLUGIN_DIR` to the destination; the copy is skipped without failing when the variable is unset or the folder does not exist.
+- `npm test`: run the pure-logic assertion scripts (`src/whiteboard/*.test.ts`) via `node --experimental-strip-types`.
 - `npm run dev` / `npm run preview`: Vite server and preview. Of limited use — the plugin only renders inside Orca.
 
 Minimum verification for any change is `npm run build` followed by reloading the plugin in Orca.
@@ -56,4 +56,4 @@ Pull requests should include a short summary, verification steps with actual com
 
 ## Security & Configuration Tips
 
-Do not hardcode secrets or user-specific repository locations. `scripts/deploy-dist.mjs` currently carries a machine-specific default path — override it with `ORCA_PLUGIN_DIR` rather than editing it for your machine. Treat `orca` as a runtime global supplied by Orca Note, and keep external runtime dependencies aligned with the `vite.config.ts` externals.
+Do not hardcode secrets or user-specific repository locations. `scripts/deploy-dist.mjs` takes its destination from `ORCA_PLUGIN_DIR` — set that variable rather than editing the script for your machine. Treat `orca` as a runtime global supplied by Orca Note, and keep external runtime dependencies aligned with the `vite.config.ts` externals.

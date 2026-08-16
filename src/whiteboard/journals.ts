@@ -102,7 +102,8 @@ export async function fetchJournalBlocks(range: DateRange): Promise<Block[]> {
       ? []
       : ((await orca.invokeBackend("get-blocks", ids)) as Block[] | null) ?? [];
   if (!Array.isArray(fetched)) {
-    throw new Error("get-blocks did not return an array");
+    console.error("[whiteboard] get-blocks did not return an array", fetched);
+    throw new Error(t("Failed to load journals"));
   }
   cacheBlocks(fetched);
   return fetched;

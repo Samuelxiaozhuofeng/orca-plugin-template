@@ -69,6 +69,7 @@ type TrackedGesture = {
 };
 
 const marqueeBuckets = new WeakMap<object, Set<TrackedGesture>>();
+const liveMarquees = new Set<TrackedGesture>();
 
 function trackMarquee(root: object, onAbort: () => void): TrackedGesture {
   let open = true;
@@ -82,15 +83,18 @@ function trackMarquee(root: object, onAbort: () => void): TrackedGesture {
       if (!open) return;
       open = false;
       bucket!.delete(entry);
+      liveMarquees.delete(entry);
       onAbort();
     },
     untrack() {
       if (!open) return;
       open = false;
       bucket!.delete(entry);
+      liveMarquees.delete(entry);
     },
   };
   bucket.add(entry);
+  liveMarquees.add(entry);
   return entry;
 }
 
@@ -99,6 +103,11 @@ export function abortMarquees(root: object | null | undefined): void {
   const bucket = marqueeBuckets.get(root);
   if (bucket == null) return;
   for (const entry of [...bucket]) entry.abort();
+}
+
+/** Abort every in-flight marquee and drop window listeners. */
+export function abortAllMarquees(): void {
+  for (const entry of [...liveMarquees]) entry.abort();
 }
 
 export function startMarquee(opts: {

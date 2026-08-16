@@ -222,10 +222,7 @@ export async function createWhiteboardPage(
   } catch (err: unknown) {
     console.error("[whiteboard] failed to mark new page as whiteboard", err);
     await abandonNewPage(newId);
-    orca.notify(
-      "error",
-      err instanceof Error ? err.message : t("Failed to create whiteboard"),
-    );
+    orca.notify("error", t("Failed to create whiteboard"));
     return null;
   }
 

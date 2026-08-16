@@ -5,10 +5,9 @@ import {
   startDrawArea,
   startMoveArea,
 } from "./areaGestures";
-import { createBoardDropHover } from "./boardDropHover";
+import { beginCardMoveSelection } from "./beginCardMove";
 import {
   abortCardGestures,
-  startMoveCards,
   startRightButtonSession,
   swallowNextContextMenu,
 } from "./cardGestures";
@@ -181,60 +180,26 @@ export function useCanvasPointer(opts: {
     dismissEdgeToolbar();
     const canvas = refs.canvas.current;
     if (canvas == null) return;
-    const movingIds = new Set(refs.selected.current);
-    const moving = refs.cards.current.filter((item: WhiteboardCard) =>
-      movingIds.has(item.blockId),
-    );
-    if (moving.length === 0) return;
-    const others = refs.cards.current.filter(
-      (item: WhiteboardCard) => !movingIds.has(item.blockId),
-    );
     dropHoverRef.current?.dispose();
-    const hover = createBoardDropHover({
-      canvas,
-      cards: () => refs.cards.current,
-      movingIds,
-      currentBoardId: boardBlockId,
-    });
-    dropHoverRef.current = hover;
-    const applyMoves = (
-      moves: ReadonlyArray<{ blockId: DbId; x: number; y: number }>,
-    ) => {
-      if (!mountedRef.current || moves.length === 0) return;
-      onPatchCards(
-        moves.map((item) => ({
-          blockId: item.blockId,
-          patch: { x: item.x, y: item.y },
-        })),
-      );
-    };
-    startMoveCards({
+    dropHoverRef.current = null;
+    beginCardMoveSelection({
       startX,
       startY,
       canvas,
       guidesEl: refs.guides.current,
-      showGuides: () => refs.settings.current.showAlignGuides,
-      moving,
-      others,
+      boardBlockId,
+      selected: refs.selected.current,
+      liveCards: () => refs.cards.current,
+      settings: () => refs.settings.current,
+      liveView: () => refs.liveView.current,
       pointerToWorld,
-      view: () => refs.liveView.current,
-      onFrame: (boxes, world) => {
-        onMoveFrame?.(boxes);
-        hover.onPointerWorld(world);
-      },
+      mounted: () => mountedRef.current,
+      onMoveFrame,
+      onPatchCards,
       onClick,
-      onEnd: (end) => {
-        const target = hover.armedTarget();
-        hover.dispose();
-        if (dropHoverRef.current === hover) dropHoverRef.current = null;
-        if (!mountedRef.current) return;
-        if (end.dragged && target != null && onDropOntoBoard != null) {
-          void onDropOntoBoard(target, [...movingIds]).then((handled) => {
-            if (!handled) applyMoves(end.moves);
-          });
-          return;
-        }
-        applyMoves(end.moves);
+      onDropOntoBoard,
+      setHover: (hover) => {
+        dropHoverRef.current = hover;
       },
     });
   };

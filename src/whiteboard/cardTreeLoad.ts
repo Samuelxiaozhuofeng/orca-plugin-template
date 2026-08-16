@@ -236,6 +236,13 @@ export async function loadCardTrees(
   return { fetched };
 }
 
+export function resetCardTreeLoad(): void {
+  retryableIds.clear();
+  goneIds.clear();
+  inflight.clear();
+  loadListeners.clear();
+}
+
 /**
  * Load trees for the given card roots (typically the visible ones).
  * Returns a per-root generation that bumps only when that card had holes

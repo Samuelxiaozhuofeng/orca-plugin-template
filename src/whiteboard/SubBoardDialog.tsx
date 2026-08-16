@@ -143,7 +143,19 @@ async function defaultSubBoardName(): Promise<string> {
  * One-shot host on document.body — same idea as NamePageDialog, but it does
  * not need load-time mounting. The whiteboard panel has no editor.
  */
+let requestOpen = false;
+
 export async function requestSubBoard(): Promise<SubBoardDialogResult | null> {
+  if (requestOpen) return null;
+  requestOpen = true;
+  try {
+    return await requestSubBoardOnce();
+  } finally {
+    requestOpen = false;
+  }
+}
+
+async function requestSubBoardOnce(): Promise<SubBoardDialogResult | null> {
   const defaultName = await defaultSubBoardName();
   return new Promise((resolve) => {
     const el = document.createElement("div");

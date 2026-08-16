@@ -138,7 +138,7 @@ const remapped = mustPlan(
 check(remapped.leftoverEdges.length === 1, "one remapped edge stays on A");
 check(remapped.leftoverEdges[0].from === B, "selected end remaps to the board card");
 check(remapped.leftoverEdges[0].to === 12, "unselected end stays");
-check(remapped.leftoverEdges[0].linked == null, "remapped edge drops linked");
+check(remapped.leftoverEdges[0].linked === true, "remapped edge keeps linked");
 check(remapped.leftoverEdges[0].bend == null, "remapped edge drops bend");
 check(remapped.leftoverEdges[0].arrow === "both", "remapped edge keeps arrow");
 check(remapped.leftoverEdges[0].color === "blue", "remapped edge keeps color");
@@ -237,4 +237,22 @@ check(
   keptBend.movedEdges[0].bend?.from.across === 0.4 &&
     keptBend.movedEdges[0].bend?.to.across === -0.3,
   "moved bend values are unchanged",
+);
+
+const intoSelf = mustPlan(
+  [card(10, { x: 0, y: 0 }), card(B, { x: 400, y: 0 }), card(12, { x: 80, y: 0 })],
+  [edge(10, B, { label: "into-board" }), edge(10, 12)],
+  [10],
+);
+check(
+  intoSelf.leftoverEdges.every((item) => item.from !== item.to),
+  "edge into the target board is not kept as a self-loop",
+);
+check(
+  !intoSelf.leftoverEdges.some((item) => item.from === 10 && item.to === B),
+  "X→B is consumed when X is dropped onto B",
+);
+check(
+  intoSelf.leftoverEdges.some((item) => item.from === B && item.to === 12),
+  "the other remapped end still lands on the board card",
 );

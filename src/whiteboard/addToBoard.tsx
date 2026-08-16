@@ -131,12 +131,7 @@ export async function locateBlockOnWhiteboard(blockId: DbId): Promise<void> {
     openLocatePicker(hits);
   } catch (err: unknown) {
     console.error("[whiteboard] locate on whiteboard failed", err);
-    orca.notify(
-      "error",
-      err instanceof Error
-        ? err.message
-        : t("Failed to find this block on whiteboards"),
-    );
+    orca.notify("error", t("Failed to find this block on whiteboards"));
   }
 }
 

@@ -82,9 +82,7 @@ function WhiteboardPicker(props: {
       .catch((err: unknown) => {
         console.error("[whiteboard] failed to list whiteboards", err);
         if (!cancelled) {
-          setError(
-            err instanceof Error ? err.message : t("Failed to list whiteboards"),
-          );
+          setError(t("Failed to list whiteboards"));
         }
       });
     return () => {
@@ -99,10 +97,7 @@ function WhiteboardPicker(props: {
       await props.onPick(boardId);
     } catch (err: unknown) {
       console.error("[whiteboard] add to board failed", err);
-      orca.notify(
-        "error",
-        err instanceof Error ? err.message : props.failMessage,
-      );
+      orca.notify("error", props.failMessage);
     } finally {
       setBusyId(null);
     }

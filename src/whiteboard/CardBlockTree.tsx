@@ -26,6 +26,7 @@ import {
   cardExcerpt,
   collectBlockTreeIds,
 } from "./viewTransform";
+import { CardErrorBoundary } from "./CardErrorBoundary";
 import { attachCardRefHoverPreview } from "./hoverPreview";
 
 const { useEffect, useRef } = window.React;
@@ -84,6 +85,7 @@ export function CardBlockTree({
   );
 
   return (
+    <CardErrorBoundary key={blockId}>
     <div
       ref={treeRef}
       className="owb-card-block-tree"
@@ -189,5 +191,6 @@ export function CardBlockTree({
         );
       })}
     </div>
+    </CardErrorBoundary>
   );
 }

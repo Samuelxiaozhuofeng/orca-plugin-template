@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Orca shows icon.png in the plugin list; never ignore it.
+!icon.png
+
 .claude/worktrees
 
 # Editor directories and files

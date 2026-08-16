@@ -43,3 +43,7 @@ export function shouldSendPersistSeq(
 ): boolean {
   return writeSeq === issuedSeq;
 }
+
+export function resetPersistSeq(): void {
+  writeGens.clear();
+}

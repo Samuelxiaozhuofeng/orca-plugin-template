@@ -310,6 +310,20 @@ export function useCanvasBoard({
     afterEditorFlush(() => setEditingId(null));
   }, [afterEditorFlush]);
 
+  const stopEditNow = useCallback(() => {
+    if (editingRef.current == null) return;
+    editGenRef.current += 1;
+    window.clearTimeout(flushTimerRef.current);
+    blurCardEditor(viewportRef.current);
+    setEditingId(null);
+  }, []);
+
+  useEffect(() => {
+    if (editingId == null) return;
+    if (cards.some((card: WhiteboardCard) => card.blockId === editingId)) return;
+    stopEditNow();
+  }, [cards, editingId, stopEditNow]);
+
   const closeEdgeDrop = useCallback(() => {
     setEdgeDrop(null);
     edgeApiRef.current?.clearGhost();
@@ -329,12 +343,7 @@ export function useCanvasBoard({
         if (edit) startEdit(card.blockId);
       } catch (error) {
         console.error("[whiteboard] create blank card failed", error);
-        orca.notify(
-          "error",
-          error instanceof Error
-            ? error.message
-            : t("Failed to create a new card"),
-        );
+        orca.notify("error", t("Failed to create a new card"));
       }
     },
     [boardBlockId, onAddCards, selectCards, startEdit],
@@ -358,18 +367,14 @@ export function useCanvasBoard({
         })
         .catch((error: unknown) => {
           console.error("[whiteboard] extract card failed", error);
-          orca.notify(
-            "error",
-            error instanceof Error
-              ? error.message
-              : t("Failed to add blocks to the board"),
-          );
+          orca.notify("error", t("Failed to add blocks to the board"));
         });
     },
     [boardBlockId, onAddCards, onCommitEdges, selectCards],
   );
 
   const collectSelected = useCallback(() => {
+    stopEditNow();
     void collectSelectedIntoBoard({
       boardBlockId,
       selectedIds: selectedRef.current,
@@ -378,11 +383,12 @@ export function useCanvasBoard({
       areas: areasRef.current,
       selectCards,
     });
-  }, [boardBlockId, selectCards]);
+  }, [boardBlockId, selectCards, stopEditNow]);
 
   const dropOntoBoard = useCallback(
-    (targetBoardId: DbId, movingIds: readonly DbId[]) =>
-      dropCardsOntoBoard({
+    (targetBoardId: DbId, movingIds: readonly DbId[]) => {
+      stopEditNow();
+      return dropCardsOntoBoard({
         boardBlockId,
         targetBoardId,
         movingIds,
@@ -390,8 +396,9 @@ export function useCanvasBoard({
         edges: edgesRef.current,
         areas: areasRef.current,
         selectCards,
-      }),
-    [boardBlockId, selectCards],
+      });
+    },
+    [boardBlockId, selectCards, stopEditNow],
   );
 
   useEffect(

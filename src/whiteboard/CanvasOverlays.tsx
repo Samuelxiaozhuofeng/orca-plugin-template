@@ -135,7 +135,12 @@ export function CanvasViewportOverlays({
           </div>
           <div className="owb-canvas-empty-sub">
             {t(
-              "Use the toolbar to place journals, or drag blocks here from a note.",
+              "Right-click empty space and choose New card here. You can also place journals from the toolbar, or drag blocks here from a note.",
+            )}
+          </div>
+          <div className="owb-canvas-empty-sub">
+            {t(
+              "Pan and zoom follow the mouse or trackpad mode in the plugin settings.",
             )}
           </div>
         </div>

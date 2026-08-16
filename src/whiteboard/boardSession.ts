@@ -93,13 +93,11 @@ export function notifyWriteError(
   console.error(`[whiteboard] failed to save ${kind}`, error);
   orca.notify(
     "error",
-    error instanceof Error
-      ? error.message
-      : kind === "cards"
-        ? t("Failed to save card positions")
-        : kind === "edges"
-          ? t("Failed to save connections")
-          : t("Failed to save sections"),
+    kind === "cards"
+      ? t("Failed to save card positions")
+      : kind === "edges"
+        ? t("Failed to save connections")
+        : t("Failed to save sections"),
     {
       title: t("Retry"),
       action: () => {
@@ -131,6 +129,13 @@ export function refuseIfNotHydrated(session: BoardSession): boolean {
 
 export function refuseIfNotWritable(session: BoardSession): boolean {
   return refuseIfProtected(session) || refuseIfNotHydrated(session);
+}
+
+/** Closed-panel writes may use a live session; never a stub or protect board. */
+export function sessionCanAcceptCards(
+  session: BoardSession | null | undefined,
+): session is BoardSession {
+  return session != null && session.hydrated && !session.protect;
 }
 
 function createSession(

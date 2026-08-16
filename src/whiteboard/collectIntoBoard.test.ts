@@ -79,7 +79,7 @@ const remapped = mustPlan(
 check(remapped.leftoverEdges.length === 1, "one remapped edge stays on A");
 check(remapped.leftoverEdges[0].from === SUB, "selected end remaps to the sub-board");
 check(remapped.leftoverEdges[0].to === 3, "unselected end stays");
-check(remapped.leftoverEdges[0].linked == null, "remapped edge drops linked");
+check(remapped.leftoverEdges[0].linked === true, "remapped edge keeps linked");
 check(remapped.leftoverEdges[0].bend == null, "remapped edge drops bend");
 check(remapped.leftoverEdges[0].arrow === "both", "remapped edge keeps arrow");
 check(remapped.leftoverEdges[0].color === "blue", "remapped edge keeps color");

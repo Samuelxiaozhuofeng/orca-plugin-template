@@ -99,10 +99,7 @@ export function BoardTitle({
       setEditing(false);
     } catch (error) {
       console.error("[whiteboard] failed to rename board", error);
-      orca.notify(
-        "error",
-        error instanceof Error ? error.message : t("Failed to rename whiteboard"),
-      );
+      orca.notify("error", t("Failed to rename whiteboard"));
       setDraft(name);
       setEditing(false);
     } finally {

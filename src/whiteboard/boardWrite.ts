@@ -2,10 +2,8 @@ import type { Block, DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n.ts";
 import { tryReadAreas } from "./areas.ts";
 import { emitBoardCardsChanged } from "./boardEvents.ts";
-import { tryReadCards, type JsonParseResult } from "./cards.ts";
-import { tryReadEdges } from "./edges.ts";
-
-const CARDS_PROP = "cards";
+import { CARDS_PROP, tryReadCards, type JsonParseResult } from "./cards.ts";
+import { EDGES_PROP, tryReadEdges } from "./edges.ts";
 
 export const BOARD_UNREADABLE_MSG =
   "This whiteboard's data could not be read. Saving has been stopped so nothing is overwritten. Changes you make now will not be kept.";
@@ -26,10 +24,13 @@ const ALL_DROPPED_MSG =
   "${cards} cards, ${edges} connections and ${areas} sections could not be read. Saving has been stopped so nothing is overwritten. Changes you make now will not be kept.";
 
 const protectTold = new Set<DbId>();
+const fetchedBoardIds = new Set<DbId>();
+const writeAttemptGen = new Map<DbId, number>();
 
 export type BoardWritePayload = {
   blockId: DbId;
   props: Array<{ name: string; type: number; value: string }>;
+  gen: number;
 };
 
 const lastWrites = new Map<DbId, BoardWritePayload>();
@@ -38,6 +39,21 @@ export function peekLastBoardWrite(
   blockId: DbId,
 ): BoardWritePayload | undefined {
   return lastWrites.get(blockId);
+}
+
+/** True only while `payload` is still this board's latest write attempt. */
+export function isBoardWriteRetryCurrent(
+  payload: BoardWritePayload | null | undefined,
+  latest: BoardWritePayload | undefined,
+): boolean {
+  if (payload == null || latest == null) return false;
+  return payload.blockId === latest.blockId && payload.gen === latest.gen;
+}
+
+function nextWriteGen(blockId: DbId): number {
+  const gen = (writeAttemptGen.get(blockId) ?? 0) + 1;
+  writeAttemptGen.set(blockId, gen);
+  return gen;
 }
 
 function droppedCount(read: JsonParseResult<unknown> | undefined): number {
@@ -108,6 +124,13 @@ export function clearBoardProtectTold(boardId: DbId): void {
   protectTold.delete(boardId);
 }
 
+export function resetBoardWriteState(): void {
+  protectTold.clear();
+  lastWrites.clear();
+  fetchedBoardIds.clear();
+  writeAttemptGen.clear();
+}
+
 /** True when a stored cards/edges property is missing, empty, or a JSON array. */
 export function isJsonArrayProp(value: unknown): boolean {
   if (value == null) return true;
@@ -123,16 +146,57 @@ export function isJsonArrayProp(value: unknown): boolean {
   return Array.isArray(value);
 }
 
+/**
+ * Cache is safe to treat as the real board when `cards` and `edges` are
+ * listed. `areas` is optional (legacy boards omit it). A stub with only
+ * `_repr` / `whiteboardPage` is not enough — fetch before treating as empty.
+ */
+export function hasBoardLayoutProps(
+  block:
+    | { properties?: readonly { name: string }[] }
+    | null
+    | undefined,
+): boolean {
+  const props = block?.properties;
+  if (props == null) return false;
+  let cards = false;
+  let edges = false;
+  for (const item of props) {
+    if (item.name === CARDS_PROP) cards = true;
+    else if (item.name === EDGES_PROP) edges = true;
+  }
+  return cards && edges;
+}
+
+function cacheFetchedBlock(block: Block | null): Block | null {
+  if (block != null && typeof block.id === "number") {
+    orca.state.blocks[block.id] = block;
+    fetchedBoardIds.add(block.id);
+    return block;
+  }
+  return null;
+}
+
 export async function loadBoardBlock(blockId: DbId): Promise<Block | null> {
   const cached = orca.state.blocks[blockId];
-  if (cached != null) return cached;
-  const fresh = (await orca.invokeBackend("get-block", blockId)) as
-    | Block
-    | null;
-  if (fresh != null && typeof fresh.id === "number") {
-    orca.state.blocks[fresh.id] = fresh;
+  if (
+    cached != null &&
+    (hasBoardLayoutProps(cached) || fetchedBoardIds.has(blockId))
+  ) {
+    return cached;
   }
-  return fresh;
+  try {
+    const fresh = (await orca.invokeBackend("get-block", blockId)) as
+      | Block
+      | null;
+    const stored = cacheFetchedBlock(fresh);
+    if (stored != null) return stored;
+    fetchedBoardIds.add(blockId);
+    return cached ?? null;
+  } catch (error) {
+    console.error("[whiteboard] failed to load board block", error);
+    return cached ?? null;
+  }
 }
 
 export function boardPropsReadable(
@@ -149,6 +213,9 @@ export function boardPropsReadable(
 
 export async function assertBoardWritable(blockId: DbId): Promise<void> {
   const block = await loadBoardBlock(blockId);
+  if (!hasBoardLayoutProps(block) && !fetchedBoardIds.has(blockId)) {
+    throw new Error(t("Whiteboard is still loading"));
+  }
   if (boardPropsReadable(block)) return;
   notifyBoardUnreadable(blockId);
   const cardsRead = tryReadCards(block ?? undefined);
@@ -161,6 +228,13 @@ export async function retryBoardWrite(
   payload: BoardWritePayload | null | undefined,
 ): Promise<void> {
   if (payload == null) return;
+  if (!isBoardWriteRetryCurrent(payload, lastWrites.get(payload.blockId))) {
+    orca.notify(
+      "info",
+      t("A newer save already completed. This retry was skipped."),
+    );
+    return;
+  }
   await assertBoardWritable(payload.blockId);
   await writeProperties(payload.blockId, payload.props);
   if (payload.props.some((prop) => prop.name === CARDS_PROP)) {
@@ -195,7 +269,11 @@ export async function writeProperties(
   if (props.length === 0) {
     return orca.state.blocks[blockId] ?? null;
   }
-  lastWrites.set(blockId, { blockId, props: props.slice() });
+  lastWrites.set(blockId, {
+    blockId,
+    props: props.slice(),
+    gen: nextWriteGen(blockId),
+  });
   const result = await orca.invokeBackend("set-properties", [blockId], props);
   applyReturnedBlocks(result);
   const fresh = (await orca.invokeBackend("get-block", blockId)) as

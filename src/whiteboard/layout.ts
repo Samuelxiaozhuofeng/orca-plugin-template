@@ -1,3 +1,5 @@
+import { t } from "../libs/l10n.ts";
+
 export const CARD_WIDTH = 340;
 export const CARD_HEIGHT = 200;
 export const MIN_CARD_WIDTH = 160;
@@ -14,7 +16,19 @@ export const MAX_RANGE_DAYS = 92;
 export const MIN_GRID_COLUMNS = 1;
 export const MAX_GRID_COLUMNS = 14;
 
-const WEEKDAYS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+function weekdayLabel(day: number): string {
+  return (
+    [
+      t("Sun"),
+      t("Mon"),
+      t("Tue"),
+      t("Wed"),
+      t("Thu"),
+      t("Fri"),
+      t("Sat"),
+    ][day] ?? ""
+  );
+}
 
 export type DateRange = { start: Date; end: Date };
 export type LayoutMode = "calendar" | "grid";
@@ -151,7 +165,7 @@ export function cardDateMeta(dateKey: string): {
   }
   return {
     date: dateKey,
-    weekday: WEEKDAYS[date.getDay()] ?? "",
+    weekday: weekdayLabel(date.getDay()),
     isToday: dateKey === formatDateKey(new Date()),
     isWeekend: date.getDay() === 0 || date.getDay() === 6,
   };

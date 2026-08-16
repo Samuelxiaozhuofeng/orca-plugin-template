@@ -77,12 +77,7 @@ export function useBoardDrop(opts: {
       });
       void drop.catch((error: unknown) => {
         console.error("[whiteboard] failed to drop blocks", error);
-        orca.notify(
-          "error",
-          error instanceof Error
-            ? error.message
-            : t("Failed to add blocks to the board"),
-        );
+        orca.notify("error", t("Failed to add blocks to the board"));
       });
     },
     [

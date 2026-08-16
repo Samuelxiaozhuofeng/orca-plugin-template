@@ -1,8 +1,9 @@
 import type { DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n";
-import { markCardEditorInput } from "./cardEditorFlush";
+import { CardErrorBoundary } from "./CardErrorBoundary";
+import { markCardEditorInput, parkCardEditorHost } from "./cardEditorFlush";
 
-const { useEffect, useRef } = window.React;
+const { useLayoutEffect, useRef } = window.React;
 const { useSnapshot } = window.Valtio;
 
 /** First visible editable line inside the card editor (hidden chrome skipped). */
@@ -27,28 +28,59 @@ export function CardEditor({
 }) {
   const { panelRenderers } = useSnapshot(orca.state);
   const BlockPanel = panelRenderers.block;
-  const editorRef = useRef<HTMLDivElement | null>(null);
+  const slotRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    if (BlockPanel == null) return;
+    const slot = slotRef.current;
+    if (slot == null) return;
+
+    // Own React root: closing the whiteboard must not unmount BlockPanel
+    // before Orca's 240ms content commit can run.
+    const host = document.createElement("div");
+    host.className = "owb-card-editor";
+    slot.appendChild(host);
+    const root = window.createRoot(host) as {
+      render: (node: React.ReactNode) => void;
+      unmount: () => void;
+    };
+    root.render(
+      <CardErrorBoundary>
+        <BlockPanel panelId={panelId} blockId={blockId} active />
+      </CardErrorBoundary>,
+    );
+
+    const mark = (event: Event) => {
+      if (event instanceof KeyboardEvent) {
+        if (
+          event.key === "Escape" ||
+          event.key === "Shift" ||
+          event.key === "Meta" ||
+          event.key === "Control" ||
+          event.key === "Alt"
+        ) {
+          return;
+        }
+      }
+      markCardEditorInput();
+    };
+    host.addEventListener("beforeinput", mark, true);
+    host.addEventListener("input", mark, true);
+    host.addEventListener("compositionend", mark, true);
+    host.addEventListener("keydown", mark, true);
+
     let cancelled = false;
     let timer = 0;
     let attempts = 0;
-
     const focusEditor = () => {
       if (cancelled) return;
-      attempts++;
-      const el = editorRef.current;
-      if (el == null) return;
-
-      const target = firstEditableLine(el);
+      attempts += 1;
+      const target = firstEditableLine(host);
       if (target == null) {
         if (attempts < 20) timer = window.setTimeout(focusEditor, 25);
         return;
       }
-
       target.focus({ preventScroll: true });
-      // Host CursorData is derived from a pointer hit. Deliver one hit so
-      // the editor activates; do not then overwrite the caret it places.
       const rect = target.getBoundingClientRect();
       const clientX = rect.left + 2;
       const clientY = rect.top + Math.min(10, rect.height / 2);
@@ -70,51 +102,26 @@ export function CardEditor({
         );
       }
     };
-
     timer = window.setTimeout(focusEditor, 10);
+
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
+      host.removeEventListener("beforeinput", mark, true);
+      host.removeEventListener("input", mark, true);
+      host.removeEventListener("compositionend", mark, true);
+      host.removeEventListener("keydown", mark, true);
+      parkCardEditorHost(host, () => {
+        root.unmount();
+        host.remove();
+      });
     };
-  }, [blockId, panelId]);
-
-  useEffect(() => {
-    const el = editorRef.current;
-    if (el == null) return;
-    const mark = (event: Event) => {
-      if (event instanceof KeyboardEvent) {
-        if (
-          event.key === "Escape" ||
-          event.key === "Shift" ||
-          event.key === "Meta" ||
-          event.key === "Control" ||
-          event.key === "Alt"
-        ) {
-          return;
-        }
-      }
-      markCardEditorInput();
-    };
-    el.addEventListener("beforeinput", mark, true);
-    el.addEventListener("input", mark, true);
-    el.addEventListener("compositionend", mark, true);
-    el.addEventListener("keydown", mark, true);
-    return () => {
-      el.removeEventListener("beforeinput", mark, true);
-      el.removeEventListener("input", mark, true);
-      el.removeEventListener("compositionend", mark, true);
-      el.removeEventListener("keydown", mark, true);
-    };
-  }, [blockId, panelId]);
+  }, [BlockPanel, blockId, panelId]);
 
   if (BlockPanel == null) {
     return <div className="owb-card-editor-missing">{t("Editor unavailable")}</div>;
   }
-  // No extra .orca-panel[data-panel-id] wrapper: the real panel already
-  // owns that id. A second node with the same id would steal closest().
-  return (
-    <div ref={editorRef} className="owb-card-editor">
-      <BlockPanel panelId={panelId} blockId={blockId} active />
-    </div>
-  );
+  // Slot only: BlockPanel lives on an independent root so closing the
+  // whiteboard can park it until the host editor finishes committing.
+  return <div ref={slotRef} className="owb-card-editor" />;
 }

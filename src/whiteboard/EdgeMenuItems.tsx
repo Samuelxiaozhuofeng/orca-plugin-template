@@ -24,12 +24,7 @@ export function EdgeMenuItems({
       await linkEdgeToNote(edge);
     } catch (error) {
       console.error("[whiteboard] link edge failed", error);
-      orca.notify(
-        "error",
-        error instanceof Error
-          ? error.message
-          : t("Failed to create a note reference"),
-      );
+      orca.notify("error", t("Failed to create a note reference"));
       return;
     }
     const marked = edges.map((item: WhiteboardEdge) =>

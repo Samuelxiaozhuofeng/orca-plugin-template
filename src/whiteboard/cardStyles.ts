@@ -363,6 +363,20 @@ export const CARD_CSS = `
   color: var(--orca-color-text-1);
 }
 
+.owb-card-crash {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 3.6em;
+  padding: 10px 12px;
+  color: var(--orca-color-text-2);
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: center;
+}
+
 .owb-card.is-filter-dim {
   opacity: 0.28;
   pointer-events: none;

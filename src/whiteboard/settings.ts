@@ -46,7 +46,7 @@ export function whiteboardSettingsSchema(): PluginSettingsSchema {
     mouseScheme: {
       label: t("Controls"),
       description: t(
-        "Mouse mode zooms with the wheel and pans with a right-drag. Trackpad mode pans with two fingers and zooms with a pinch.",
+        "Switch this if pan and zoom feel wrong. Mouse mode zooms with the wheel and pans with a right-drag. Trackpad mode pans with two fingers and zooms with a pinch.",
       ),
       type: "singleChoice",
       defaultValue: DEFAULTS.mouseScheme,

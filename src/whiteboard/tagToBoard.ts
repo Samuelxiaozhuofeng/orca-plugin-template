@@ -41,7 +41,11 @@ export function tagNameFromBlock(block: {
 export function collectTaggedBlockIds(result: unknown): DbId[] {
   if (result == null) return [];
   if (!Array.isArray(result)) {
-    throw new Error("get-blocks-with-tags did not return an array");
+    console.error(
+      "[whiteboard] get-blocks-with-tags did not return an array",
+      result,
+    );
+    throw new Error(t("Failed to spread tagged notes onto the board"));
   }
   const ids: DbId[] = [];
   for (const item of result) {
@@ -55,7 +59,11 @@ export function collectTaggedBlockIds(result: unknown): DbId[] {
     }
   }
   if (result.length > 0 && ids.length === 0) {
-    throw new Error("get-blocks-with-tags returned an unexpected shape");
+    console.error(
+      "[whiteboard] get-blocks-with-tags returned an unexpected shape",
+      result,
+    );
+    throw new Error(t("Failed to spread tagged notes onto the board"));
   }
   return ids;
 }

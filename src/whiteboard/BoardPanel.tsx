@@ -9,7 +9,12 @@ import {
 import { retainBoardHistory } from "./boardHistory";
 import { BoardToolbar } from "./BoardToolbar";
 import { useBoardPersist } from "./useBoardPersist";
-import { formatProtectMessage } from "./boardWrite";
+import {
+  formatProtectMessage,
+  hasBoardLayoutProps,
+  loadBoardBlock,
+} from "./boardWrite";
+import { blurCardEditor } from "./cardEditorFlush";
 import { areasPropertyPresent, tryReadAreas } from "./areas";
 import { tryReadCards, type WhiteboardCard } from "./cards";
 import { Canvas } from "./Canvas";
@@ -44,7 +49,10 @@ type Props = {
 export default function BoardPanel({ panelId, blockId }: Props) {
   const { blocks } = useSnapshot(orca.state);
   const block = blockId == null ? undefined : blocks[blockId];
-  const serverReady = block != null;
+  const [fetchedFor, setFetchedFor] = useState<DbId | null>(null);
+  const serverReady =
+    block != null &&
+    (hasBoardLayoutProps(block) || fetchedFor === blockId);
   const cardsRead = tryReadCards(block);
   const edgesRead = tryReadEdges(block);
   const areasRead = tryReadAreas(block);
@@ -78,6 +86,7 @@ export default function BoardPanel({ panelId, blockId }: Props) {
   const [loadedFor, setLoadedFor] = useState<DbId | null>(null);
   const viewReady = blockId != null && loadedFor === blockId;
   const [blockError, setBlockError] = useState(false);
+  const panelRef = useRef<HTMLDivElement | null>(null);
   const [busy, setBusy] = useState(false);
   const [viewportWidth, setViewportWidth] = useState(800);
   const [drawArea, setDrawArea] = useState(false);
@@ -221,19 +230,26 @@ export default function BoardPanel({ panelId, blockId }: Props) {
     if (el) el.textContent = formatZoomPercent(view.scale);
   }, [view.scale]);
 
+  useLayoutEffect(() => {
+    return () => {
+      blurCardEditor(panelRef.current);
+    };
+  }, []);
+
   useEffect(() => {
     if (blockId == null) {
       setBlockError(false);
+      setFetchedFor(null);
       return;
     }
-    if (orca.state.blocks[blockId]) {
+    if (hasBoardLayoutProps(orca.state.blocks[blockId])) {
       setBlockError(false);
+      setFetchedFor(blockId);
       return;
     }
     setBlockError(false);
     let cancelled = false;
-    void orca
-      .invokeBackend("get-block", blockId)
+    void loadBoardBlock(blockId)
       .then((loaded: Block | null) => {
         if (cancelled) return;
         if (loaded == null) {
@@ -241,7 +257,7 @@ export default function BoardPanel({ panelId, blockId }: Props) {
           orca.notify("error", t("Failed to load whiteboard"));
           return;
         }
-        orca.state.blocks[loaded.id] = loaded;
+        setFetchedFor(blockId);
       })
       .catch((error: unknown) => {
         if (cancelled) return;
@@ -256,7 +272,7 @@ export default function BoardPanel({ panelId, blockId }: Props) {
 
   if (blockId == null) {
     return (
-      <div className="owb-panel">
+      <div ref={panelRef} className="owb-panel">
         <div className="owb-empty">{t("Whiteboard not found")}</div>
       </div>
     );
@@ -264,7 +280,7 @@ export default function BoardPanel({ panelId, blockId }: Props) {
 
   if (blockError && !serverReady) {
     return (
-      <div className="owb-panel">
+      <div ref={panelRef} className="owb-panel">
         <div className="owb-empty">{t("Failed to load whiteboard")}</div>
       </div>
     );
@@ -272,14 +288,14 @@ export default function BoardPanel({ panelId, blockId }: Props) {
 
   if (!viewReady || !serverReady || !persistReady) {
     return (
-      <div className="owb-panel">
+      <div ref={panelRef} className="owb-panel">
         <div className="owb-empty">{t("Loading whiteboard…")}</div>
       </div>
     );
   }
 
   return (
-    <div className="owb-panel">
+    <div ref={panelRef} className="owb-panel">
       {protect ? (
         <div className="owb-protect-banner" role="alert">
           {formatProtectMessage(cardsRead, edgesRead, areasRead)}

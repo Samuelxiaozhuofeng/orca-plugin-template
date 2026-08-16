@@ -106,10 +106,7 @@ export function EdgeDropMenu({
       await connectTo(card.blockId);
     } catch (error) {
       console.error("[whiteboard] drop-create card failed", error);
-      orca.notify(
-        "error",
-        error instanceof Error ? error.message : t("Failed to create a new card"),
-      );
+      orca.notify("error", t("Failed to create a new card"));
       discardLastRecord(boardBlockId);
     } finally {
       release();
@@ -157,12 +154,7 @@ export function EdgeDropMenu({
       }
     } catch (error) {
       console.error("[whiteboard] drop-connect existing failed", error);
-      orca.notify(
-        "error",
-        error instanceof Error
-          ? error.message
-          : t("Failed to add blocks to the board"),
-      );
+      orca.notify("error", t("Failed to add blocks to the board"));
       discardLastRecord(boardBlockId);
     } finally {
       busyRef.current = false;

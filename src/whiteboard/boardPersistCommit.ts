@@ -19,6 +19,36 @@ import {
 import { type WhiteboardCard } from "./cards.ts";
 import { sanitizeEdges, type WhiteboardEdge } from "./edges.ts";
 
+/** Keep newer pending on a lane; put the skipped snapshot back on empty lanes. */
+export function rearmSkippedLanes(
+  session: {
+    cardPending: WhiteboardCard[] | null;
+    edgePending: WhiteboardEdge[] | null;
+    areaPending: WhiteboardArea[] | null;
+    cardDirty: boolean;
+    edgeDirty: boolean;
+    areaDirty: boolean;
+  },
+  snapshot: {
+    cards: WhiteboardCard[];
+    edges?: WhiteboardEdge[];
+    areas: WhiteboardArea[];
+  },
+): void {
+  if (session.cardPending == null) {
+    session.cardPending = snapshot.cards;
+    session.cardDirty = true;
+  }
+  if (snapshot.edges != null && session.edgePending == null) {
+    session.edgePending = snapshot.edges;
+    session.edgeDirty = true;
+  }
+  if (session.areaPending == null) {
+    session.areaPending = snapshot.areas;
+    session.areaDirty = true;
+  }
+}
+
 export async function commitBoardOn(
   session: BoardSession,
   cards: WhiteboardCard[],
@@ -43,15 +73,25 @@ export async function commitBoardOn(
   const toWriteEdges = session.edges;
   const toWriteAreas = session.areas;
   const areasPresent = session.areasPresent;
-  const ok = await enqueue(session, "card", async () =>
+  session.cardInFlight = true;
+  session.edgeInFlight = true;
+  session.areaInFlight = true;
+  let ok = false;
+  try {
+    ok = await enqueue(session, "card", async () =>
     enqueue(session, "edge", async () =>
       enqueue(session, "area", async () => {
-        if (getBoardSession(id) !== session) return true;
+        if (getBoardSession(id) !== session) return false;
         if (
           session.cardPending != null ||
           session.edgePending != null ||
           session.areaPending != null
         ) {
+          rearmSkippedLanes(session, {
+            cards: toWriteCards,
+            edges: toWriteEdges,
+            areas: toWriteAreas,
+          });
           return true;
         }
         const cardSeq = takeLaneSeq(id, "card");
@@ -132,6 +172,11 @@ export async function commitBoardOn(
       }),
     ),
   );
+  } finally {
+    session.cardInFlight = false;
+    session.edgeInFlight = false;
+    session.areaInFlight = false;
+  }
   let result = ok;
   if (session.cardPending != null) {
     result = (await flushCards(session)) && result;
@@ -168,10 +213,18 @@ export async function commitCardsAndAreasOn(
   const toWriteCards = session.cards;
   const toWriteAreas = session.areas;
   const areasPresent = session.areasPresent;
-  const ok = await enqueue(session, "card", async () =>
+  session.cardInFlight = true;
+  session.areaInFlight = true;
+  let ok = false;
+  try {
+    ok = await enqueue(session, "card", async () =>
     enqueue(session, "area", async () => {
-      if (getBoardSession(id) !== session) return true;
+      if (getBoardSession(id) !== session) return false;
       if (session.cardPending != null || session.areaPending != null) {
+        rearmSkippedLanes(session, {
+          cards: toWriteCards,
+          areas: toWriteAreas,
+        });
         return true;
       }
       const cardSeq = takeLaneSeq(id, "card");
@@ -228,6 +281,10 @@ export async function commitCardsAndAreasOn(
       }
     }),
   );
+  } finally {
+    session.cardInFlight = false;
+    session.areaInFlight = false;
+  }
   let result = ok;
   if (session.cardPending != null) {
     result = (await flushCards(session)) && result;

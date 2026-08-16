@@ -137,12 +137,7 @@ export async function turnIntoWhiteboard(
     await writePageWhiteboardFlag(blockId, true);
   } catch (err: unknown) {
     console.error("[whiteboard] failed to mark page as whiteboard", err);
-    orca.notify(
-      "error",
-      err instanceof Error
-        ? err.message
-        : t("Failed to turn this block into a whiteboard"),
-    );
+    orca.notify("error", t("Failed to turn this block into a whiteboard"));
     return false;
   }
 
@@ -153,12 +148,7 @@ export async function turnIntoWhiteboard(
       await writeCards(blockId, plan.cards);
     } catch (err: unknown) {
       console.error("[whiteboard] failed to write converted cards", err);
-      orca.notify(
-        "error",
-        err instanceof Error
-          ? err.message
-          : t("Whiteboard cards were not saved"),
-      );
+      orca.notify("error", t("Failed to turn this block into a whiteboard"));
     }
   }
 
@@ -196,9 +186,7 @@ export async function turnBackIntoOutline(blockId: DbId): Promise<boolean> {
     console.error("[whiteboard] failed to restore outline", err);
     orca.notify(
       "error",
-      err instanceof Error
-        ? err.message
-        : t("Failed to turn this whiteboard back into an outline"),
+      t("Failed to turn this whiteboard back into an outline"),
     );
     return false;
   }

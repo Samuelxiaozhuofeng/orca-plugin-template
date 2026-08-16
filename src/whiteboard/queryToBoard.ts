@@ -99,7 +99,8 @@ export function queryBackendPayload(
 export function collectQueryResultIds(result: unknown): DbId[] {
   if (result == null) return [];
   if (!Array.isArray(result)) {
-    throw new Error("query did not return an array");
+    console.error("[whiteboard] query did not return an array", result);
+    throw new Error(t("Failed to spread query results onto the board"));
   }
   const ids: DbId[] = [];
   for (const item of result) {
@@ -107,7 +108,8 @@ export function collectQueryResultIds(result: unknown): DbId[] {
     if (id != null) ids.push(id);
   }
   if (result.length > 0 && ids.length === 0) {
-    throw new Error("query returned an unexpected shape");
+    console.error("[whiteboard] query returned an unexpected shape", result);
+    throw new Error(t("Failed to spread query results onto the board"));
   }
   return ids;
 }

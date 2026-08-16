@@ -70,6 +70,13 @@ function cardBox(
   return card == null ? null : card;
 }
 
+const liveHandleGestures = new Set<{ abort: () => void }>();
+
+/** Abort every in-flight edge-handle drag and drop window listeners. */
+export function abortAllEdgeHandleGestures(): void {
+  for (const entry of [...liveHandleGestures]) entry.abort();
+}
+
 type HandleGestureOpts = {
   edgeId: string;
   canvas: HTMLElement;
@@ -117,10 +124,15 @@ function attachWindowDrag(opts: {
   };
   opts.canvas.classList.add(opts.className);
   const tracked = trackEdgeGesture(opts.canvas, () => opts.onCancel());
+  liveHandleGestures.add(tracked);
+  const finishAndForget = (after?: () => void) => {
+    liveHandleGestures.delete(tracked);
+    finish(after);
+  };
   window.addEventListener("mousemove", onMove);
   window.addEventListener("mouseup", onUp);
   window.addEventListener("keydown", onKey, true);
-  return { finish };
+  return { finish: finishAndForget };
 }
 
 function passedClick(

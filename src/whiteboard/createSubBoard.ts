@@ -154,10 +154,7 @@ async function createBlockSubBoard(
   } catch (err: unknown) {
     console.error("[whiteboard] failed to create block sub-board", err);
     if (createdId != null) await abandonNewSubBoard(createdId);
-    orca.notify(
-      "error",
-      err instanceof Error ? err.message : t("Failed to create whiteboard"),
-    );
+    orca.notify("error", t("Failed to create whiteboard"));
     return null;
   }
 }
@@ -191,10 +188,7 @@ async function createPageSubBoard(name: string): Promise<DbId | null> {
   } catch (err: unknown) {
     console.error("[whiteboard] failed to mark sub-board page", err);
     await abandonNewSubBoard(newId);
-    orca.notify(
-      "error",
-      err instanceof Error ? err.message : t("Failed to create whiteboard"),
-    );
+    orca.notify("error", t("Failed to create whiteboard"));
     return null;
   }
 

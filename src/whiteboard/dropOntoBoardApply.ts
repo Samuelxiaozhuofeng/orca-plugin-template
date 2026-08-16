@@ -2,7 +2,8 @@ import type { DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n";
 import type { WhiteboardArea } from "./areas";
 import { areasPropertyPresent, tryReadAreas } from "./areas";
-import { discardLastRecord, runAsHistoryStep } from "./boardHistory";
+import { discardLastRecord, historyDepth, runAsHistoryStep } from "./boardHistory";
+import { nestWouldCycle } from "./boardNestCycle";
 import { boardCardName } from "./boardCardView";
 import { commitBoardOn } from "./boardPersistCommit";
 import { getOpenBoard } from "./boards";
@@ -20,6 +21,11 @@ import {
 import type { WhiteboardCard } from "./cards";
 import { tryReadCards } from "./cards";
 import { planDropOntoBoard } from "./collectIntoBoard";
+import {
+  cloneBoardSnapshot,
+  registerDropCouple,
+  writeBoardCardsEdges,
+} from "./crossBoardHistory";
 import { originBelowCards } from "./dropBlocks";
 import { nextEdgeId, sanitizeEdges, tryReadEdges, type WhiteboardEdge } from "./edges";
 import { GRID_ORIGIN } from "./layout";
@@ -132,6 +138,49 @@ async function loadTargetWrite(targetId: DbId): Promise<TargetWrite> {
   };
 }
 
+async function cardsOnBoard(boardId: DbId): Promise<WhiteboardCard[]> {
+  const session = getBoardSession(boardId);
+  if (session != null && session.hydrated) return session.cards;
+  const block = (await loadBoardBlock(boardId)) ?? orca.state.blocks[boardId];
+  const read = tryReadCards(block ?? undefined);
+  return read.ok ? read.value : [];
+}
+
+async function childBoardIds(boardId: DbId): Promise<DbId[]> {
+  const cards = await cardsOnBoard(boardId);
+  const out: DbId[] = [];
+  for (const card of cards) {
+    let block = orca.state.blocks[card.blockId];
+    if (!isWhiteboardBlock(block)) {
+      block = (await loadBoardBlock(card.blockId)) ?? undefined;
+    }
+    if (isWhiteboardBlock(block)) out.push(card.blockId);
+  }
+  return out;
+}
+
+async function dropWouldCycle(
+  movingIds: readonly DbId[],
+  targetBoardId: DbId,
+): Promise<boolean> {
+  const map = new Map<DbId, DbId[]>();
+  const queue = [...movingIds];
+  let steps = 0;
+  while (queue.length > 0 && steps < 64) {
+    const id = queue.shift()!;
+    if (map.has(id)) continue;
+    steps += 1;
+    const kids = await childBoardIds(id);
+    map.set(id, kids);
+    for (const kid of kids) queue.push(kid);
+  }
+  return nestWouldCycle({
+    movingIds,
+    targetBoardId,
+    childrenOf: (id) => map.get(id) ?? [],
+  });
+}
+
 /**
  * Write the payload onto B first, then mutate A. Returns false when the
  * caller should fall back to a regular move (nothing to drop).
@@ -165,12 +214,7 @@ export async function dropCardsOntoBoard(opts: {
   } catch (err: unknown) {
     console.error("[whiteboard] failed to open drop target", err);
     if (!(err instanceof Error && err.message === ALREADY_TOLD)) {
-      orca.notify(
-        "error",
-        err instanceof Error
-          ? err.message
-          : t("Could not add the cards to that whiteboard."),
-      );
+      orca.notify("error", t("Could not add the cards to that whiteboard."));
     }
     return true;
   }
@@ -189,11 +233,19 @@ export async function dropCardsOntoBoard(opts: {
   });
   if (plan == null) return false;
 
-  const snapshot = {
-    cards: sessionA.cards.map((card) => ({ ...card })),
-    edges: sessionA.edges.map((edge) => ({ ...edge })),
-    areas: opts.areas.map((area) => ({ ...area })),
-  };
+  if (await dropWouldCycle(plan.movedCards.map((card) => card.blockId), opts.targetBoardId)) {
+    orca.notify("warn", t("That would nest this whiteboard inside itself."));
+    return true;
+  }
+
+  const snapshotA = cloneBoardSnapshot(
+    sessionA.cards,
+    sessionA.edges,
+    opts.areas,
+  );
+  const snapshotB = cloneBoardSnapshot(target.cards, target.edges, []);
+  const sessionB = getBoardSession(opts.targetBoardId);
+  const recordB = sessionB != null && sessionB.hydrated && !sessionB.protect;
 
   const merged = mergeOntoTarget(
     target.cards,
@@ -202,32 +254,63 @@ export async function dropCardsOntoBoard(opts: {
     plan.movedEdges,
   );
   try {
-    await target.commit(merged.cards, merged.edges);
+    if (recordB) {
+      const okB = await runAsHistoryStep(opts.targetBoardId, snapshotB, () =>
+        target.commit(merged.cards, merged.edges).then(() => true),
+      );
+      if (!okB) throw alreadyTold();
+    } else {
+      await target.commit(merged.cards, merged.edges);
+    }
   } catch (err: unknown) {
     console.error("[whiteboard] failed to write drop target", err);
+    if (recordB) discardLastRecord(opts.targetBoardId);
     if (!(err instanceof Error && err.message === ALREADY_TOLD)) {
-      orca.notify(
-        "error",
-        err instanceof Error
-          ? err.message
-          : t("Could not add the cards to that whiteboard."),
-      );
+      orca.notify("error", t("Could not add the cards to that whiteboard."));
     }
     return true;
   }
-  const saved = await runAsHistoryStep(opts.boardBlockId, snapshot, () =>
+
+  const snapshotAAfter = cloneBoardSnapshot(
+    plan.leftoverCards,
+    plan.leftoverEdges,
+    opts.areas,
+  );
+  const snapshotBAfter = cloneBoardSnapshot(merged.cards, merged.edges, []);
+
+  const saved = await runAsHistoryStep(opts.boardBlockId, snapshotA, () =>
     commitBoardOn(sessionA, plan.leftoverCards, plan.leftoverEdges),
   );
   if (!saved) {
     discardLastRecord(opts.boardBlockId);
+    if (recordB) discardLastRecord(opts.targetBoardId);
+    const rolled = await writeBoardCardsEdges(
+      opts.targetBoardId,
+      snapshotB.cards,
+      snapshotB.edges,
+    );
     orca.notify(
-      "warn",
-      t(
-        "This board was not changed, but the cards are already on the other whiteboard.",
-      ),
+      rolled ? "error" : "warn",
+      rolled
+        ? t("Could not finish moving the cards. Nothing was changed.")
+        : t(
+            "This board was not changed, but the cards are already on the other whiteboard.",
+          ),
     );
     return true;
   }
+
+  registerDropCouple({
+    a: opts.boardBlockId,
+    b: opts.targetBoardId,
+    aDepth: historyDepth(opts.boardBlockId),
+    bDepth: recordB ? historyDepth(opts.targetBoardId) : null,
+    movedIds: plan.movedCards.map((card) => card.blockId),
+    aBefore: snapshotA,
+    bBefore: snapshotB,
+    aAfter: snapshotAAfter,
+    bAfter: snapshotBAfter,
+  });
 
   opts.selectCards([opts.targetBoardId]);
   orca.notify(

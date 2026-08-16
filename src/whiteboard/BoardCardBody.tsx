@@ -45,7 +45,7 @@ export function BoardCardBody({
         }
       >
         {countError
-          ? t("Data unreadable")
+          ? t("Board data unreadable; saving stopped")
           : board.count === 0
             ? t("No cards yet")
             : t("${count} cards", { count: String(board.count) })}

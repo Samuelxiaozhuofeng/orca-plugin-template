@@ -41,6 +41,7 @@ type TrackedGesture = {
 };
 
 const areaGestureBuckets = new WeakMap<object, Set<TrackedGesture>>();
+const liveAreaGestures = new Set<TrackedGesture>();
 
 function trackAreaGesture(root: object, onAbort: () => void): TrackedGesture {
   let open = true;
@@ -54,15 +55,18 @@ function trackAreaGesture(root: object, onAbort: () => void): TrackedGesture {
       if (!open) return;
       open = false;
       bucket!.delete(entry);
+      liveAreaGestures.delete(entry);
       onAbort();
     },
     untrack() {
       if (!open) return;
       open = false;
       bucket!.delete(entry);
+      liveAreaGestures.delete(entry);
     },
   };
   bucket.add(entry);
+  liveAreaGestures.add(entry);
   return entry;
 }
 
@@ -71,6 +75,11 @@ export function abortAreaGestures(root: object | null | undefined): void {
   const bucket = areaGestureBuckets.get(root);
   if (bucket == null) return;
   for (const entry of [...bucket]) entry.abort();
+}
+
+/** Abort every in-flight area draw/move/resize and drop window listeners. */
+export function abortAllAreaGestures(): void {
+  for (const entry of [...liveAreaGestures]) entry.abort();
 }
 
 function resizeAreaBox(

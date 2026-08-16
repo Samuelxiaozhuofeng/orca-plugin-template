@@ -183,9 +183,16 @@ export function startPageBoardRedirect(): () => void {
   }
   schedule();
   return () => {
-    redirectActive = false;
-    unsub?.();
     if (timer != null) clearTimeout(timer);
-    fetchInflight.clear();
+    unsub?.();
+    resetPageBoardRedirectState();
   };
+}
+
+export function resetPageBoardRedirectState(): void {
+  redirectActive = false;
+  suppressed.clear();
+  redirected.clear();
+  fetchFailedUntil.clear();
+  fetchInflight.clear();
 }

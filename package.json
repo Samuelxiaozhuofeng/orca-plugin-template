@@ -1,10 +1,17 @@
 {
-  "name": "orca-whiteboard",
-  "version": "0.0.0",
+  "name": "orca-plugin-whiteboard",
+  "version": "0.1.0",
+  "description": "Heptabase-style whiteboard for Orca Note: live-editable cards on an infinite canvas, with hand-drawn arrows that can become real note references.",
+  "license": "MIT",
+  "author": "sam",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Samuelxiaozhuofeng/orca-plugin-whiteboard"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "NODE_ENV=production tsc && vite build",
+    "build": "tsc && vite build",
     "postbuild": "node scripts/deploy-dist.mjs",
     "test": "node --experimental-strip-types --test \"src/whiteboard/*.test.ts\"",
     "preview": "vite preview"

@@ -39,6 +39,7 @@ import {
 } from "./cardFitHeight";
 import { useCardAutoHeight } from "./useCardAutoHeight";
 import { invokeCollectSelectedOnActivePanel } from "./collectIntoBoardApply";
+import { CardErrorBoundary } from "./CardErrorBoundary";
 
 const { useEffect, useLayoutEffect, useRef } = window.React;
 
@@ -429,22 +430,24 @@ export function Card({
             </button>
           ) : null}
           {simplified ? null : (
-            <CardBody
-              panelId={panelId}
-              card={card}
-              treeRev={treeRev}
-              hosted={hosted}
-              editing={liveEditing}
-              noteGone={noteGone}
-              fillLoadError={fillLoadError}
-              shownNotice={shownNotice}
-              loadRetrying={loadRetrying}
-              isEmptyJournal={isEmptyJournal}
-              promotedKey={promotedKey}
-              onStartEdit={onStartEdit}
-              onRetryLoad={onRetryLoad}
-              onFocusCard={onFocusCard}
-            />
+            <CardErrorBoundary key={card.blockId}>
+              <CardBody
+                panelId={panelId}
+                card={card}
+                treeRev={treeRev}
+                hosted={hosted}
+                editing={liveEditing}
+                noteGone={noteGone}
+                fillLoadError={fillLoadError}
+                shownNotice={shownNotice}
+                loadRetrying={loadRetrying}
+                isEmptyJournal={isEmptyJournal}
+                promotedKey={promotedKey}
+                onStartEdit={onStartEdit}
+                onRetryLoad={onRetryLoad}
+                onFocusCard={onFocusCard}
+              />
+            </CardErrorBoundary>
           )}
           {showResize
             ? RESIZE_HANDLES.map((handle) => (
