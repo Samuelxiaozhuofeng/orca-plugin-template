@@ -1,3 +1,5 @@
+import { MEDIA_CARD_HEADER_H } from "./mediaCard.ts";
+
 export const MEDIA_CARD_CSS = `
 /* Media cards: drop outline chrome on the root media row and let the
    hosted media fill the body. Every rule is gated by .owb-card.is-media
@@ -11,6 +13,7 @@ export const MEDIA_CARD_CSS = `
 }
 
 .owb-card.is-media {
+  --owb-media-header-h: ${MEDIA_CARD_HEADER_H}px;
   transition:
     transform var(--owb-duration) var(--owb-ease),
     border-color var(--owb-duration) var(--owb-ease),
@@ -51,6 +54,20 @@ export const MEDIA_CARD_CSS = `
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
+}
+
+/* Video keeps a permanent strip for the title instead of letting it sit on
+   the picture. The strip is reserved even while the title is hidden, so
+   hovering never shifts or shrinks the player. */
+.owb-card.is-media.owb-card-media-video:not(.is-editing):not(.is-simplified) .owb-card-header {
+  box-sizing: border-box;
+  height: var(--owb-media-header-h);
+  overflow: hidden;
+  background: none;
+}
+
+.owb-card.is-media.owb-card-media-video:not(.is-editing):not(.is-simplified) .owb-card-body {
+  padding-top: var(--owb-media-header-h);
 }
 
 .owb-card.is-media .owb-card-handle {

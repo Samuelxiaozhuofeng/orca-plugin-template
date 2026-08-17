@@ -10,7 +10,10 @@ import {
   MEDIA_CARD_HEIGHT_VIDEO,
   MEDIA_CARD_KINDS,
   MEDIA_CARD_WIDTH,
+  mediaCardKindOf,
   mediaCardSize,
+  mediaCardWatchIds,
+  mediaBlockHasContentChildren,
   mediaKindOfBlock,
   type MediaCardKind,
 } from "./mediaCard.ts";
@@ -123,5 +126,64 @@ check(
   MEDIA_CARD_HEIGHT_AUDIO < MIN_CARD_HEIGHT,
   "audio raw default is below the floor (documents the clamp)",
 );
+
+// Media blocks with real child content keep ordinary card chrome.
+{
+  const video = { _repr: { type: "video" }, children: [2, 3] };
+  const bare = { _repr: { type: "video" } };
+  const empties = { 2: { children: [] }, 3: { text: "   " } };
+  const filled = { 2: { children: [] }, 3: { text: "a note" } };
+  const nested = { 2: { children: [] }, 3: { children: [4] } };
+  const frags = { 2: { content: [{ t: "t", v: "hi" }] } };
+
+  check(
+    mediaBlockHasContentChildren(video, empties) === false,
+    "empty children do not count as content",
+  );
+  check(
+    mediaBlockHasContentChildren(video, filled) === true,
+    "a child with text counts as content",
+  );
+  check(
+    mediaBlockHasContentChildren(video, nested) === true,
+    "a child with its own children counts as content",
+  );
+  check(
+    mediaBlockHasContentChildren({ _repr: { type: "video" }, children: [2] }, frags) === true,
+    "a child with content fragments counts as content",
+  );
+  check(
+    mediaBlockHasContentChildren(bare, filled) === false,
+    "a childless media block has no child content",
+  );
+
+  check(
+    mediaCardKindOf(1, { 1: bare }) === "video",
+    "a bare video block still renders as a media card",
+  );
+  check(
+    mediaCardKindOf(1, { 1: video, ...empties }) === "video",
+    "empty children keep the media look",
+  );
+  check(
+    mediaCardKindOf(1, { 1: video, ...filled }) === null,
+    "child content turns the card back into an ordinary card",
+  );
+  check(
+    mediaCardKindOf(1, { 1: { _repr: { type: "text" } } }) === null,
+    "a non-media block is never a media card",
+  );
+  check(mediaCardKindOf(1, null) === null, "missing blocks are not media");
+
+  check(
+    mediaCardWatchIds(1, { 1: video }).join(",") === "1,2,3",
+    "the watch set covers the media block and its children",
+  );
+  check(
+    mediaCardWatchIds(1, { 1: bare }).join(",") === "1",
+    "a childless media block watches only itself",
+  );
+  check(mediaCardWatchIds(1, null).join(",") === "1", "missing blocks watch the root");
+}
 
 console.log("mediaCard.test.ts ok");

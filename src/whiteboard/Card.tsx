@@ -19,7 +19,7 @@ import { type WhiteboardCard } from "./data";
 import type { ArrangeAction } from "./selection";
 import { isHostOverlayTarget } from "./hostOverlay";
 import { useCardBlockView, useWatchedValue } from "./blockWatch";
-import { mediaKindOfBlock } from "./mediaCard";
+import { mediaCardKindOf, mediaCardWatchIds } from "./mediaCard";
 import { CardBody, openBoardFromCardEvent } from "./BoardCardBody";
 import { CARD_ROW_FOCUS_CLASS } from "./cardRowOnBoard";
 import {
@@ -143,8 +143,10 @@ export function Card({
 
   const hosted = useCardBlockView(card.blockId, treeRev);
   const mediaKind = useWatchedValue(
-    () => mediaKindOfBlock(orca.state.blocks[card.blockId]),
-    () => [card.blockId],
+    // Media chrome is dropped only for a bare media block. Once it carries
+    // child content, the card needs its normal frame and title back.
+    () => mediaCardKindOf(card.blockId, orca.state.blocks),
+    () => mediaCardWatchIds(card.blockId, orca.state.blocks),
     [card.blockId],
   );
   const isBoardCard = hosted.board != null;

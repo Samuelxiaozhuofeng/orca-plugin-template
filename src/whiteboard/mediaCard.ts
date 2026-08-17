@@ -17,8 +17,14 @@ export const MEDIA_CARD_KINDS: readonly MediaCardKind[] = [
 /** Same width as ordinary cards so layout / snap stay aligned. */
 export const MEDIA_CARD_WIDTH = CARD_WIDTH;
 
-/** 16:9 frame. */
-export const MEDIA_CARD_HEIGHT_VIDEO = 191;
+/**
+ * Height of the title strip a video card reserves above its player, so the
+ * title never lands on top of the video when the frame appears on hover.
+ * Mirrored by `--owb-media-header-h` in mediaCardStyles.
+ */
+export const MEDIA_CARD_HEADER_H = 36;
+/** 16:9 frame plus the reserved title strip. */
+export const MEDIA_CARD_HEIGHT_VIDEO = 191 + MEDIA_CARD_HEADER_H;
 /** 4:3 fallback when the image ratio is unknown. */
 export const MEDIA_CARD_HEIGHT_IMAGE = 255;
 /** Single-row player. Clamped up to MIN_CARD_HEIGHT when applied. */
@@ -74,6 +80,79 @@ export function mediaKindOfBlock(block: unknown): MediaCardKind | null {
   } catch {
     return null;
   }
+}
+
+export type MediaBlockLookup = {
+  readonly [id: number]: unknown;
+};
+
+function hasOwnContent(block: unknown): boolean {
+  if (block == null || typeof block !== "object") return false;
+  const rec = block as { text?: unknown; content?: unknown; children?: unknown };
+  if (typeof rec.text === "string" && rec.text.trim().length > 0) return true;
+  if (Array.isArray(rec.content) && rec.content.length > 0) return true;
+  // A child that only carries children of its own still counts as content.
+  return Array.isArray(rec.children) && rec.children.length > 0;
+}
+
+/**
+ * True when a media block carries child blocks that actually hold something.
+ * Such a block is more note than media, so it keeps ordinary card chrome.
+ * Empty placeholder children (created and never filled) do not count.
+ */
+export function mediaBlockHasContentChildren(
+  block: unknown,
+  blocks: MediaBlockLookup | null | undefined,
+): boolean {
+  try {
+    if (block == null || typeof block !== "object") return false;
+    const children = (block as { children?: unknown }).children;
+    if (!Array.isArray(children) || children.length === 0) return false;
+    if (blocks == null || typeof blocks !== "object") return false;
+    return children.some((id) => {
+      const childId = Number(id);
+      if (!Number.isFinite(childId)) return false;
+      return hasOwnContent(blocks[childId]);
+    });
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The media kind a *card* should render as. Null means "render as an ordinary
+ * card": either the block is not media, or it has real child content below the
+ * media, which needs the normal frame and title.
+ */
+export function mediaCardKindOf(
+  blockId: number,
+  blocks: MediaBlockLookup | null | undefined,
+): MediaCardKind | null {
+  const block = blocks?.[blockId];
+  const kind = mediaKindOfBlock(block);
+  if (kind == null) return null;
+  return mediaBlockHasContentChildren(block, blocks) ? null : kind;
+}
+
+/** Blocks whose changes can flip `mediaCardKindOf` for this card. */
+export function mediaCardWatchIds(
+  blockId: number,
+  blocks: MediaBlockLookup | null | undefined,
+): number[] {
+  const ids = [blockId];
+  try {
+    const children = (blocks?.[blockId] as { children?: unknown } | undefined)
+      ?.children;
+    if (Array.isArray(children)) {
+      for (const id of children) {
+        const childId = Number(id);
+        if (Number.isFinite(childId)) ids.push(childId);
+      }
+    }
+  } catch {
+    // Fall back to watching the root alone.
+  }
+  return ids;
 }
 
 export function mediaCardSize(kind: MediaCardKind): { w: number; h: number } {
