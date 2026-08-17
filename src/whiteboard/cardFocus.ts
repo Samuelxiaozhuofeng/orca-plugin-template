@@ -28,11 +28,17 @@ export type CanvasFocusApi = {
   focusCard: (cardBlockId: DbId) => boolean;
   /** Frames every card on the board. False when there is nothing to frame. */
   fitAll: () => boolean;
-  /** Frames the given boxes (selection, or any subset). */
+  /** Frames the given boxes (selection, or any subset).
+   * `fit` overrides the defaults: it is how the slideshow zooms a small card
+   * past 100% instead of merely centring it. */
   fitBoxes: (
     boxes: readonly Pick<WhiteboardCard, "x" | "y" | "w" | "h">[],
+    fit?: FitOptions,
   ) => boolean;
 };
+
+/** Padding and zoom ceiling for one fit. Omitted fields keep the defaults. */
+export type FitOptions = { padding?: number; maxScale?: number };
 
 export function focusView(
   card: Pick<WhiteboardCard, "x" | "y" | "w" | "h">,
@@ -197,9 +203,10 @@ export function applyCanvasFitBoxes(opts: {
   grid: HTMLElement | null;
   viewportEl: HTMLElement | null;
   onViewChange: (view: CanvasView) => void;
+  fit?: FitOptions;
 }): boolean {
   const viewport = liveViewportSize(opts.viewportEl) ?? opts.viewport;
-  const next = fitViewForBoxes(opts.boxes, viewport);
+  const next = fitViewForBoxes(opts.boxes, viewport, opts.fit);
   if (next == null) return false;
   beginViewAnimation(opts.canvas, opts.grid, opts.viewportEl);
   opts.onViewChange(next);
@@ -252,7 +259,7 @@ export function useCanvasFocusApi(
           viewportEl: viewportRef.current,
           onViewChange,
         }),
-      fitBoxes: (boxes) =>
+      fitBoxes: (boxes, fit) =>
         applyCanvasFitBoxes({
           boxes,
           viewport: viewportSize,
@@ -260,6 +267,7 @@ export function useCanvasFocusApi(
           grid: gridRef.current,
           viewportEl: viewportRef.current,
           onViewChange,
+          fit,
         }),
     };
     return () => {

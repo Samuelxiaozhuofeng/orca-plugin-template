@@ -2,6 +2,7 @@ import type { DbId } from "../orca.d.ts";
 import { type WhiteboardArea } from "./areas.ts";
 import type { WhiteboardKeyActions } from "./canvasKeys.ts";
 import type { CanvasFocusApi } from "./cardFocus.ts";
+import { MAX_SCALE } from "./layout.ts";
 import type { WhiteboardCard } from "./data.ts";
 import {
   buildSlides,
@@ -14,6 +15,12 @@ import {
 import type { CanvasView } from "./viewTransform.ts";
 
 const { useCallback, useEffect, useMemo, useRef, useState } = window.React;
+
+/** A presented slide or card should fill the screen, so unlike the toolbar's
+ * "fit" these lift the 100% ceiling all the way to the canvas maximum. A single
+ * card gets more breathing room than a whole section. */
+const SLIDE_FIT = { padding: 48, maxScale: MAX_SCALE };
+const CARD_FIT = { padding: 72, maxScale: MAX_SCALE };
 
 export type PresentationState = {
   active: boolean;
@@ -81,13 +88,14 @@ export function usePresentation(opts: {
       const slide = currentSlides[cur.slideIndex];
       if (!slide) return;
       if (cur.cardIndex === -1) {
-        focusApiRef.current?.fitBoxes([slide.box]);
+        focusApiRef.current?.fitBoxes([slide.box], SLIDE_FIT);
       } else {
         const card = slide.cards[cur.cardIndex];
         if (card != null) {
-          focusApiRef.current?.fitBoxes([
-            { x: card.x, y: card.y, w: card.w, h: card.h },
-          ]);
+          focusApiRef.current?.fitBoxes(
+            [{ x: card.x, y: card.y, w: card.w, h: card.h }],
+            CARD_FIT,
+          );
         }
       }
     },
