@@ -10,6 +10,16 @@ const { useEffect } = window.React;
 
 const CARET_MAX_FRAMES = 20;
 
+/**
+ * Orca's block editor is a single `contenteditable="plaintext-only"` host —
+ * NOT `contenteditable="true"`, and its inner rows carry `contenteditable=
+ * "false"`. Matching on `"true"` finds nothing inside a card, which is what
+ * used to leave the caret wherever Orca put it (the start of the block).
+ */
+export const EDITABLE_ONLY_SELECTOR =
+  '[contenteditable]:not([contenteditable="false"])';
+export const EDITABLE_SELECTOR = `${EDITABLE_ONLY_SELECTOR}, input, textarea`;
+
 const CLICK_EDIT_BLOCK =
   `.owb-card-header, .owb-card-journal-badge, .owb-card-handle, .owb-card-floating-toolbar, .owb-card-load-error, .${CARD_ROW_FOCUS_CLASS}, .${CARD_BACK_CLASS}`;
 
@@ -41,7 +51,10 @@ export function isCardBodyClickEdit(input: CardClickEditInput): boolean {
   return !isOnCardScrollbar(input.target, input.clientX, input.clientY);
 }
 
-type PendingCaret = { blockId: DbId; x: number; y: number };
+type PendingCaret = { blockId: DbId; x: number; y: number; at: number };
+
+/** A click point older than this belongs to a previous edit, not this one. */
+const CARET_TTL_MS = 3_000;
 
 let pendingCaret: PendingCaret | null = null;
 
@@ -50,16 +63,32 @@ export function requestCardEditCaret(
   clientX: number,
   clientY: number,
 ): void {
-  pendingCaret = { blockId, x: clientX, y: clientY };
+  pendingCaret = { blockId, x: clientX, y: clientY, at: Date.now() };
 }
 
-function takePendingCardEditCaret(
+/**
+ * The click that opened this card's editor, if it is still fresh.
+ *
+ * Deliberately non-consuming: both the editor's initial focus click and the
+ * follow-up caret loop need the same point. Whoever reads it first must not
+ * leave the other one aiming at the first line instead.
+ */
+export function readPendingCardEditCaret(
   blockId: DbId,
 ): { x: number; y: number } | null {
   if (pendingCaret == null || pendingCaret.blockId !== blockId) return null;
-  const next = { x: pendingCaret.x, y: pendingCaret.y };
-  pendingCaret = null;
-  return next;
+  if (Date.now() - pendingCaret.at > CARET_TTL_MS) {
+    pendingCaret = null;
+    return null;
+  }
+  return { x: pendingCaret.x, y: pendingCaret.y };
+}
+
+/** Drop the stored point once this card is done with it. */
+export function clearPendingCardEditCaret(blockId: DbId): void {
+  if (pendingCaret != null && pendingCaret.blockId === blockId) {
+    pendingCaret = null;
+  }
 }
 
 /** Same threshold as card drag: fire `onClick` only if the pointer stayed put. */
@@ -91,7 +120,7 @@ export function watchPointerClick(opts: {
 function nodeIsEditable(node: Node): boolean {
   const el = node instanceof Element ? node : node.parentElement;
   if (el == null) return false;
-  if (el.closest('[contenteditable="true"]') != null) return true;
+  if (el.closest(EDITABLE_ONLY_SELECTOR) != null) return true;
   return el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement;
 }
 
@@ -165,7 +194,7 @@ function tryPlaceCaretAtPoint(
         ? range.startContainer
         : range.startContainer.parentElement;
     const editable = host?.closest(
-      '[contenteditable="true"], input, textarea',
+      EDITABLE_SELECTOR,
     );
     if (editable instanceof HTMLElement) {
       editable.focus({ preventScroll: true });
@@ -187,7 +216,7 @@ function hitEditorAtPoint(
     if (root == null) return false;
     const hit = document.elementFromPoint(clientX, clientY);
     if (!(hit instanceof Element) || !root.contains(hit)) return false;
-    const editable = hit.closest('[contenteditable="true"], input, textarea');
+    const editable = hit.closest(EDITABLE_SELECTOR);
     if (!(editable instanceof HTMLElement)) return false;
     const opts = {
       bubbles: true,
@@ -213,7 +242,7 @@ export function useCardClickCaret(
 ): void {
   useEffect(() => {
     if (!editing) return;
-    const pending = takePendingCardEditCaret(blockId);
+    const pending = readPendingCardEditCaret(blockId);
     if (pending == null) return;
     let frames = 0;
     let raf = 0;
@@ -238,6 +267,9 @@ export function useCardClickCaret(
       raf = window.requestAnimationFrame(tick);
     };
     raf = window.requestAnimationFrame(tick);
-    return () => window.cancelAnimationFrame(raf);
+    return () => {
+      window.cancelAnimationFrame(raf);
+      clearPendingCardEditCaret(blockId);
+    };
   }, [blockId, cardRef, editing]);
 }

@@ -5,6 +5,7 @@ import type { CardBlockView } from "./blockWatch";
 import { CardBlockTree } from "./CardBlockTree";
 import { CardEditor } from "./CardEditor";
 import { CardLoadNotice } from "./CardLoadNotice";
+import { requestCardEditCaret } from "./cardClickEdit";
 import type { CardLoadCause, CardLoadScope } from "./cardTreeLoad";
 import { CARD_ROW_FOCUS_CLASS } from "./cardRowOnBoard";
 import { openBoard, type WhiteboardCard } from "./data";
@@ -127,6 +128,9 @@ export function CardBody({
           orca.notify("info", t("This note is gone"));
           return;
         }
+        // Double-click enters edit too — aim its caret the same way a single
+        // click does, instead of dropping it at the top of the card.
+        requestCardEditCaret(card.blockId, event.clientX, event.clientY);
         onStartEdit(card.blockId);
       }}
     >

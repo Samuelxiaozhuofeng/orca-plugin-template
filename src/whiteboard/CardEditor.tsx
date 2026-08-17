@@ -2,6 +2,10 @@ import type { DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n";
 import { CardErrorBoundary } from "./CardErrorBoundary";
 import { markCardEditorInput, parkCardEditorHost } from "./cardEditorFlush";
+import {
+  EDITABLE_SELECTOR,
+  readPendingCardEditCaret,
+} from "./cardClickEdit";
 
 const { useLayoutEffect, useRef } = window.React;
 const { useSnapshot } = window.Valtio;
@@ -9,13 +13,37 @@ const { useSnapshot } = window.Valtio;
 /** First visible editable line inside the card editor (hidden chrome skipped). */
 function firstEditableLine(root: HTMLElement): HTMLElement | null {
   const candidates = root.querySelectorAll<HTMLElement>(
-    '[contenteditable="true"], input, textarea',
+    EDITABLE_SELECTOR,
   );
   for (const node of Array.from(candidates)) {
     const rect = node.getBoundingClientRect();
     if (rect.width > 0 && rect.height > 0) return node;
   }
   return null;
+}
+
+/**
+ * The editable line under the click that opened this editor, if the click
+ * point still lands inside it. Null means "no usable point — use the first
+ * line", e.g. the click was on the card's padding or the layout has shifted.
+ */
+function editableAtClick(
+  host: HTMLElement,
+  blockId: DbId,
+): { el: HTMLElement; x: number; y: number } | null {
+  const point = readPendingCardEditCaret(blockId);
+  if (point == null) return null;
+  try {
+    const hit = document.elementFromPoint(point.x, point.y);
+    if (!(hit instanceof Element) || !host.contains(hit)) return null;
+    const editable = hit.closest<HTMLElement>(
+      EDITABLE_SELECTOR,
+    );
+    if (editable == null || !host.contains(editable)) return null;
+    return { el: editable, x: point.x, y: point.y };
+  } catch {
+    return null;
+  }
 }
 
 /** Hosts Orca's live BlockPanel inside a card and tracks typing for flush-on-exit. */
@@ -75,15 +103,19 @@ export function CardEditor({
     const focusEditor = () => {
       if (cancelled) return;
       attempts += 1;
-      const target = firstEditableLine(host);
+      // Aim the focus click at wherever the user clicked. Falling back to the
+      // first line is what used to park the caret at the very start of the
+      // card no matter where the click landed.
+      const aimed = editableAtClick(host, blockId);
+      const target = aimed?.el ?? firstEditableLine(host);
       if (target == null) {
         if (attempts < 20) timer = window.setTimeout(focusEditor, 25);
         return;
       }
       target.focus({ preventScroll: true });
       const rect = target.getBoundingClientRect();
-      const clientX = rect.left + 2;
-      const clientY = rect.top + Math.min(10, rect.height / 2);
+      const clientX = aimed?.x ?? rect.left + 2;
+      const clientY = aimed?.y ?? rect.top + Math.min(10, rect.height / 2);
       try {
         const opts = {
           bubbles: true,
