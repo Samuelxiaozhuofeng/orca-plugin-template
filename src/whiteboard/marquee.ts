@@ -128,10 +128,18 @@ export function startMarquee(opts: {
   let last: { x: number; y: number } = { x: opts.startX, y: opts.startY };
 
   opts.viewport.classList.add("is-marqueeing");
+  // `is-selected` is owned by React (Card.tsx). Clearing it imperatively here is
+  // only a preview of the pending selection, so remember what we cleared and put
+  // it back when the gesture ends — otherwise a card that stays selected keeps
+  // the class stripped, since React's diff sees no className change to re-apply.
+  const clearedSelection: HTMLElement[] = [];
   if (!opts.additive) {
-    opts.canvas.querySelectorAll(".owb-card.is-selected").forEach((el) => {
-      el.classList.remove("is-selected");
-    });
+    opts.canvas
+      .querySelectorAll<HTMLElement>(".owb-card.is-selected")
+      .forEach((el) => {
+        el.classList.remove("is-selected");
+        clearedSelection.push(el);
+      });
   }
 
   const paint = () => {
@@ -155,6 +163,8 @@ export function startMarquee(opts: {
     opts.viewport.classList.remove("is-marqueeing");
     paintMarquee(opts.marqueeEl, null);
     clearMarqueeHits(opts.canvas);
+    for (const el of clearedSelection) el.classList.add("is-selected");
+    clearedSelection.length = 0;
   };
 
   const onMove = (event: MouseEvent) => {
