@@ -28,6 +28,8 @@ type Props = {
   setView: (
     next: CanvasView | ((current: CanvasView) => CanvasView),
   ) => void;
+  slideCount?: number;
+  onStartPresent?: () => void;
 };
 
 export function BoardToolbar({
@@ -41,6 +43,8 @@ export function BoardToolbar({
   onPlace,
   onFitView,
   setView,
+  slideCount = 0,
+  onStartPresent,
 }: Props) {
   const filter = useCardFilterControls(blockId);
   const popoverRef = useRef<HTMLDivElement | null>(null);
@@ -113,6 +117,20 @@ export function BoardToolbar({
         </button>
         {filter.open ? <CardFilterPopover controls={filter} /> : null}
       </div>
+      <div className="owb-toolbar-sep" />
+      <button
+        type="button"
+        className="owb-toolbar-btn"
+        disabled={slideCount === 0}
+        title={
+          slideCount === 0
+            ? t("Add sections to the slideshow first")
+            : t("Start slideshow")
+        }
+        onClick={onStartPresent}
+      >
+        <i className="ti ti-presentation" />
+      </button>
       <div className="owb-toolbar-sep" />
       <div className="owb-zoom">
         <button

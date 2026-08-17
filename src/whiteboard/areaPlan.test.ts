@@ -35,7 +35,7 @@ if (planned != null) {
 
 check(planAreaFromCards([]) == null, "no selection yields no area");
 check(planWrapAreaFromCards([]) == null, "wrap of 0 cards yields no area");
-check(planWrapAreaFromCards([a]) == null, "wrap of 1 card yields no area");
+check(planWrapAreaFromCards([a]) != null, "wrap of 1 card yields an area");
 check(planWrapAreaFromCards([a, b]) != null, "wrap of 2 cards yields an area");
 
 const frame: WhiteboardArea = {

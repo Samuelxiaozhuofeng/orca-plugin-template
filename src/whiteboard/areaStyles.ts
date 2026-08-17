@@ -78,6 +78,26 @@ export const AREA_CSS = `
   background: color-mix(in oklab, var(--orca-color-bg-1) 82%, transparent);
 }
 
+.owb-area-slide {
+  flex: none;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 3px;
+  margin-right: 1px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--orca-color-text-1);
+  background: color-mix(in oklab, var(--owb-area-ink) 22%, transparent);
+  border: 1px solid color-mix(in oklab, var(--owb-area-ink) 55%, transparent);
+  user-select: none;
+}
+
 .owb-area-title-text {
   min-width: 0;
   overflow: hidden;
@@ -170,5 +190,11 @@ export const AREA_CSS = `
 .owb-toolbar-btn.is-active {
   background: color-mix(in oklab, var(--orca-color-primary-5, #00a896) 22%, transparent);
   border-color: var(--orca-color-primary-5, #00a896);
+}
+
+.owb-panel.is-presenting .owb-area-collapse,
+.owb-panel.is-presenting .owb-area-color,
+.owb-panel.is-presenting .owb-area-handle {
+  display: none;
 }
 `.trim();

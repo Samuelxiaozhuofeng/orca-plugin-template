@@ -35,6 +35,8 @@ export type WhiteboardArea = {
   color?: AreaColorId;
   /** Present only when collapsed. Omitted = expanded. */
   collapsed?: true;
+  /** Present only when the area is part of the slide sequence. */
+  slide?: number;
 };
 
 function asFinite(value: unknown): number | null {
@@ -45,6 +47,13 @@ function asFinite(value: unknown): number | null {
 export function areaColorIfValid(value: unknown): AreaColorId | undefined {
   return typeof value === "string" && AREA_COLOR_SET.has(value)
     ? (value as AreaColorId)
+    : undefined;
+}
+
+/** Finite integer >= 1. Invalid / non-positive / non-integer / string → undefined. */
+export function slideNumberIfValid(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isInteger(value) && value >= 1
+    ? value
     : undefined;
 }
 
@@ -72,6 +81,8 @@ export function normalizeArea(value: unknown): WhiteboardArea | null {
   const color = areaColorIfValid(raw.color);
   if (color != null) area.color = color;
   if (raw.collapsed === true) area.collapsed = true;
+  const slide = slideNumberIfValid(raw.slide);
+  if (slide != null) area.slide = slide;
   return area;
 }
 
@@ -137,7 +148,8 @@ function areaEqual(left: WhiteboardArea, right: WhiteboardArea): boolean {
     left.h === right.h &&
     left.name === right.name &&
     left.color === right.color &&
-    left.collapsed === right.collapsed
+    left.collapsed === right.collapsed &&
+    left.slide === right.slide
   );
 }
 
@@ -216,11 +228,11 @@ export function planAreaFromCards(
   };
 }
 
-/** Wrap-into-section requires two or more cards. */
+/** Wrap-into-section needs at least one card. */
 export function planWrapAreaFromCards(
   cards: ReadonlyArray<{ x: number; y: number; w: number; h: number }>,
 ): { x: number; y: number; w: number; h: number } | null {
-  if (cards.length < 2) return null;
+  if (cards.length < 1) return null;
   return planAreaFromCards(cards);
 }
 

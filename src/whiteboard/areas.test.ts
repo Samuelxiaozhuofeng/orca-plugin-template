@@ -111,4 +111,14 @@ check(
   "legacy board without areas stays readable",
 );
 
+const validSlide = tryParseAreas([area("area-1", { slide: 1 })]);
+check(isOk(validSlide) && validSlide.value[0].slide === 1, "valid slide is kept");
+
+for (const invalid of [0, -1, 1.5, "2", Number.NaN, Infinity, -Infinity, null]) {
+  const res = tryParseAreas([area("area-1", { slide: invalid })]);
+  check(isOk(res), `invalid slide ${String(invalid)} does not protect`);
+  check(isOk(res) && res.value[0].slide === undefined, `invalid slide ${String(invalid)} is omitted`);
+  check(isOk(res) && !("slide" in res.value[0]), `invalid slide ${String(invalid)} has no slide key`);
+}
+
 console.log("areas.test.ts ok");

@@ -29,7 +29,9 @@ export type CanvasFocusApi = {
   /** Frames every card on the board. False when there is nothing to frame. */
   fitAll: () => boolean;
   /** Frames the given boxes (selection, or any subset). */
-  fitBoxes: (boxes: readonly WhiteboardCard[]) => boolean;
+  fitBoxes: (
+    boxes: readonly Pick<WhiteboardCard, "x" | "y" | "w" | "h">[],
+  ) => boolean;
 };
 
 export function focusView(

@@ -14,6 +14,7 @@ import { EDGE_CSS } from "./edgeStyles";
 import { PANEL_CSS } from "./panelStyles";
 import { SELECTION_TOOLBAR_CSS } from "./selectionToolbarStyles";
 import { RELATION_MAP_CSS } from "./relationMapStyles";
+import { PRESENT_CSS } from "./presentStyles";
 
 export const WHITEBOARD_CSS_ROLE = "whiteboard.canvas.styles";
 
@@ -49,6 +50,7 @@ export const WHITEBOARD_CSS = [
   BOARD_TITLE_CSS,
   SELECTION_TOOLBAR_CSS,
   RELATION_MAP_CSS,
+  PRESENT_CSS,
 ].join("\n");
 
 export function injectWhiteboardStyles(): void {

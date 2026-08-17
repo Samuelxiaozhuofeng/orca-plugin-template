@@ -35,6 +35,7 @@ import {
   formatZoomPercent,
   type CanvasView,
 } from "./viewTransform";
+import { usePresentation } from "./usePresentation";
 
 const { useCallback, useEffect, useLayoutEffect, useRef, useState } =
   window.React;
@@ -103,6 +104,16 @@ export default function BoardPanel({ panelId, blockId }: Props) {
   cardsRef.current = cards;
   edgesRef.current = edges;
   areasRef.current = areas;
+
+  const presentation = usePresentation({
+    areas,
+    cards,
+    view,
+    focusApiRef,
+    setView,
+  });
+  const presentingRef = useRef(presentation.active);
+  presentingRef.current = presentation.active;
 
   useEffect(() => {
     setDrawArea(false);
@@ -218,7 +229,9 @@ export default function BoardPanel({ panelId, blockId }: Props) {
     (next: CanvasView | ((current: CanvasView) => CanvasView)) => {
       setView((current: CanvasView) => {
         const resolved = typeof next === "function" ? next(current) : next;
-        if (blockId != null) scheduleRememberedView(blockId, resolved);
+        if (blockId != null && !presentingRef.current) {
+          scheduleRememberedView(blockId, resolved);
+        }
         return resolved;
       });
     },
@@ -295,7 +308,16 @@ export default function BoardPanel({ panelId, blockId }: Props) {
   }
 
   return (
-    <div ref={panelRef} className="owb-panel">
+    <div
+      ref={panelRef}
+      className={[
+        "owb-panel",
+        presentation.active ? "is-presenting" : "",
+        presentation.focusCardId != null ? "is-card-focus" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
       {protect ? (
         <div className="owb-protect-banner" role="alert">
           {formatProtectMessage(cardsRead, edgesRead, areasRead)}
@@ -327,22 +349,29 @@ export default function BoardPanel({ panelId, blockId }: Props) {
           setPlaceOpen(true);
         }}
         focusApiRef={focusApiRef}
+        presenting={presentation.active}
+        presentation={presentation}
+        presentFocusId={presentation.focusCardId}
       />
-      <BoardToolbar
-        blockId={blockId}
-        block={block}
-        historyTick={historyTick}
-        busy={busy}
-        zoomLabelRef={zoomLabelRef}
-        onUndo={onUndo}
-        onRedo={onRedo}
-        onPlace={() => {
-          setPlaceOrigin(null);
-          setPlaceOpen(true);
-        }}
-        onFitView={() => focusApiRef.current?.fitAll() ?? false}
-        setView={setViewAndRemember}
-      />
+      {!presentation.active ? (
+        <BoardToolbar
+          blockId={blockId}
+          block={block}
+          historyTick={historyTick}
+          busy={busy}
+          zoomLabelRef={zoomLabelRef}
+          onUndo={onUndo}
+          onRedo={onRedo}
+          onPlace={() => {
+            setPlaceOrigin(null);
+            setPlaceOpen(true);
+          }}
+          onFitView={() => focusApiRef.current?.fitAll() ?? false}
+          setView={setViewAndRemember}
+          slideCount={presentation.slides.length}
+          onStartPresent={presentation.start}
+        />
+      ) : null}
       <PlaceDialog
         visible={placeOpen}
         defaultColumns={defaultGridColumns(viewportWidth)}

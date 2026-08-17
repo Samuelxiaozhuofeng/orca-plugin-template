@@ -51,13 +51,21 @@ function stopChromePointer(event: React.SyntheticEvent): void {
   event.stopPropagation();
 }
 
-function AreaColorMenu({
-  color,
-  onPick,
+function AreaMenu({
+  area,
+  onPickColor,
+  onAddToSlides,
+  onMoveSlideEarlier,
+  onMoveSlideLater,
+  onRemoveFromSlides,
   close,
 }: {
-  color: string | undefined;
-  onPick: (next: string | undefined) => void;
+  area: WhiteboardArea;
+  onPickColor: (next: string | undefined) => void;
+  onAddToSlides: (id: string) => void;
+  onMoveSlideEarlier: (id: string) => void;
+  onMoveSlideLater: (id: string) => void;
+  onRemoveFromSlides: (id: string) => void;
   close: () => void;
 }) {
   return (
@@ -65,7 +73,7 @@ function AreaColorMenu({
       <orca.components.MenuTitle title={t("Section color")} />
       {COLOR_PRESETS.map((preset) => {
         const next = preset.id === "default" ? undefined : preset.id;
-        const active = (color ?? "default") === preset.id;
+        const active = (area.color ?? "default") === preset.id;
         return (
           <orca.components.MenuText
             key={preset.id}
@@ -73,11 +81,45 @@ function AreaColorMenu({
             preIcon={active ? "ti ti-check" : "ti ti-point"}
             onClick={() => {
               close();
-              onPick(next);
+              onPickColor(next);
             }}
           />
         );
       })}
+      <orca.components.MenuSeparator />
+      {area.slide != null ? (
+        <>
+          <orca.components.MenuText
+            title={t("Move slide earlier")}
+            onClick={() => {
+              close();
+              onMoveSlideEarlier(area.id);
+            }}
+          />
+          <orca.components.MenuText
+            title={t("Move slide later")}
+            onClick={() => {
+              close();
+              onMoveSlideLater(area.id);
+            }}
+          />
+          <orca.components.MenuText
+            title={t("Remove from slideshow")}
+            onClick={() => {
+              close();
+              onRemoveFromSlides(area.id);
+            }}
+          />
+        </>
+      ) : (
+        <orca.components.MenuText
+          title={t("Add to slideshow")}
+          onClick={() => {
+            close();
+            onAddToSlides(area.id);
+          }}
+        />
+      )}
     </orca.components.Menu>
   );
 }
@@ -98,6 +140,9 @@ function AreaBox({
   onMoveFrame,
   onSetColor,
   onToggleCollapsed,
+  onAddToSlides,
+  onMoveSlide,
+  onRemoveFromSlides,
 }: {
   area: WhiteboardArea;
   selected: boolean;
@@ -114,6 +159,9 @@ function AreaBox({
   onMoveFrame?: (boxes: Map<DbId, { x: number; y: number; w: number; h: number }>) => void;
   onSetColor: (id: string, color: string | undefined) => void;
   onToggleCollapsed: (id: string) => void;
+  onAddToSlides: (id: string) => void;
+  onMoveSlide: (id: string, delta: number) => void;
+  onRemoveFromSlides: (id: string) => void;
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const skipBlurRef = useRef(false);
@@ -217,9 +265,13 @@ function AreaBox({
       container={bodyRef}
       allowBeyondContainer
       menu={(close: () => void) => (
-        <AreaColorMenu
-          color={area.color}
-          onPick={(next) => onSetColor(area.id, next)}
+        <AreaMenu
+          area={area}
+          onPickColor={(next) => onSetColor(area.id, next)}
+          onAddToSlides={onAddToSlides}
+          onMoveSlideEarlier={(id) => onMoveSlide(id, -1)}
+          onMoveSlideLater={(id) => onMoveSlide(id, 1)}
+          onRemoveFromSlides={onRemoveFromSlides}
           close={close}
         />
       )}
@@ -241,6 +293,14 @@ function AreaBox({
             onMouseDown={onTitleMouseDown}
             onDoubleClick={onTitleDoubleClick}
           >
+            {area.slide != null ? (
+              <span
+                className="owb-area-slide"
+                title={t("Slide ${n}", { n: String(area.slide) })}
+              >
+                {area.slide}
+              </span>
+            ) : null}
             <button
               type="button"
               className="owb-area-collapse"
@@ -375,6 +435,9 @@ export function AreaLayer({
           onMoveFrame={onMoveFrame}
           onSetColor={chrome?.setColor ?? (() => {})}
           onToggleCollapsed={chrome?.toggleCollapsed ?? (() => {})}
+          onAddToSlides={chrome?.addToSlides ?? (() => {})}
+          onMoveSlide={chrome?.moveSlide ?? (() => {})}
+          onRemoveFromSlides={chrome?.removeFromSlides ?? (() => {})}
         />
       ))}
       <div ref={ghostRef} className="owb-area-ghost" hidden />

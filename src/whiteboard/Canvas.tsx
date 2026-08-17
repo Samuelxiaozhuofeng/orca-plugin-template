@@ -17,6 +17,7 @@ import {
   CanvasViewportOverlays,
   useCanvasOverlayState,
 } from "./CanvasOverlays";
+import { buildCanvasOverlayProps } from "./canvasOverlayProps";
 import { CanvasCards } from "./CanvasCards";
 import { EdgeLayer, type EdgeLayerApi } from "./EdgeLayer";
 import type { CardBox } from "./edgeGeometry";
@@ -34,6 +35,11 @@ import {
 import { useCanvasView } from "./useCanvasView";
 import { type CanvasView } from "./viewTransform";
 import { blurCardEditor } from "./cardEditorFlush";
+import { PresentOverlay } from "./PresentOverlay";
+import {
+  usePresentKeyActions,
+  type PresentationState,
+} from "./usePresentation";
 
 export type { CanvasView, CardPatchEntry };
 
@@ -68,6 +74,9 @@ type Props = {
   onViewportWidth: (width: number) => void;
   onPlaceJournalsAt: (origin: CanvasOrigin) => void;
   focusApiRef: { current: CanvasFocusApi | null };
+  presenting?: boolean;
+  presentation?: PresentationState;
+  presentFocusId?: DbId | null;
 };
 
 export function Canvas({
@@ -93,6 +102,9 @@ export function Canvas({
   onViewportWidth,
   onPlaceJournalsAt,
   focusApiRef,
+  presenting = false,
+  presentation,
+  presentFocusId,
 }: Props) {
   const editingRef = useRef<DbId | null>(null);
   const selectedRef = useRef<DbId[]>([]);
@@ -127,6 +139,7 @@ export function Canvas({
   const onFocusCard = useCallback((cardBlockId: DbId) => {
     focusApiRef.current?.focusCard(cardBlockId);
   }, []);
+  const isPresentingFn = useCallback(() => presenting, [presenting]);
 
   const {
     viewportRef,
@@ -145,7 +158,10 @@ export function Canvas({
     onViewportWidth,
     isEditing: () => editingRef.current != null,
     controlsMode: settings.mouseScheme,
+    isPresenting: isPresentingFn,
   });
+
+  const presentActions = usePresentKeyActions(presenting, presentation);
 
   const {
     editingId,
@@ -208,6 +224,7 @@ export function Canvas({
     focusApiRef,
     onViewChange,
     searchOpen: overlay.searchOpen || filter.open,
+    present: presentActions,
   });
 
   useLayoutEffect(() => {
@@ -305,7 +322,7 @@ export function Canvas({
     onDismissEdgeToolbar: dismissEdgeToolbar,
   });
 
-  const overlayProps = {
+  const overlayProps = buildCanvasOverlayProps({
     overlay,
     boardBlockId,
     cards,
@@ -322,12 +339,8 @@ export function Canvas({
     applyUnifySize,
     applyArrange,
     onWrapSelected: wrapSelected,
-    filterActive: filter.active,
-    filterTags: filter.query.tags,
-    filterMatched: filter.matchedCount,
-    filterTotal: filter.totalCount,
-    onClearFilter: filter.clear,
-  };
+    filter,
+  });
 
   return (
     <>
@@ -449,27 +462,38 @@ export function Canvas({
             onExtractRow={extractRow}
             onWrapSelected={wrapSelected}
             onFocusCard={onFocusCard}
+            presentFocusId={presentFocusId ?? presentation?.focusCardId ?? null}
           />
         </div>
         <div ref={guidesRef} className="owb-guides" />
         <div ref={marqueeRef} className="owb-marquee" hidden />
-        <CanvasViewportOverlays
-          {...overlayProps}
-          edgeDrop={edgeDrop}
-          hiddenCardCount={hiddenCardCount}
-          shownCount={shownCards.length}
-          refEdgesTruncated={refEdgesTruncated}
-          onCloseEdgeDrop={closeEdgeDrop}
-        />
+        {presenting && presentation ? (
+          <PresentOverlay
+            cursor={presentation.cursor}
+            slides={presentation.slides}
+            onExit={presentation.stop}
+          />
+        ) : (
+          <CanvasViewportOverlays
+            {...overlayProps}
+            edgeDrop={edgeDrop}
+            hiddenCardCount={hiddenCardCount}
+            shownCount={shownCards.length}
+            refEdgesTruncated={refEdgesTruncated}
+            onCloseEdgeDrop={closeEdgeDrop}
+          />
+        )}
       </div>
-      <CanvasHostOverlays
-        {...overlayProps}
-        onPlaceJournalsAt={onPlaceJournalsAt}
-        onStartDrawArea={onStartDrawArea}
-        createBlankAt={createBlankAt}
-        createMediaAt={createMediaAt}
-        selectCards={selectCards}
-      />
+      {!presenting ? (
+        <CanvasHostOverlays
+          {...overlayProps}
+          onPlaceJournalsAt={onPlaceJournalsAt}
+          onStartDrawArea={onStartDrawArea}
+          createBlankAt={createBlankAt}
+          createMediaAt={createMediaAt}
+          selectCards={selectCards}
+        />
+      ) : null}
     </>
   );
 }

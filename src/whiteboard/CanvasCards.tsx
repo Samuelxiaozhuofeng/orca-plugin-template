@@ -34,6 +34,7 @@ type Props = {
   onExtractRow: (blockId: DbId, sourceCard: WhiteboardCard) => void;
   onWrapSelected: () => void;
   onFocusCard: (blockId: DbId) => void;
+  presentFocusId?: DbId | null;
 };
 
 export function CanvasCards({
@@ -58,6 +59,7 @@ export function CanvasCards({
   onExtractRow,
   onWrapSelected,
   onFocusCard,
+  presentFocusId,
 }: Props) {
   const promotedKey = cardIdsKey(cards);
   const cardTrees = useVisibleCardTrees(
@@ -120,6 +122,7 @@ export function CanvasCards({
           onFocusCard={onFocusCard}
           onExtractRow={onExtractRow}
           onWrapSelected={onWrapSelected}
+          presentFocusId={presentFocusId}
         />
       ))}
     </>

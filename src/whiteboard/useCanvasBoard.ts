@@ -37,6 +37,7 @@ import {
   registerCollectSelectedAction,
 } from "./collectIntoBoardApply";
 import { dropCardsOntoBoard } from "./dropOntoBoardApply";
+import type { WhiteboardKeyActions } from "./canvasKeys";
 
 const { useCallback, useEffect, useMemo, useRef, useState } = window.React;
 
@@ -78,6 +79,7 @@ type Args = {
   searchOpen: boolean;
   /** Extra ids that must drop out of selection (tag filter). */
   inoperableIds?: ReadonlySet<DbId> | null;
+  present?: WhiteboardKeyActions["present"];
 };
 
 export function useCanvasBoard({
@@ -111,6 +113,7 @@ export function useCanvasBoard({
   onViewChange,
   searchOpen,
   inoperableIds,
+  present,
 }: Args) {
   const [editingId, setEditingId] = useState<DbId | null>(null);
   const [selected, setSelected] = useState<DbId[]>([]);
@@ -459,6 +462,7 @@ export function useCanvasBoard({
     setSelectedEdge,
     endEdit,
     onViewChange,
+    present,
   });
 
   return {

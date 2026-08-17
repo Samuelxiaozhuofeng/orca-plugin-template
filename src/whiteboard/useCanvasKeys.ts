@@ -3,6 +3,7 @@ import { canRedo, canUndo } from "./boardHistory";
 import {
   handleWhiteboardKey,
   isWhiteboardShortcutTarget,
+  type WhiteboardKeyActions,
 } from "./canvasKeys";
 import type { CanvasFocusApi } from "./cardFocus";
 import { planColorPatches } from "./cardBatch";
@@ -40,6 +41,7 @@ export function useCanvasKeys(opts: {
   setSelectedEdge: (id: string | null) => void;
   endEdit: () => void;
   onViewChange: (view: CanvasView) => void;
+  present?: WhiteboardKeyActions["present"];
 }): void {
   const optsRef = useRef(opts);
   optsRef.current = opts;
@@ -64,6 +66,7 @@ export function useCanvasKeys(opts: {
       handleWhiteboardKey(
         event,
         {
+          present: ctx.present,
           nudge: (dx, dy) => {
             const ids = new Set<DbId>(ctx.selectedRef.current);
             if (ids.size === 0) return;

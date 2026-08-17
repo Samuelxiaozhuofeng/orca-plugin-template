@@ -52,6 +52,15 @@ export type WhiteboardKeyActions = {
   zoomOut?: () => void;
   fit?: () => void;
   color?: (id: string | undefined) => void;
+  present?: {
+    next: () => void;
+    prev: () => void;
+    nextCard: () => void;
+    prevCard: () => void;
+    exit: () => void;
+    firstSlide?: () => void;
+    lastSlide?: () => void;
+  };
 };
 
 export type WhiteboardUndoGate = {
@@ -73,6 +82,49 @@ export function handleWhiteboardKey(
   actions: WhiteboardKeyActions,
   undoGate?: WhiteboardUndoGate,
 ): boolean {
+  if (actions.present != null) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      actions.present.exit();
+      return true;
+    }
+    if (
+      event.key === "ArrowRight" ||
+      event.key === "PageDown" ||
+      event.key === " " ||
+      event.code === "Space"
+    ) {
+      event.preventDefault();
+      actions.present.next();
+      return true;
+    }
+    if (event.key === "ArrowLeft" || event.key === "PageUp") {
+      event.preventDefault();
+      actions.present.prev();
+      return true;
+    }
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      actions.present.nextCard();
+      return true;
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      actions.present.prevCard();
+      return true;
+    }
+    if (event.key === "Home") {
+      event.preventDefault();
+      actions.present.firstSlide?.();
+      return true;
+    }
+    if (event.key === "End") {
+      event.preventDefault();
+      actions.present.lastSlide?.();
+      return true;
+    }
+  }
+
   if (event.key === "Escape") {
     actions.escape();
     return true;

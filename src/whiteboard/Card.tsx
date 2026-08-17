@@ -40,6 +40,7 @@ import {
 } from "./cardFitHeight";
 import { useCardAutoHeight } from "./useCardAutoHeight";
 import { invokeCollectSelectedOnActivePanel } from "./collectIntoBoardApply";
+import { invokeWrapSelectedOnActivePanel } from "./useCanvasAreas";
 import { CardErrorBoundary } from "./CardErrorBoundary";
 
 const { useEffect, useLayoutEffect, useRef } = window.React;
@@ -86,6 +87,7 @@ type Props = {
   onFocusCard?: (blockId: DbId) => void;
   onExtractRow?: (blockId: DbId, sourceCard: WhiteboardCard) => void;
   onWrapSelected?: () => void;
+  presentFocusId?: DbId | null;
 };
 
 type CardBox = { x: number; y: number; w: number; h: number };
@@ -113,6 +115,7 @@ export function Card({
   promotedKey = "",
   onFocusCard,
   onExtractRow,
+  presentFocusId,
 }: Props) {
   const cardRef = useRef<HTMLDivElement | null>(null);
   const extractRowRef = useRef<DbId | null>(null);
@@ -299,6 +302,9 @@ export function Card({
     onEndEdit();
   }, [liveEditing, noteGone, onEndEdit]);
 
+  const isPresentFocus =
+    presentFocusId != null && card.blockId === presentFocusId;
+
   const className = [
     "owb-card",
     liveEditing ? "is-editing" : "",
@@ -308,6 +314,7 @@ export function Card({
     mediaKind ? "is-media" : "",
     mediaKind ? `owb-card-media-${mediaKind}` : "",
     card.color ? `owb-card-theme-${card.color}` : "",
+    isPresentFocus ? "is-present-focus" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -353,6 +360,15 @@ export function Card({
               />
             );
           })()}
+          {selected && selectedCount >= 1 ? (
+            <orca.components.MenuText
+              title={t("Group into section")}
+              onClick={() => {
+                close();
+                invokeWrapSelectedOnActivePanel();
+              }}
+            />
+          ) : null}
           {selected && selectedCount >= 2 ? (
             <orca.components.MenuText
               title={t("Collect into new whiteboard")}

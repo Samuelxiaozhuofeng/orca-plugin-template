@@ -193,4 +193,44 @@ if (
 }
 check(whileSearch.log.length === 0, "zoom does not fire while search is open");
 
+// Presentation mode keys
+const presentLog: string[] = [];
+const presentActions = {
+  ...actions(),
+  present: {
+    next: () => presentLog.push("next"),
+    prev: () => presentLog.push("prev"),
+    nextCard: () => presentLog.push("nextCard"),
+    prevCard: () => presentLog.push("prevCard"),
+    exit: () => presentLog.push("exit"),
+    firstSlide: () => presentLog.push("firstSlide"),
+    lastSlide: () => presentLog.push("lastSlide"),
+  },
+};
+
+check(handleWhiteboardKey(event("ArrowRight"), presentActions) === true, "ArrowRight calls next");
+check(handleWhiteboardKey(event("PageDown"), presentActions) === true, "PageDown calls next");
+check(handleWhiteboardKey(event(" ", { code: "Space" }), presentActions) === true, "Space calls next");
+check(handleWhiteboardKey(event("ArrowLeft"), presentActions) === true, "ArrowLeft calls prev");
+check(handleWhiteboardKey(event("PageUp"), presentActions) === true, "PageUp calls prev");
+check(handleWhiteboardKey(event("ArrowDown"), presentActions) === true, "ArrowDown calls nextCard");
+check(handleWhiteboardKey(event("ArrowUp"), presentActions) === true, "ArrowUp calls prevCard");
+check(handleWhiteboardKey(event("Escape"), presentActions) === true, "Escape calls exit");
+check(handleWhiteboardKey(event("Home"), presentActions) === true, "Home calls firstSlide");
+check(handleWhiteboardKey(event("End"), presentActions) === true, "End calls lastSlide");
+
+check(
+  presentLog.join(",") ===
+    "next,next,next,prev,prev,nextCard,prevCard,exit,firstSlide,lastSlide",
+  "presentation shortcuts fire in order and do not trigger nudge/escape",
+);
+check(
+  presentActions.log.length === 0,
+  "nudge/escape/etc log is empty when present handles keys",
+);
+
+// Other keys in presentation mode (e.g. undo, color) still work
+check(handleWhiteboardKey(event("1"), presentActions) === true, "1 still paints in presentation mode");
+check(presentActions.log.join(",") === "color:blue", "non-nav keys execute normally");
+
 console.log("canvasKeys tests passed");

@@ -6,6 +6,11 @@ import {
   planAreaColor,
 } from "./areaChrome";
 import {
+  planAddToSlides,
+  planMoveSlide,
+  planRemoveFromSlides,
+} from "./areaSlides";
+import {
   nextAreaId,
   planAreaMove,
   planWrapAreaFromCards,
@@ -26,6 +31,9 @@ const wrapByPanel = new Map<string, () => void>();
 type AreaChrome = {
   setColor: (id: string, color: string | undefined) => void;
   toggleCollapsed: (id: string) => void;
+  addToSlides: (id: string) => void;
+  moveSlide: (id: string, delta: number) => void;
+  removeFromSlides: (id: string) => void;
 };
 
 const chromeByPanel = new Map<string, AreaChrome>();
@@ -263,9 +271,39 @@ export function useCanvasAreas({
     [commitAreasStep],
   );
 
+  const addToSlides = useCallback(
+    (id: string) => {
+      const next = planAddToSlides(areasRef.current, id);
+      if (next == null) return;
+      void commitAreasStep(next);
+    },
+    [commitAreasStep],
+  );
+
+  const moveSlide = useCallback(
+    (id: string, delta: number) => {
+      const next = planMoveSlide(areasRef.current, id, delta);
+      if (next == null) return;
+      void commitAreasStep(next);
+    },
+    [commitAreasStep],
+  );
+
+  const removeFromSlides = useCallback(
+    (id: string) => {
+      const next = planRemoveFromSlides(areasRef.current, id);
+      if (next == null) return;
+      void commitAreasStep(next);
+    },
+    [commitAreasStep],
+  );
+
   chromeByPanel.set(panelId, {
     setColor: setAreaColor,
     toggleCollapsed: toggleAreaCollapsed,
+    addToSlides,
+    moveSlide,
+    removeFromSlides,
   });
   useEffect(() => {
     return () => {
@@ -273,7 +311,7 @@ export function useCanvasAreas({
       if (current?.setColor === setAreaColor) chromeByPanel.delete(panelId);
       fullCardsByPanel.delete(panelId);
     };
-  }, [panelId, setAreaColor, toggleAreaCollapsed]);
+  }, [panelId, setAreaColor, toggleAreaCollapsed, addToSlides, moveSlide, removeFromSlides]);
 
   return {
     selectedArea,
@@ -286,5 +324,8 @@ export function useCanvasAreas({
     deleteSelectedArea,
     setAreaColor,
     toggleAreaCollapsed,
+    addToSlides,
+    moveSlide,
+    removeFromSlides,
   };
 }

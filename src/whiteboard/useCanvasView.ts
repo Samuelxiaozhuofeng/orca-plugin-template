@@ -31,6 +31,7 @@ type Opts = {
   onViewportWidth: (width: number) => void;
   isEditing: () => boolean;
   controlsMode: ControlsMode;
+  isPresenting?: () => boolean;
 };
 
 export function useCanvasView({
@@ -41,6 +42,7 @@ export function useCanvasView({
   onViewportWidth,
   isEditing,
   controlsMode,
+  isPresenting,
 }: Opts) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLDivElement | null>(null);
@@ -53,6 +55,8 @@ export function useCanvasView({
   isEditingRef.current = isEditing;
   const controlsModeRef = useRef(controlsMode);
   controlsModeRef.current = controlsMode;
+  const isPresentingRef = useRef(isPresenting);
+  isPresentingRef.current = isPresenting;
   const spaceHeldRef = useRef(false);
   const [viewportSize, setViewportSize] = useState({
     width: 800,
@@ -257,6 +261,7 @@ export function useCanvasView({
     };
 
     const canUseSpace = (event: KeyboardEvent) => {
+      if (isPresentingRef.current?.() === true) return false;
       if (isEditingRef.current()) return false;
       if (orca.state.activePanel !== panelId) return false;
       if (isEditableTarget(event.target)) return false;
