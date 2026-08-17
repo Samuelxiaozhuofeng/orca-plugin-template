@@ -1,4 +1,4 @@
-import type { BlockRef, DbId } from "../orca.d.ts";
+import type { Block, BlockRef, DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n";
 import type { WhiteboardEdge } from "./edges";
 import { cacheBlockList, fetchBlock } from "./newCard";
@@ -204,7 +204,15 @@ export async function linkEdgeByProperty(edge: WhiteboardEdge): Promise<DbId> {
 
 export async function unlinkEdgeByProperty(edge: WhiteboardEdge): Promise<void> {
   await enqueueBlock(edge.from, async () => {
-    const source = await fetchBlock(edge.from);
+    // The source note may already be gone (deleted from the outline). Its
+    // property ref went with it, so there is nothing left to unlink.
+    const loaded = (await orca.invokeBackend(
+      "get-block",
+      edge.from,
+    )) as Block | null;
+    if (loaded == null) return;
+    cacheBlockList([loaded]);
+    const source = loaded;
     const current = readEdgeLinkPropIds(source);
     const refId =
       edge.linkRefId ??

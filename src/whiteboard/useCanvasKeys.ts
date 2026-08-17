@@ -30,7 +30,10 @@ export function useCanvasKeys(opts: {
   focusApiRef: { current: CanvasFocusApi | null };
   hostUndoOnceRef: { current: boolean };
   onPatchCards: PatchCardsFn;
-  onRemoveCards: (ids: DbId[]) => Promise<boolean>;
+  onRemoveCards: (
+    ids: DbId[],
+    opts?: { permanent?: boolean },
+  ) => Promise<boolean>;
   onCommitEdges: (next: WhiteboardEdge[]) => Promise<boolean>;
   onUndo: () => void;
   onRedo: () => void;
@@ -94,7 +97,7 @@ export function useCanvasKeys(opts: {
             ctx.selectArea(null);
             ctx.onExitDrawArea();
           },
-          remove: () => {
+          remove: (opts) => {
             const edgeId = ctx.selectedEdgeRef.current;
             if (edgeId != null) {
               void ctx
@@ -111,7 +114,7 @@ export function useCanvasKeys(opts: {
             if (ctx.deleteSelectedArea()) return;
             const ids = ctx.selectedRef.current;
             if (ids.length === 0) return;
-            void ctx.onRemoveCards(ids).then((ok: boolean) => {
+            void ctx.onRemoveCards(ids, opts).then((ok: boolean) => {
               if (ok) ctx.selectCards([]);
             });
           },

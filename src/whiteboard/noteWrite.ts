@@ -56,14 +56,26 @@ export async function createInlineRef(
   return refId;
 }
 
-export async function deleteBlockBestEffort(id: DbId): Promise<void> {
+export async function deleteBlocksBestEffort(
+  ids: readonly DbId[],
+): Promise<boolean> {
+  if (ids.length === 0) return true;
   try {
-    const result = await orca.invokeBackend("delete-blocks", [id]);
+    const result = await orca.invokeBackend("delete-blocks", [...ids]);
     cacheReturnedBlocks(result);
-    delete orca.state.blocks[id];
-    orca.broadcasts.broadcast("orca.delete-blocks", [id]);
-    orca.broadcasts.broadcast("orca.refresh-blocks", [id]);
+    for (const id of ids) {
+      delete orca.state.blocks[id];
+    }
+    orca.broadcasts.broadcast("orca.delete-blocks", [...ids]);
+    orca.broadcasts.broadcast("orca.refresh-blocks", [...ids]);
+    return true;
   } catch (error) {
-    console.error("[whiteboard] failed to delete leftover block", id, error);
+    console.error("[whiteboard] failed to delete blocks", ids, error);
+    return false;
   }
 }
+
+export async function deleteBlockBestEffort(id: DbId): Promise<void> {
+  await deleteBlocksBestEffort([id]);
+}
+

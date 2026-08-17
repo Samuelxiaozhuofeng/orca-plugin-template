@@ -36,6 +36,11 @@ import { writeEdgesAfterLinkSync } from "./edgeLinkSync";
 import { type WhiteboardEdge } from "./edges";
 import { type PlaceDialogValue } from "./PlaceDialog";
 import { type CanvasView } from "./viewTransform";
+import { getBoardSession, refuseIfProtected } from "./boardSession";
+import { isCardShellBlock } from "./cardShell";
+import { blockCardTitle } from "./CardTitle";
+import { requestDeleteConfirm } from "./ConfirmDeleteDialog";
+import { deleteBlocksBestEffort } from "./noteWrite";
 
 const { useCallback, useState } = window.React;
 
@@ -180,8 +185,77 @@ export function useBoardCommands(opts: {
   );
 
   const onRemoveCards = useCallback(
-    async (ids: DbId[]): Promise<boolean> => {
+    async (
+      ids: DbId[],
+      opts?: { permanent?: boolean },
+    ): Promise<boolean> => {
       if (ids.length === 0) return true;
+      if (blockId != null) {
+        const session = getBoardSession(blockId);
+        if (session != null && refuseIfProtected(session)) return false;
+      }
+
+      if (opts?.permanent) {
+        const blocks = orca.state.blocks;
+        const titles = ids.map((id) => blockCardTitle(id, blocks));
+        const confirmed = await requestDeleteConfirm(titles);
+        if (!confirmed) return false;
+
+        const drop = new Set(ids);
+        const next = cards.filter((card) => !drop.has(card.blockId));
+        const currentEdges = edgesRef.current;
+        const leftover = currentEdges.filter(
+          (edge) => !drop.has(edge.from) && !drop.has(edge.to),
+        );
+        record();
+        const release = blockId != null ? holdHistory(blockId) : holdHistory();
+        try {
+          const saved = await writeEdgesAfterLinkSync(
+            currentEdges,
+            leftover,
+            (synced) => commitBoard(next, synced),
+            false, // card removal is not a rehang
+          );
+          if (!saved) {
+            if (blockId != null) discardLastRecord(blockId);
+            return false;
+          }
+        } finally {
+          release();
+        }
+
+        // Notes already gone from the outline need no backend delete.
+        const alive = ids.filter((id) => orca.state.blocks[id] != null);
+        const ok = await deleteBlocksBestEffort(alive);
+        if (ok) {
+          orca.notify(
+            "success",
+            t("Deleted ${count} notes and removed from whiteboard.", {
+              count: String(ids.length),
+            }),
+          );
+        } else {
+          orca.notify("error", t("Failed to delete notes"));
+        }
+        return true;
+      }
+
+      const emptyIds: DbId[] = [];
+      const contentIds: DbId[] = [];
+      // Cards whose note is already gone: nothing left to delete, and no
+      // point offering "delete the note too".
+      const goneIds: DbId[] = [];
+      for (const id of ids) {
+        const block = orca.state.blocks[id];
+        if (block == null) {
+          goneIds.push(id);
+        } else if (isCardShellBlock(block)) {
+          emptyIds.push(id);
+        } else {
+          contentIds.push(id);
+        }
+      }
+
       const drop = new Set(ids);
       const next = cards.filter((card) => !drop.has(card.blockId));
       const currentEdges = edgesRef.current;
@@ -204,13 +278,68 @@ export function useBoardCommands(opts: {
       } finally {
         release();
       }
-      orca.notify(
-        "info",
-        t(
-          "Removed ${count} cards from the board. Journals themselves were not deleted.",
-          { count: String(ids.length) },
-        ),
-      );
+
+      if (emptyIds.length > 0) {
+        await deleteBlocksBestEffort(emptyIds);
+      }
+
+      if (contentIds.length === 0) {
+        orca.notify(
+          "info",
+          emptyIds.length === 0
+            ? t("Removed ${count} cards from the board.", {
+                count: String(goneIds.length),
+              })
+            : t(
+                "Removed ${count} empty cards from the board and deleted their notes.",
+                { count: String(emptyIds.length) },
+              ),
+        );
+      } else {
+        const deleteNotesAction = async () => {
+          const ok = await deleteBlocksBestEffort(contentIds);
+          if (ok) {
+            orca.notify(
+              "success",
+              t("Deleted ${count} notes.", {
+                count: String(contentIds.length),
+              }),
+            );
+          } else {
+            orca.notify("error", t("Failed to delete notes"));
+          }
+        };
+
+        if (emptyIds.length === 0) {
+          orca.notify(
+            "info",
+            t(
+              "Removed ${count} cards from the board. Notes themselves were not deleted.",
+              { count: String(contentIds.length) },
+            ),
+            {
+              title: t("Delete notes too"),
+              action: deleteNotesAction,
+            },
+          );
+        } else {
+          orca.notify(
+            "info",
+            t(
+              "Removed ${empty} empty cards (notes deleted) and ${content} cards from the board (notes kept).",
+              {
+                empty: String(emptyIds.length),
+                content: String(contentIds.length),
+              },
+            ),
+            {
+              title: t("Delete notes too"),
+              action: deleteNotesAction,
+            },
+          );
+        }
+      }
+
       return true;
     },
     [blockId, cards, commitBoard, record],

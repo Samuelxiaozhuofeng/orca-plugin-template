@@ -53,7 +53,8 @@ function actions(): WhiteboardKeyActions & {
     nudge: (dx, dy) => log.push(`nudge:${dx},${dy}`),
     selectAll: () => log.push("selectAll"),
     escape: () => log.push("escape"),
-    remove: () => log.push("remove"),
+    remove: (opts) =>
+      log.push(`remove:${opts?.permanent === true ? "permanent" : "default"}`),
     undo: () => log.push("undo"),
     redo: () => log.push("redo"),
     find: () => log.push("find"),
@@ -242,5 +243,41 @@ check(
   "Enter is not handled outside presentation mode",
 );
 
+// Delete / Backspace keys (regular vs Shift)
+const removeDefault = actions();
+check(
+  handleWhiteboardKey(event("Delete"), removeDefault) === true,
+  "Delete calls remove",
+);
+check(
+  handleWhiteboardKey(event("Backspace"), removeDefault) === true,
+  "Backspace calls remove",
+);
+check(
+  removeDefault.log.join(",") === "remove:default,remove:default",
+  "Delete and Backspace trigger default removal",
+);
+
+const removePermanent = actions();
+check(
+  handleWhiteboardKey(
+    event("Delete", { shiftKey: true }),
+    removePermanent,
+  ) === true,
+  "Shift+Delete calls remove with permanent",
+);
+check(
+  handleWhiteboardKey(
+    event("Backspace", { shiftKey: true }),
+    removePermanent,
+  ) === true,
+  "Shift+Backspace calls remove with permanent",
+);
+check(
+  removePermanent.log.join(",") === "remove:permanent,remove:permanent",
+  "Shift+Delete and Shift+Backspace trigger permanent removal",
+);
+
 console.log("canvasKeys tests passed");
+
 

@@ -355,6 +355,24 @@ const zhCN = {
   "Could not finish moving the cards. Nothing was changed.":
     "没能把卡片移过去，两边都没有改动。",
   "No journals in this date range": "这段时间没有可放入的日记",
+  "Removed ${count} empty cards from the board and deleted their notes.":
+    "已从白板移除 ${count} 张空卡片并删除对应笔记。",
+  "Removed ${count} cards from the board. Notes themselves were not deleted.":
+    "已从白板移除 ${count} 张卡片。只是从白板拿掉，笔记本身没有被删除。",
+  "Removed ${count} cards from the board.": "已从白板移除 ${count} 张卡片。",
+  "Delete notes too": "同时删除笔记",
+  "Deleted ${count} notes.": "已删除 ${count} 条笔记。",
+  "Failed to delete notes": "删除笔记失败",
+  "Removed ${empty} empty cards (notes deleted) and ${content} cards from the board (notes kept).":
+    "已从白板移除 ${empty} 张空卡片（笔记已删除）和 ${content} 张卡片（笔记保留）。",
+  "Permanently delete notes?": "永久删除笔记？",
+  "This action cannot be undone.": "此操作无法撤销。",
+  "The following notes and their whiteboard cards will be permanently deleted:":
+    "以下笔记将连同白板卡片一起被永久删除：",
+  "…and ${count} others": "…等 ${count} 个",
+  "Delete permanently": "永久删除",
+  "Deleted ${count} notes and removed from whiteboard.":
+    "已永久删除 ${count} 条笔记并移出白板。",
 };
 
 export default zhCN;

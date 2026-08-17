@@ -44,7 +44,7 @@ export type WhiteboardKeyActions = {
   nudge: (dx: number, dy: number) => void;
   selectAll: () => void;
   escape: () => void;
-  remove: () => void;
+  remove: (opts?: { permanent?: boolean }) => void;
   undo: () => void;
   redo: () => void;
   find?: () => void;
@@ -137,7 +137,7 @@ export function handleWhiteboardKey(
   }
   if (event.key === "Delete" || event.key === "Backspace") {
     event.preventDefault();
-    actions.remove();
+    actions.remove({ permanent: event.shiftKey });
     return true;
   }
   if (event.metaKey || event.ctrlKey) {

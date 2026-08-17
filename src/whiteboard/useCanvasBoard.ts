@@ -59,7 +59,10 @@ type Args = {
   areasRef: { current: WhiteboardArea[] };
   edgeApiRef: { current: EdgeLayerApi | null };
   onPatchCards: PatchCardsFn;
-  onRemoveCards: (ids: DbId[]) => Promise<boolean>;
+  onRemoveCards: (
+    ids: DbId[],
+    opts?: { permanent?: boolean },
+  ) => Promise<boolean>;
   onAddCards: (cards: WhiteboardCard[]) => Promise<boolean>;
   onCommitEdges: (
     next: WhiteboardEdge[],

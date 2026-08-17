@@ -157,4 +157,26 @@ export const DIALOG_CSS = `
   justify-content: flex-end;
   gap: var(--owb-space-2);
 }
+
+.owb-delete-list {
+  margin: var(--owb-space-2) 0;
+  padding-left: 20px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.owb-delete-item {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--orca-color-text-1);
+  word-break: break-word;
+}
+
+.owb-delete-item-more {
+  font-size: 12px;
+  font-style: italic;
+  color: var(--orca-color-text-3);
+  margin-top: 4px;
+}
 `.trim();
+

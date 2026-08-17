@@ -53,7 +53,10 @@ type Props = {
   zoomLabelRef: { current: HTMLElement | null };
   onViewChange: (view: CanvasView) => void;
   onPatchCards: PatchCardsFn;
-  onRemoveCards: (ids: DbId[]) => Promise<boolean>;
+  onRemoveCards: (
+    ids: DbId[],
+    opts?: { permanent?: boolean },
+  ) => Promise<boolean>;
   onAddCards: (cards: WhiteboardCard[]) => Promise<boolean>;
   onCommitEdges: (
     next: WhiteboardEdge[],
