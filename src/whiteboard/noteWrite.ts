@@ -38,12 +38,14 @@ export async function writeBlockContent(
 export async function createInlineRef(
   fromId: DbId,
   toId: DbId,
+  alias?: string,
 ): Promise<DbId> {
   const result = await orca.invokeBackend(
     "create-ref",
     fromId,
     toId,
     REF_TYPE_INLINE,
+    alias,
   );
   const refId = asDbId(Array.isArray(result) ? result[0] : result);
   if (refId == null) {

@@ -24,6 +24,7 @@ import { useReferenceEdges } from "./edgeRefs";
 import type { WhiteboardEdge } from "./edges";
 import { useWhiteboardSettings } from "./settings";
 import { useBoardDrop } from "./useBoardDrop";
+import { useBoardPaste } from "./useBoardPaste";
 import { useCanvasBoard } from "./useCanvasBoard";
 import {
   useCanvasPointer,
@@ -242,6 +243,20 @@ export function Canvas({
     pointerToWorld,
     onAddCards,
     onCommitEdges,
+  });
+
+  useBoardPaste({
+    panelId,
+    boardBlockId,
+    searchOpen: overlay.searchOpen || filter.open,
+    viewportRef,
+    editingRef,
+    cardsRef,
+    edgesRef,
+    pointerToWorld,
+    onAddCards,
+    onCommitEdges,
+    selectCards,
   });
 
   useCanvasFocusApi(focusApiRef, {

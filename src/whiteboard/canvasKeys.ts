@@ -14,7 +14,7 @@ export function isEditableTarget(target: EventTarget | null): boolean {
 }
 
 export function isWhiteboardShortcutTarget(
-  event: KeyboardEvent,
+  event: { target: EventTarget | null },
   opts: {
     panelId: string;
     editing: boolean;

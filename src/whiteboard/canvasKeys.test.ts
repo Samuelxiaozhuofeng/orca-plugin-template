@@ -122,6 +122,13 @@ check(
   }) === true,
   "idle canvas accepts shortcuts",
 );
+check(
+  isWhiteboardShortcutTarget(
+    { target: null },
+    { panelId: "panel-a", editing: false, viewport: null },
+  ) === true,
+  "idle canvas accepts generic event target (e.g. paste event)",
+);
 
 const zoom = actions();
 check(handleWhiteboardKey(event("+"), zoom), "+ zooms in");

@@ -3,6 +3,9 @@ import { t } from "../libs/l10n";
 import type { WhiteboardCard } from "./cards";
 import { journalDateKey } from "./journals";
 import { CARD_HEIGHT, CARD_WIDTH, GRID_GAP } from "./layout";
+import { parseDroppedBlockIds } from "./pasteBlocks";
+
+export { parseDroppedBlockIds };
 
 const DROP_COLUMNS = 4;
 
@@ -23,29 +26,6 @@ export function isOrcaBlockDrag(
 ): boolean {
   if (dataTransfer == null) return false;
   return Array.from(dataTransfer.types).includes(orcaBlockMime());
-}
-
-export function parseDroppedBlockIds(
-  dataTransfer: DataTransfer | null | undefined,
-): DbId[] {
-  if (dataTransfer == null) return [];
-  const raw = dataTransfer.getData(orcaBlockMime());
-  if (!raw) return [];
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return [];
-  }
-  if (parsed == null || typeof parsed !== "object") return [];
-  if ("highlight" in parsed) return [];
-  const blocks = (parsed as { blocks?: unknown }).blocks;
-  if (!Array.isArray(blocks)) return [];
-  const ids: DbId[] = [];
-  for (const item of blocks) {
-    if (typeof item === "number" && Number.isFinite(item)) ids.push(item);
-  }
-  return ids;
 }
 
 export function isLeavingDragTarget(
