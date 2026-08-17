@@ -8,6 +8,7 @@ import type { DrawDropEmpty } from "./edgeGestures";
 import type { EdgeLayerApi } from "./EdgeLayer";
 import type { WhiteboardEdge } from "./edges";
 import { extractBlocksToBoard } from "./cardExtractApply";
+import { addMediaCardToBoard, type MediaKind } from "./insertMediaCard";
 import { addBlankCardToBoard } from "./newCard";
 import { applyCardBox, cardHasLiveGesture } from "./cardGestures";
 import {
@@ -349,6 +350,20 @@ export function useCanvasBoard({
     [boardBlockId, onAddCards, selectCards, startEdit],
   );
 
+  const createMediaAt = useCallback(
+    async (at: { x: number; y: number }, kind: MediaKind) => {
+      const card = await addMediaCardToBoard({
+        boardBlockId,
+        x: at.x,
+        y: at.y,
+        kind,
+        addCards: onAddCards,
+      });
+      if (card != null) selectCards([card.blockId]);
+    },
+    [boardBlockId, onAddCards, selectCards],
+  );
+
   const extractRow = useCallback(
     (blockId: DbId, sourceCard: WhiteboardCard) => {
       void extractBlocksToBoard({
@@ -457,6 +472,7 @@ export function useCanvasBoard({
     endEdit,
     closeEdgeDrop,
     createBlankAt,
+    createMediaAt,
     extractRow,
     dropOntoBoard,
     shownCards,

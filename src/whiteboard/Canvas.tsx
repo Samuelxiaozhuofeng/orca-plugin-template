@@ -169,6 +169,7 @@ export function Canvas({
     endEdit,
     closeEdgeDrop,
     createBlankAt,
+    createMediaAt,
     extractRow,
     dropOntoBoard,
     shownCards,
@@ -451,6 +452,7 @@ export function Canvas({
         onPlaceJournalsAt={onPlaceJournalsAt}
         onStartDrawArea={onStartDrawArea}
         createBlankAt={createBlankAt}
+        createMediaAt={createMediaAt}
         selectCards={selectCards}
       />
     </>

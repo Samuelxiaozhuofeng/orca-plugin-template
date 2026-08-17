@@ -221,6 +221,16 @@ const zhCN = {
   "Failed to rename whiteboard": "无法重命名白板",
   "Undo removed the card from the board. The note is still under this whiteboard in the outline.":
     "卡片已从白板上拿掉，笔记还在这块白板下面，没有被删除。",
+  "Insert media": "插入媒体",
+  PDF: "PDF",
+  EPUB: "EPUB",
+  Video: "视频",
+  Audio: "音频",
+  Image: "图片",
+  "Can't pick a local file in this Orca version. Update Orca and try again.":
+    "当前 Orca 版本没法选本地文件，请更新后再试",
+  "Failed to copy the file into this notebook": "没能把文件拷进这个笔记本",
+  "Failed to create a media card": "无法创建媒体卡片",
   "New card here": "在这里新建卡片",
   "Add a note as a card…": "把已有笔记加成卡片…",
   "Tidy all cards up to grid": "把所有卡片理成网格",

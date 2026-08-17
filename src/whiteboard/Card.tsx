@@ -18,7 +18,8 @@ import {
 import { type WhiteboardCard } from "./data";
 import type { ArrangeAction } from "./selection";
 import { isHostOverlayTarget } from "./hostOverlay";
-import { useCardBlockView } from "./blockWatch";
+import { useCardBlockView, useWatchedValue } from "./blockWatch";
+import { mediaKindOfBlock } from "./mediaCard";
 import { CardBody, openBoardFromCardEvent } from "./BoardCardBody";
 import { CARD_ROW_FOCUS_CLASS } from "./cardRowOnBoard";
 import {
@@ -141,6 +142,11 @@ export function Card({
   }
 
   const hosted = useCardBlockView(card.blockId, treeRev);
+  const mediaKind = useWatchedValue(
+    () => mediaKindOfBlock(orca.state.blocks[card.blockId]),
+    () => [card.blockId],
+    [card.blockId],
+  );
   const isBoardCard = hosted.board != null;
   const liveEditing = editing && !isBoardCard;
   /** Set when this card was extracted from another card on this board. */
@@ -297,6 +303,8 @@ export function Card({
     selected ? "is-selected" : "",
     simplified ? "is-simplified" : "",
     isBoardCard ? "is-board" : "",
+    mediaKind ? "is-media" : "",
+    mediaKind ? `owb-card-media-${mediaKind}` : "",
     card.color ? `owb-card-theme-${card.color}` : "",
   ]
     .filter(Boolean)

@@ -14,6 +14,7 @@ import type { ArrangeAction } from "./selection";
 import { CardFilterBanner } from "./CardFilterPopover";
 import { SelectionToolbar } from "./SelectionToolbar";
 import { placeNewSubBoardOnBoard } from "./collectIntoBoardApply";
+import type { MediaKind } from "./insertMediaCard";
 import { RelationMap } from "./RelationMap";
 
 const { useCallback, useEffect, useRef, useState } = window.React;
@@ -214,6 +215,7 @@ export function CanvasHostOverlays({
   onPlaceJournalsAt,
   onStartDrawArea,
   createBlankAt,
+  createMediaAt,
   selectCards,
   applyArrange,
   applyCardColor,
@@ -222,6 +224,7 @@ export function CanvasHostOverlays({
   onPlaceJournalsAt: (origin: CanvasOrigin) => void;
   onStartDrawArea: () => void;
   createBlankAt: (at: CanvasOrigin, edit: boolean) => Promise<void> | void;
+  createMediaAt: (at: CanvasOrigin, kind: MediaKind) => Promise<void> | void;
 }) {
   const {
     menuPointRef,
@@ -255,6 +258,8 @@ export function CanvasHostOverlays({
           selectCards,
           applyArrange,
           onNewCard: () => void createBlankAt(menuPointRef.current, true),
+          onInsertMedia: (kind: MediaKind) =>
+            void createMediaAt(menuPointRef.current, kind),
           onNewSubBoard: () => {
             const at = menuPointRef.current;
             void placeNewSubBoardOnBoard({

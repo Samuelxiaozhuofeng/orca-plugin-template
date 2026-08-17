@@ -3,9 +3,22 @@ import { t } from "../libs/l10n";
 import { COLOR_PRESETS } from "./CardToolbar";
 import type { UnifySizeMode } from "./cardBatch";
 import type { WhiteboardCard } from "./data";
+import type { MediaKind } from "./insertMediaCard";
 import type { ArrangeAction } from "./selection";
 
 const { useRef } = window.React;
+
+const MEDIA_MENU: readonly {
+  kind: MediaKind;
+  title: string;
+  icon: string;
+}[] = [
+  { kind: "pdf", title: "PDF", icon: "ti ti-file-type-pdf" },
+  { kind: "epub", title: "EPUB", icon: "ti ti-book" },
+  { kind: "video", title: "Video", icon: "ti ti-video" },
+  { kind: "audio", title: "Audio", icon: "ti ti-music" },
+  { kind: "image", title: "Image", icon: "ti ti-photo" },
+];
 
 function pointRect(x: number, y: number): DOMRect {
   return new DOMRect(x, y, 1, 1);
@@ -19,6 +32,8 @@ export type BoardMenuOptions = {
   applyArrange: (action: ArrangeAction, ids?: readonly DbId[]) => void;
   /** New blank card at the point that was right-clicked. */
   onNewCard: () => void;
+  /** Pick a local file and drop a media card at the right-clicked point. */
+  onInsertMedia: (kind: MediaKind) => void;
   /** New nested whiteboard card at the right-clicked point. */
   onNewSubBoard: () => void;
   /** Search an existing note and drop it at the right-clicked point. */
@@ -50,6 +65,21 @@ export function boardMenu(close: () => void, opts: BoardMenuOptions) {
         preIcon="ti ti-square-plus"
         onClick={run(opts.onNewCard)}
       />
+      <orca.components.MenuText
+        title={t("Insert media")}
+        preIcon="ti ti-photo-plus"
+      >
+        <orca.components.Menu>
+          {MEDIA_MENU.map((item) => (
+            <orca.components.MenuText
+              key={item.kind}
+              title={t(item.title)}
+              preIcon={item.icon}
+              onClick={run(() => opts.onInsertMedia(item.kind))}
+            />
+          ))}
+        </orca.components.Menu>
+      </orca.components.MenuText>
       <orca.components.MenuText
         title={t("New sub-whiteboard")}
         preIcon="ti ti-chalkboard"
