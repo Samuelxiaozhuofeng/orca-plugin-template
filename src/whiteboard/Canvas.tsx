@@ -36,6 +36,7 @@ import { useCanvasView } from "./useCanvasView";
 import { type CanvasView } from "./viewTransform";
 import { blurCardEditor } from "./cardEditorFlush";
 import { PresentOverlay } from "./PresentOverlay";
+import { deriveTargetHighlightedRows } from "./edgeRowHighlight";
 import {
   usePresentKeyActions,
   type PresentationState,
@@ -43,7 +44,7 @@ import {
 
 export type { CanvasView, CardPatchEntry };
 
-const { useCallback, useLayoutEffect, useRef } = window.React;
+const { useCallback, useLayoutEffect, useMemo, useRef } = window.React;
 
 type Props = {
   panelId: string;
@@ -225,6 +226,14 @@ export function Canvas({
     visible.edges,
     settings.showReferenceEdges,
   );
+  const highlightedRowIds = useMemo(() => {
+    if (selectedSet.size === 0) return undefined;
+    const highlighted = deriveTargetHighlightedRows(
+      [...visible.edges, ...refEdges],
+      selectedSet,
+    );
+    return highlighted.size === 0 ? undefined : highlighted;
+  }, [visible.edges, refEdges, selectedSet]);
 
   const {
     dropActive,
@@ -444,6 +453,7 @@ export function Canvas({
             onWrapSelected={wrapSelected}
             onFocusCard={onFocusCard}
             presentReveal={presentReveal ?? presentation?.reveal ?? null}
+            highlightedRowIds={highlightedRowIds}
           />
         </div>
         <div ref={guidesRef} className="owb-guides" />

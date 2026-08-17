@@ -6,7 +6,8 @@ import {
   type CardBox,
   type Point,
 } from "./edgeGeometry";
-import { pairKey, type EdgeBend, type Side } from "./edges";
+import { edgeDedupeKey, type EdgeBend, type Side } from "./edges";
+import { resolveSourceBox } from "./edgeRowBoxes";
 
 export type BoxedCard = { blockId: DbId } & CardBox;
 
@@ -69,22 +70,31 @@ export function paintEdgesForBoxes(
     id: string;
     from: DbId;
     to: DbId;
+    fromBlock?: DbId;
     fromSide?: Side;
     toSide?: Side;
     bend?: EdgeBend;
   }>,
   boxes: Map<DbId, CardBox>,
   getEls: (id: string) => EdgeEls | undefined,
+  getRowBox?: (cardId: DbId, rowId: DbId, cardBox: CardBox) => CardBox | null,
 ): void {
   for (const edge of edges) {
-    const from = boxes.get(edge.from);
+    const fromCardBox = boxes.get(edge.from);
     const to = boxes.get(edge.to);
-    if (from == null || to == null) continue;
+    if (fromCardBox == null || to == null) continue;
     const els = getEls(edge.id);
     if (els == null) continue;
+    const fromBox =
+      edge.fromBlock != null && getRowBox != null
+        ? resolveSourceBox(
+            fromCardBox,
+            getRowBox(edge.from, edge.fromBlock, fromCardBox),
+          )
+        : fromCardBox;
     paintCurveDom(
       els,
-      curveForBoxes(from, to, edge.fromSide, edge.toSide, edge.bend),
+      curveForBoxes(fromBox, to, edge.fromSide, edge.toSide, edge.bend),
     );
   }
 }
@@ -108,6 +118,7 @@ export type DrawDropEmpty = {
   clientY: number;
   world: { x: number; y: number };
   fromId: DbId;
+  fromBlock?: DbId;
   fromSide?: Side;
 };
 
@@ -159,6 +170,7 @@ export function abortAllEdgeGestures(): void {
 
 export function startDrawEdge(opts: {
   fromId: DbId;
+  fromBlock?: DbId;
   fromSide?: Side;
   fromBox: CardBox;
   cards: () => readonly BoxedCard[];
@@ -192,13 +204,24 @@ export function startDrawEdge(opts: {
       clearTargets(opts.canvas);
       opts.canvas.classList.remove("is-drawing-edge");
       opts.canvas
-        .querySelectorAll(".owb-card-tb-btn.is-connecting")
+        .querySelectorAll(
+          ".owb-card-tb-btn.is-connecting, .owb-row-connect-btn.is-connecting",
+        )
         .forEach((el) => el.classList.remove("is-connecting"));
     }
     if (clearGhost) setGhostPath(opts.ghost, "");
   };
 
   const tracked = trackEdgeGesture(opts.canvas, () => cleanup(true));
+
+  const targetOccupied = (targetId: DbId, occupied: ReadonlySet<string>) => {
+    const key = edgeDedupeKey({
+      from: opts.fromId,
+      to: targetId,
+      fromBlock: opts.fromBlock,
+    });
+    return occupied.has(key);
+  };
 
   const paint = (clientX: number, clientY: number) => {
     if (!live) return;
@@ -209,7 +232,7 @@ export function startDrawEdge(opts: {
     const hit =
       rawHit != null &&
       rawHit !== opts.fromId &&
-      !occupied.has(pairKey(opts.fromId, rawHit))
+      !targetOccupied(rawHit, occupied)
         ? rawHit
         : null;
     setEdgeTarget(opts.canvas, hit);
@@ -231,7 +254,7 @@ export function startDrawEdge(opts: {
     const hit =
       rawHit != null &&
       rawHit !== opts.fromId &&
-      !occupied.has(pairKey(opts.fromId, rawHit))
+      !targetOccupied(rawHit, occupied)
         ? rawHit
         : null;
     if (hit == null) {
@@ -249,6 +272,7 @@ export function startDrawEdge(opts: {
         clientY: event.clientY,
         world,
         fromId: opts.fromId,
+        fromBlock: opts.fromBlock,
         fromSide: opts.fromSide,
       });
       return;

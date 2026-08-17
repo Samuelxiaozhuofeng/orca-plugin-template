@@ -14,15 +14,18 @@ import {
 } from "./edgeGestures";
 import {
   nextEdgeId,
-  pairKey,
+  edgeDedupeKey,
   type EdgeBend,
   type Side,
   type WhiteboardEdge,
 } from "./edges";
 import type { ReferenceEdge } from "./edgeRefs";
+import { CardRowObserverManager } from "./edgeRowObservers";
 import { reconcileLiveBoxes } from "./edgeLiveBoxes";
+import { resolveSourceBox, RowBoxCache } from "./edgeRowBoxes";
 
-const { useLayoutEffect, useRef } = window.React;
+const { useCallback, useEffect, useLayoutEffect, useMemo, useRef } =
+  window.React;
 
 export type EdgeLayerApi = {
   startDraw: (
@@ -31,6 +34,7 @@ export type EdgeLayerApi = {
     clientX: number,
     clientY: number,
     finishOn?: "mouseup" | "mousedown",
+    fromBlock?: DbId,
   ) => void;
   onFrame: (boxes: Map<DbId, CardBox>) => void;
   clearGhost: () => void;
@@ -41,6 +45,7 @@ export type AnyEdge = {
   id: string;
   from: DbId;
   to: DbId;
+  fromBlock?: DbId;
   fromSide?: Side;
   toSide?: Side;
   bend?: EdgeBend;
@@ -108,6 +113,7 @@ export function useEdgeLayerApi(opts: {
   const selectRef = useRef(onSelect);
   const hideToolbarRef = useRef(hideToolbar);
   const dismissDrawRef = useRef<(() => void) | null>(null);
+  const rowCacheRef = useRef(new RowBoxCache());
   const dropEmptyRef = useRef(onDropEmpty);
   dropEmptyRef.current = onDropEmpty;
   cardsRef.current = cards;
@@ -198,8 +204,69 @@ export function useEdgeLayerApi(opts: {
 
   const allPainted = (): AnyEdge[] => [...edgesRef.current, ...refsRef.current];
 
+  const rowSourceIds = useMemo(() => {
+    const ids = new Set<DbId>();
+    for (const edge of edges) {
+      if (edge.fromBlock != null) ids.add(edge.from);
+    }
+    for (const ref of refEdges) {
+      if (ref.fromBlock != null) ids.add(ref.from);
+    }
+    return ids;
+  }, [edges, refEdges]);
+
+  const dirtyCardIdsRef = useRef(new Set<DbId>());
+  const rafRef = useRef<number | null>(null);
+
+  const onCardRowDirty = useCallback((cardId: DbId) => {
+    rowCacheRef.current.invalidateCard(cardId);
+    dirtyCardIdsRef.current.add(cardId);
+    if (rafRef.current == null) {
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = null;
+        const dirty = dirtyCardIdsRef.current;
+        if (dirty.size === 0) return;
+        const affected = new Set(dirty);
+        dirty.clear();
+
+        const canvas = canvasRef.current;
+        const currentBoxes = boxMap();
+        const getRowBox = (cId: DbId, rId: DbId, cBox: CardBox) => {
+          return rowCacheRef.current.measure(canvas, cId, rId, cBox);
+        };
+
+        const edgesToPaint = allPainted().filter(
+          (edge) => edge.fromBlock != null && affected.has(edge.from),
+        );
+        if (edgesToPaint.length > 0) {
+          paintEdgesForBoxes(
+            edgesToPaint,
+            currentBoxes,
+            (id) => elsRef.current.get(id),
+            getRowBox,
+          );
+        }
+      });
+    }
+  }, []);
+
+  const observerRef = useRef<CardRowObserverManager | null>(null);
+  if (observerRef.current == null) {
+    observerRef.current = new CardRowObserverManager(onCardRowDirty);
+  }
+
   const paintAll = () => {
-    paintEdgesForBoxes(allPainted(), boxMap(), (id) => elsRef.current.get(id));
+    const canvas = canvasRef.current;
+    const currentBoxes = boxMap();
+    const getRowBox = (cardId: DbId, rowId: DbId, cardBox: CardBox) => {
+      return rowCacheRef.current.measure(canvas, cardId, rowId, cardBox);
+    };
+    paintEdgesForBoxes(
+      allPainted(),
+      currentBoxes,
+      (id) => elsRef.current.get(id),
+      getRowBox,
+    );
   };
 
   useLayoutEffect(() => {
@@ -207,8 +274,22 @@ export function useEdgeLayerApi(opts: {
   }, [cards]);
 
   useLayoutEffect(() => {
+    observerRef.current?.sync(canvasRef.current, rowSourceIds);
+  });
+
+  useLayoutEffect(() => {
     paintAll();
   });
+
+  useEffect(() => {
+    return () => {
+      observerRef.current?.disconnect();
+      if (rafRef.current != null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+    };
+  }, []);
 
   useLayoutEffect(() => {
     const startDraw = (
@@ -217,15 +298,22 @@ export function useEdgeLayerApi(opts: {
       clientX: number,
       clientY: number,
       finishOn?: "mouseup" | "mousedown",
+      fromBlock?: DbId,
     ) => {
       const canvas = canvasRef.current;
       const ghost = ghostRef.current;
       if (canvas == null || ghost == null) return;
       dismissDrawRef.current?.();
-      const fromBox = liveRef.current.get(card.blockId) ?? card;
+      const cardBox = liveRef.current.get(card.blockId) ?? card;
+      const rowBox =
+        fromBlock != null
+          ? rowCacheRef.current.measure(canvas, card.blockId, fromBlock, cardBox)
+          : null;
+      const fromBox = resolveSourceBox(cardBox, rowBox);
       selectRef.current(null);
       const session = startDrawEdge({
         fromId: card.blockId,
+        fromBlock,
         fromSide: side,
         fromBox,
         cards: () =>
@@ -239,7 +327,7 @@ export function useEdgeLayerApi(opts: {
         occupiedPairs: () =>
           new Set(
             edgesRef.current.map((edge: WhiteboardEdge) =>
-              pairKey(edge.from, edge.to),
+              edgeDedupeKey(edge),
             ),
           ),
         finishOn,
@@ -252,6 +340,7 @@ export function useEdgeLayerApi(opts: {
             to: toId,
             arrow: "end",
           };
+          if (fromBlock != null) next.fromBlock = fromBlock;
           if (fromSide != null) next.fromSide = fromSide;
           void commitRef.current([...current, next]);
         },
@@ -268,12 +357,25 @@ export function useEdgeLayerApi(opts: {
     const onFrame = (boxes: Map<DbId, CardBox>) => {
       for (const [id, box] of boxes) liveRef.current.set(id, box);
       const touched = new Set(boxes.keys());
+      const currentBoxes = boxMap();
+      const getRowBox = (cardId: DbId, rowId: DbId, cardBox: CardBox) => {
+        return (
+          rowCacheRef.current.get(cardId, rowId, cardBox) ??
+          rowCacheRef.current.measure(
+            canvasRef.current,
+            cardId,
+            rowId,
+            cardBox,
+          )
+        );
+      };
       paintEdgesForBoxes(
         allPainted().filter(
           (edge) => touched.has(edge.from) || touched.has(edge.to),
         ),
-        boxMap(),
+        currentBoxes,
         (id) => elsRef.current.get(id),
+        getRowBox,
       );
     };
 
@@ -300,6 +402,7 @@ export function useEdgeLayerApi(opts: {
     edgesRef,
     commitRef,
     boxMap,
+    rowCacheRef,
     beginEndpointDrag,
     beginBendDrag,
     resetBend,

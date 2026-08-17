@@ -238,10 +238,65 @@ export const CARD_CSS = `
 }
 
 .owb-card-block-node {
+  position: relative;
   display: flex;
   align-items: flex-start;
   gap: 6px;
   min-width: 0;
+  transition:
+    background var(--owb-duration) var(--owb-ease),
+    box-shadow var(--owb-duration) var(--owb-ease);
+}
+
+.owb-card-block-node.owb-card-row-highlight {
+  background: color-mix(in oklab, var(--orca-color-primary-5, #00a896) 12%, transparent);
+  box-shadow: inset 3px 0 0 0 var(--orca-color-primary-5, #00a896);
+  border-radius: var(--owb-radius-sm, 3px);
+}
+
+.owb-row-connect-btn {
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--orca-color-border);
+  border-radius: 4px;
+  background: var(--orca-color-bg-2, #f5f5f5);
+  color: var(--orca-color-text-2, #666);
+  font-size: 11px;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 2;
+  transition: opacity var(--owb-duration) var(--owb-ease),
+              background var(--owb-duration) var(--owb-ease),
+              color var(--owb-duration) var(--owb-ease),
+              border-color var(--owb-duration) var(--owb-ease);
+}
+
+.owb-card:not(.is-editing) .owb-card-block-node:hover .owb-row-connect-btn {
+  opacity: 0.75;
+  pointer-events: auto;
+}
+
+.owb-row-connect-btn:hover {
+  opacity: 1 !important;
+  background: var(--orca-color-primary-1, #e6f7f5);
+  color: var(--orca-color-primary-5, #00a896);
+  border-color: var(--orca-color-primary-5, #00a896);
+}
+
+.owb-row-connect-btn:active,
+.owb-row-connect-btn.is-connecting {
+  background: var(--orca-color-primary-5, #00a896);
+  color: #fff;
+  border-color: var(--orca-color-primary-5, #00a896);
 }
 
 .owb-card-block-node + .owb-card-block-node {
@@ -415,74 +470,5 @@ export const CARD_CSS = `
   -webkit-line-clamp: 8;
   white-space: pre-wrap;
   word-break: break-word;
-}
-
-/* Card Resize Handles */
-.owb-card-handle {
-  position: absolute;
-  z-index: 5;
-  box-sizing: border-box;
-  background: transparent;
-  border: none;
-  box-shadow: none;
-  pointer-events: auto;
-}
-
-.owb-card-handle-n,
-.owb-card-handle-s {
-  left: 12px;
-  right: 12px;
-  height: 8px;
-  cursor: ns-resize;
-}
-
-.owb-card-handle-e,
-.owb-card-handle-w {
-  top: 12px;
-  bottom: 12px;
-  width: 8px;
-  cursor: ew-resize;
-}
-
-.owb-card-handle-n { top: 0; }
-.owb-card-handle-s { bottom: 0; }
-.owb-card-handle-e { right: 0; }
-.owb-card-handle-w { left: 0; }
-
-.owb-card-handle-ne,
-.owb-card-handle-nw,
-.owb-card-handle-se,
-.owb-card-handle-sw {
-  width: 12px;
-  height: 12px;
-}
-
-.owb-card-handle-ne { top: 0; right: 0; cursor: nesw-resize; }
-.owb-card-handle-nw { top: 0; left: 0; cursor: nwse-resize; }
-.owb-card-handle-se { bottom: 0; right: 0; cursor: nwse-resize; }
-.owb-card-handle-sw { bottom: 0; left: 0; cursor: nesw-resize; }
-
-@keyframes owb-card-focus-flash {
-  0%, 50%, 100% {
-    border-color: var(--orca-color-primary-5, #00a896);
-  }
-  25%, 75% {
-    border-color: var(--orca-color-warning-5, #f4a259);
-  }
-}
-
-.owb-card.is-focus-flash {
-  z-index: 6;
-  animation: owb-card-focus-flash 1200ms ease-in-out;
-}
-
-.owb-canvas.is-view-animating {
-  transition: transform 240ms ease-out;
-}
-
-.owb-grid.is-view-animating {
-  transition:
-    background-position 240ms ease-out,
-    background-size 240ms ease-out;
 }
 `.trim();

@@ -1,11 +1,14 @@
 import { boardPropsReadable } from "./boardWrite.ts";
 import {
+  edgeDedupeKey,
+  edgeSourceBlock,
   edgesEqual,
   normalizeEdge,
   parseEdges,
   planEdgeColor,
   planEdgeStyle,
   preparedEdges,
+  sanitizeEdges,
   tryParseEdges,
   tryReadEdges,
   type WhiteboardEdge,
@@ -230,5 +233,122 @@ check(
     bothMarks.value[0].linkRefId === 8,
   "linked and linkRefId can coexist",
 );
+
+// --- fromBlock: parsing, serialization, resolution, deduplication ---
+const rawWithFromBlock = {
+  id: "e-1-2-row",
+  from: 1,
+  to: 2,
+  fromBlock: 101,
+  arrow: "end",
+};
+const parsedWithRow = normalizeEdge(rawWithFromBlock);
+check(parsedWithRow?.fromBlock === 101, "normalizeEdge preserves fromBlock");
+
+const rawInvalidRow = {
+  id: "e-1-2-invalid",
+  from: 1,
+  to: 2,
+  fromBlock: "not-a-number",
+  arrow: "end",
+};
+const parsedInvalid = normalizeEdge(rawInvalidRow);
+check(parsedInvalid?.fromBlock === undefined, "invalid fromBlock is dropped");
+
+const legacyRaw = {
+  id: "e-1-2-legacy",
+  from: 1,
+  to: 2,
+  arrow: "end",
+};
+const parsedLegacy = normalizeEdge(legacyRaw);
+check(parsedLegacy?.fromBlock === undefined, "legacy edge without fromBlock works");
+
+// edgeSourceBlock resolution
+check(
+  edgeSourceBlock({ from: 1, fromBlock: 101 }) === 101,
+  "edgeSourceBlock resolves fromBlock when present",
+);
+check(
+  edgeSourceBlock({ from: 1 }) === 1,
+  "edgeSourceBlock resolves from when fromBlock is undefined",
+);
+
+// edgeDedupeKey
+check(
+  edgeDedupeKey({ from: 1, to: 2 }) === "1:2",
+  "edgeDedupeKey without fromBlock returns base pairKey",
+);
+check(
+  edgeDedupeKey({ from: 2, to: 1 }) === "1:2",
+  "edgeDedupeKey is commutative across from/to when without fromBlock",
+);
+check(
+  edgeDedupeKey({ from: 1, to: 2, fromBlock: 101 }) === "1:2:101",
+  "edgeDedupeKey with fromBlock includes row id",
+);
+check(
+  edgeDedupeKey({ from: 1, to: 2, fromBlock: 102 }) === "1:2:102",
+  "edgeDedupeKey with different fromBlock produces distinct key",
+);
+
+// sanitizeEdges deduplication
+const multiRowEdges: WhiteboardEdge[] = [
+  { id: "e1", from: 1, to: 2, fromBlock: 101, arrow: "end" },
+  { id: "e2", from: 1, to: 2, fromBlock: 102, arrow: "end" },
+  { id: "e3", from: 1, to: 2, arrow: "end" },
+];
+const sanitizedMulti = sanitizeEdges(multiRowEdges);
+check(
+  sanitizedMulti.length === 3,
+  "same card pair with different fromBlocks are all kept",
+);
+
+const duplicateRowEdges: WhiteboardEdge[] = [
+  { id: "e1", from: 1, to: 2, fromBlock: 101, arrow: "end" },
+  { id: "e2", from: 1, to: 2, fromBlock: 101, arrow: "end" },
+];
+const sanitizedDups = sanitizeEdges(duplicateRowEdges);
+check(
+  sanitizedDups.length === 1 && sanitizedDups[0].id === "e1",
+  "same card pair with same fromBlock deduplicates to first edge",
+);
+
+const duplicateLegacyEdges: WhiteboardEdge[] = [
+  { id: "e1", from: 1, to: 2, arrow: "end" },
+  { id: "e2", from: 2, to: 1, arrow: "end" },
+];
+const sanitizedLegacyDups = sanitizeEdges(duplicateLegacyEdges);
+check(
+  sanitizedLegacyDups.length === 1 && sanitizedLegacyDups[0].id === "e1",
+  "same card pair without fromBlock maintains legacy pair deduplication",
+);
+
+// edgesEqual with fromBlock
+const edgeA: WhiteboardEdge = {
+  id: "e1",
+  from: 1,
+  to: 2,
+  fromBlock: 101,
+  arrow: "end",
+};
+const edgeB: WhiteboardEdge = {
+  id: "e1",
+  from: 1,
+  to: 2,
+  fromBlock: 102,
+  arrow: "end",
+};
+const edgeC: WhiteboardEdge = { id: "e1", from: 1, to: 2, arrow: "end" };
+check(!edgesEqual([edgeA], [edgeB]), "edgesEqual distinguishes different fromBlocks");
+check(!edgesEqual([edgeA], [edgeC]), "edgesEqual distinguishes fromBlock from root");
+check(edgesEqual([edgeA], [{ ...edgeA }]), "edgesEqual matches identical fromBlock");
+
+// JSON serialization roundtrip
+const serialized = JSON.stringify([edgeA, edgeC]);
+const roundtrip = parseEdges(JSON.parse(serialized));
+check(roundtrip.length === 2, "JSON roundtrip preserves edges count");
+check(roundtrip[0].fromBlock === 101, "JSON roundtrip preserves fromBlock");
+check(roundtrip[1].fromBlock === undefined, "JSON roundtrip preserves undefined fromBlock");
 
 console.log("edges.test.ts ok");

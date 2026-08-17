@@ -1,8 +1,10 @@
 import type { Block, BlockRef, DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n";
-import type { WhiteboardEdge } from "./edges";
+import { edgeSourceBlock, type WhiteboardEdge } from "./edges";
 import { cacheBlockList, fetchBlock } from "./newCard";
 import { cacheReturnedBlocks } from "./noteWrite";
+
+export { edgeSourceBlock };
 
 /** Property that holds this plugin's arrow references. Type is BlockRefs (2). */
 export const EDGE_LINK_PROP = "whiteboard.link";
@@ -173,23 +175,24 @@ async function writeEdgeLinkProp(
 }
 
 export async function linkEdgeByProperty(edge: WhiteboardEdge): Promise<DbId> {
-  return enqueueBlock(edge.from, async () => {
-    const source = await fetchBlock(edge.from);
+  const sourceId = edgeSourceBlock(edge);
+  return enqueueBlock(sourceId, async () => {
+    const source = await fetchBlock(sourceId);
     const current = readEdgeLinkPropIds(source);
     const existing = findExistingEdgeLink(source.refs ?? [], current, edge.to);
     if (existing != null) return existing;
 
     const alias = edge.label?.trim() ?? "";
-    const refId = await createPropertyRef(edge.from, edge.to, alias);
-    const fresh = await fetchBlock(edge.from);
+    const refId = await createPropertyRef(sourceId, edge.to, alias);
+    const fresh = await fetchBlock(sourceId);
     const latest = readEdgeLinkPropIds(fresh);
     const next = addLinkRefId(latest, refId);
     if (linkRefIdsEqual(latest, next)) return refId;
     try {
-      await writeEdgeLinkProp(edge.from, next, edge.to);
+      await writeEdgeLinkProp(sourceId, next, edge.to);
     } catch (error) {
       try {
-        await writeEdgeLinkProp(edge.from, latest, edge.to);
+        await writeEdgeLinkProp(sourceId, latest, edge.to);
       } catch (recycleError) {
         console.error(
           "[whiteboard] failed to recycle orphan property ref",
@@ -203,12 +206,13 @@ export async function linkEdgeByProperty(edge: WhiteboardEdge): Promise<DbId> {
 }
 
 export async function unlinkEdgeByProperty(edge: WhiteboardEdge): Promise<void> {
-  await enqueueBlock(edge.from, async () => {
+  const sourceId = edgeSourceBlock(edge);
+  await enqueueBlock(sourceId, async () => {
     // The source note may already be gone (deleted from the outline). Its
     // property ref went with it, so there is nothing left to unlink.
     const loaded = (await orca.invokeBackend(
       "get-block",
-      edge.from,
+      sourceId,
     )) as Block | null;
     if (loaded == null) return;
     cacheBlockList([loaded]);
@@ -220,6 +224,6 @@ export async function unlinkEdgeByProperty(edge: WhiteboardEdge): Promise<void> 
     if (refId == null) return;
     const next = removeLinkRefId(current, refId);
     if (linkRefIdsEqual(current, next)) return;
-    await writeEdgeLinkProp(edge.from, next, edge.to);
+    await writeEdgeLinkProp(sourceId, next, edge.to);
   });
 }

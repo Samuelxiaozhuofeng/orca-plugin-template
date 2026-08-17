@@ -9,11 +9,12 @@ import {
   type EdgeCurve,
   type Point,
 } from "./edgeGeometry.ts";
-import type {
-  EdgeBend,
-  EdgeBendPoint,
-  Side,
-  WhiteboardEdge,
+import {
+  edgeDedupeKey,
+  type EdgeBend,
+  type EdgeBendPoint,
+  type Side,
+  type WhiteboardEdge,
 } from "./edges.ts";
 
 export const BEND_LIMIT = 20;
@@ -187,14 +188,26 @@ export function nearestValidAnchor(
   const occupied = new Set<string>();
   for (const item of opts.edges) {
     if (item.id === opts.edgeId) continue;
-    occupied.add(pairKey(item.from, item.to));
+    occupied.add(edgeDedupeKey(item));
   }
 
   let best: AnchorCandidate | null = null;
   let bestDist = ANCHOR_SNAP_RADIUS;
   for (const card of cards) {
     if (card.blockId === otherId) continue;
-    if (occupied.has(pairKey(card.blockId, otherId))) continue;
+    const targetKey =
+      opts.moving === "to"
+        ? edgeDedupeKey({
+            from: opts.edge.from,
+            to: card.blockId,
+            fromBlock: opts.edge.fromBlock,
+          })
+        : edgeDedupeKey({
+            from: card.blockId,
+            to: opts.edge.to,
+            fromBlock: undefined,
+          });
+    if (occupied.has(targetKey)) continue;
     for (const side of EDGE_SIDES) {
       const point = anchorPoint(card, side);
       const dist = pointDist(world, point);

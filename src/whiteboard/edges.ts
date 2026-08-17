@@ -20,6 +20,7 @@ export type WhiteboardEdge = {
   id: string;
   from: DbId;
   to: DbId;
+  fromBlock?: DbId;
   label?: string;
   arrow: EdgeArrow;
   fromSide?: Side;
@@ -93,6 +94,21 @@ export function pairKey(a: DbId, b: DbId): string {
   return a < b ? `${a}:${b}` : `${b}:${a}`;
 }
 
+export function edgeSourceBlock(
+  edge: Pick<WhiteboardEdge, "from" | "fromBlock">,
+): DbId {
+  return edge.fromBlock ?? edge.from;
+}
+
+export function edgeDedupeKey(edge: {
+  from: DbId;
+  to: DbId;
+  fromBlock?: DbId;
+}): string {
+  const base = pairKey(edge.from, edge.to);
+  return edge.fromBlock != null ? `${base}:${edge.fromBlock}` : base;
+}
+
 export function nextEdgeId(
   from: DbId,
   to: DbId,
@@ -121,6 +137,8 @@ export function normalizeEdge(value: unknown): WhiteboardEdge | null {
     to,
     arrow: asArrow(raw.arrow),
   };
+  const fromBlock = asDbId(raw.fromBlock);
+  if (fromBlock != null) edge.fromBlock = fromBlock;
   const label = asLabel(raw.label);
   if (label != null) edge.label = label;
   const fromSide = asSide(raw.fromSide);
@@ -139,7 +157,7 @@ export function normalizeEdge(value: unknown): WhiteboardEdge | null {
   return edge;
 }
 
-/** Drops self-loops and duplicate pairs. Does not drop edges whose cards are missing. */
+/** Drops self-loops and duplicate pairs/rows. Does not drop edges whose cards are missing. */
 export function sanitizeEdges(
   edges: readonly WhiteboardEdge[],
   _cardIds?: ReadonlySet<DbId>,
@@ -148,7 +166,7 @@ export function sanitizeEdges(
   const out: WhiteboardEdge[] = [];
   for (const edge of edges) {
     if (edge.from === edge.to) continue;
-    const key = pairKey(edge.from, edge.to);
+    const key = edgeDedupeKey(edge);
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(edge);
@@ -199,6 +217,7 @@ function edgeEqual(left: WhiteboardEdge, right: WhiteboardEdge): boolean {
     left.id === right.id &&
     left.from === right.from &&
     left.to === right.to &&
+    left.fromBlock === right.fromBlock &&
     left.label === right.label &&
     left.arrow === right.arrow &&
     left.fromSide === right.fromSide &&

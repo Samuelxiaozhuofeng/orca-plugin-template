@@ -5,6 +5,7 @@ import { EdgeLabelLayer, EdgeMenuPopup } from "./EdgeOverlay";
 import { EdgeToolbar } from "./EdgeToolbar";
 import { nextEdgeToolbarOpen } from "./edgeToolbarLayout";
 import { edgeHasNoteLink } from "./edgeLink";
+import { resolveSourceBox } from "./edgeRowBoxes";
 import {
   type EdgeArrow,
   type WhiteboardEdge,
@@ -195,6 +196,7 @@ export function EdgeLayer({
     edgesRef,
     commitRef,
     boxMap,
+    rowCacheRef,
     beginEndpointDrag,
     beginBendDrag,
     resetBend,
@@ -227,10 +229,21 @@ export function EdgeLayer({
 
   const boxes = boxMap();
   const curveOf = (edge: AnyEdge) => {
-    const from = boxes.get(edge.from);
+    const fromCardBox = boxes.get(edge.from);
     const to = boxes.get(edge.to);
-    if (from == null || to == null) return null;
-    return curveForBoxes(from, to, edge.fromSide, edge.toSide, edge.bend);
+    if (fromCardBox == null || to == null) return null;
+    const rowBox =
+      edge.fromBlock != null
+        ? rowCacheRef.current.get(edge.from, edge.fromBlock, fromCardBox) ??
+          rowCacheRef.current.measure(
+            canvasRef.current,
+            edge.from,
+            edge.fromBlock,
+            fromCardBox,
+          )
+        : null;
+    const fromBox = resolveSourceBox(fromCardBox, rowBox);
+    return curveForBoxes(fromBox, to, edge.fromSide, edge.toSide, edge.bend);
   };
 
   const markersFor = (arrow: EdgeArrow) => {

@@ -5,7 +5,7 @@ import {
   isPluginPropertyRef,
   readEdgeLinkPropIds,
 } from "./edgeLink";
-import { pairKey, type WhiteboardEdge } from "./edges";
+import { edgeDedupeKey, type WhiteboardEdge } from "./edges";
 
 const { useMemo, useRef } = window.React;
 
@@ -17,6 +17,7 @@ export type ReferenceEdge = {
   id: string;
   from: DbId;
   to: DbId;
+  fromBlock?: DbId;
 };
 
 export type ReferenceEdgesResult = {
@@ -57,7 +58,7 @@ export function buildOwnerMap(
 export function collectReferenceEdges(
   cards: readonly WhiteboardCard[],
   blocks: { [id: number]: Block | undefined },
-  drawnPairs: ReadonlySet<string>,
+  drawnKeys: ReadonlySet<string>,
 ): ReferenceEdgesResult {
   const { owner, truncated } = buildOwnerMap(cards, blocks);
   const seen = new Set<string>();
@@ -74,10 +75,17 @@ export function collectReferenceEdges(
       if (!keep) continue;
       const toCard = owner.get(ref.to);
       if (toCard == null || toCard === fromCard) continue;
-      const key = pairKey(fromCard, toCard);
-      if (drawnPairs.has(key) || seen.has(key)) continue;
+      const fromBlock = blockId !== fromCard ? blockId : undefined;
+      const key = edgeDedupeKey({ from: fromCard, to: toCard, fromBlock });
+      if (drawnKeys.has(key) || seen.has(key)) continue;
       seen.add(key);
-      out.push({ id: `ref:${key}`, from: fromCard, to: toCard });
+      const edge: ReferenceEdge = {
+        id: `ref:${key}`,
+        from: fromCard,
+        to: toCard,
+      };
+      if (fromBlock != null) edge.fromBlock = fromBlock;
+      out.push(edge);
     }
   }
   return { edges: out, truncated };
@@ -181,7 +189,7 @@ export function useReferenceEdges(
   const cacheRef = useRef(new Map<DbId, CardRelationSnap>());
   const cardKey = cards.map((card) => card.blockId).join(",");
   const drawnKey = drawn
-    .map((edge) => pairKey(edge.from, edge.to))
+    .map((edge) => edgeDedupeKey(edge))
     .sort()
     .join("|");
   const relationKey = useWatchedValue(
@@ -213,9 +221,9 @@ export function useReferenceEdges(
     if (!enabled || cards.length === 0) {
       return { edges: [], truncated: false };
     }
-    const pairs = new Set(
-      drawn.map((edge) => pairKey(edge.from, edge.to)),
+    const drawnKeys = new Set(
+      drawn.map((edge) => edgeDedupeKey(edge)),
     );
-    return collectReferenceEdges(cards, liveBlocks(), pairs);
+    return collectReferenceEdges(cards, liveBlocks(), drawnKeys);
   }, [enabled, cardKey, drawnKey, relationKey]);
 }

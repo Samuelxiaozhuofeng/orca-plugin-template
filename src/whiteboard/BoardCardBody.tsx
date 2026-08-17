@@ -79,9 +79,16 @@ type CardBodyProps = {
   loadRetrying: boolean;
   isEmptyJournal: boolean;
   promotedKey: string;
+  highlightedRowIds?: ReadonlySet<DbId>;
   onStartEdit: (blockId: DbId) => void;
   onRetryLoad?: (blockId: DbId) => void;
   onFocusCard?: (blockId: DbId) => void;
+  onStartConnect?: (
+    card: WhiteboardCard,
+    event: React.MouseEvent,
+    mode: "drag" | "click",
+    fromBlock?: DbId,
+  ) => void;
 };
 
 /** Card body: board preview, or the live note tree / editor. */
@@ -97,9 +104,11 @@ export function CardBody({
   loadRetrying,
   isEmptyJournal,
   promotedKey,
+  highlightedRowIds,
   onStartEdit,
   onRetryLoad,
   onFocusCard,
+  onStartConnect,
 }: CardBodyProps) {
   if (hosted.board != null) {
     return (
@@ -150,9 +159,12 @@ export function CardBody({
         <CardBlockTree
           key={treeRev}
           panelId={panelId}
+          card={card}
           blockId={card.blockId}
           promotedKey={promotedKey}
+          highlightedRowIds={highlightedRowIds}
           onFocusCard={onFocusCard}
+          onStartConnect={onStartConnect}
         />
       )}
       {shownNotice != null && !fillLoadError ? (

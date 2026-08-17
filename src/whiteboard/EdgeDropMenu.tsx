@@ -9,8 +9,8 @@ import type { WhiteboardCard } from "./data";
 import { placeDroppedBlocks } from "./dropBlocks";
 import type { DrawDropEmpty } from "./edgeGestures";
 import {
+  edgeDedupeKey,
   nextEdgeId,
-  pairKey,
   type WhiteboardEdge,
 } from "./edges";
 import { addBlankCardToBoard } from "./newCard";
@@ -64,26 +64,27 @@ export function EdgeDropMenu({
       orca.notify("info", t("Cannot connect a card to itself"));
       return;
     }
+    const targetKey = edgeDedupeKey({
+      from: drop.fromId,
+      to: toId,
+      fromBlock: drop.fromBlock,
+    });
     if (
-      edges.some(
-        (edge: WhiteboardEdge) =>
-          pairKey(edge.from, edge.to) === pairKey(drop.fromId, toId),
-      )
+      edges.some((edge: WhiteboardEdge) => edgeDedupeKey(edge) === targetKey)
     ) {
       orca.notify("info", t("These cards are already connected"));
       onClose();
       return;
     }
-    const ok = await onCommitEdges([
-      ...edges,
-      {
-        id: nextEdgeId(drop.fromId, toId, edges),
-        from: drop.fromId,
-        to: toId,
-        arrow: "end",
-        fromSide: drop.fromSide,
-      },
-    ]);
+    const next: WhiteboardEdge = {
+      id: nextEdgeId(drop.fromId, toId, edges),
+      from: drop.fromId,
+      to: toId,
+      arrow: "end",
+    };
+    if (drop.fromBlock != null) next.fromBlock = drop.fromBlock;
+    if (drop.fromSide != null) next.fromSide = drop.fromSide;
+    const ok = await onCommitEdges([...edges, next]);
     if (ok) onClose();
   };
 

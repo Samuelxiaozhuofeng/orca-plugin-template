@@ -59,31 +59,15 @@ type Props = {
   pointerToWorld: (clientX: number, clientY: number) => { x: number; y: number };
   onStartEdit: (blockId: DbId) => void;
   onEndEdit: () => void;
-  onCardMouseDown: (
-    event: React.MouseEvent<HTMLDivElement>,
-    card: WhiteboardCard,
-  ) => void;
-  onPatchCard: (
-    blockId: DbId,
-    patch: {
-      x?: number;
-      y?: number;
-      w?: number;
-      h?: number;
-      color?: string;
-      hLock?: true;
-    },
-  ) => void;
+  onCardMouseDown: (event: React.MouseEvent<HTMLDivElement>, card: WhiteboardCard) => void;
+  onPatchCard: (blockId: DbId, patch: { x?: number; y?: number; w?: number; h?: number; color?: string; hLock?: true }) => void;
   onContentHeight: (blockId: DbId, nextH: number, record: boolean) => void;
   onArrange: (action: ArrangeAction) => void;
   onSelectOnly: (blockId: DbId) => void;
-  onStartConnect: (
-    card: WhiteboardCard,
-    event: React.MouseEvent,
-    mode: "drag" | "click",
-  ) => void;
+  onStartConnect: (card: WhiteboardCard, event: React.MouseEvent, mode: "drag" | "click", fromBlock?: DbId) => void;
   onMoveFrame?: (boxes: Map<DbId, { x: number; y: number; w: number; h: number }>) => void;
   promotedKey?: string;
+  highlightedRowIds?: ReadonlySet<DbId>;
   onFocusCard?: (blockId: DbId) => void;
   onExtractRow?: (blockId: DbId, sourceCard: WhiteboardCard) => void;
   onWrapSelected?: () => void;
@@ -113,6 +97,7 @@ export function Card({
   onStartConnect,
   onMoveFrame,
   promotedKey = "",
+  highlightedRowIds,
   onFocusCard,
   onExtractRow,
   presentReveal,
@@ -472,9 +457,11 @@ export function Card({
                 loadRetrying={loadRetrying}
                 isEmptyJournal={isEmptyJournal}
                 promotedKey={promotedKey}
+                highlightedRowIds={highlightedRowIds}
                 onStartEdit={onStartEdit}
                 onRetryLoad={onRetryLoad}
                 onFocusCard={onFocusCard}
+                onStartConnect={onStartConnect}
               />
             </CardErrorBoundary>
           )}

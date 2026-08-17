@@ -35,6 +35,7 @@ type Props = {
   onWrapSelected: () => void;
   onFocusCard: (blockId: DbId) => void;
   presentReveal?: { revealedIds: ReadonlySet<DbId>; currentId: DbId | null } | null;
+  highlightedRowIds?: ReadonlySet<DbId>;
 };
 
 export function CanvasCards({
@@ -60,6 +61,7 @@ export function CanvasCards({
   onWrapSelected,
   onFocusCard,
   presentReveal,
+  highlightedRowIds,
 }: Props) {
   const promotedKey = cardIdsKey(cards);
   const cardTrees = useVisibleCardTrees(
@@ -109,6 +111,7 @@ export function CanvasCards({
             card: WhiteboardCard,
             event: React.MouseEvent,
             mode: "drag" | "click",
+            fromBlock?: DbId,
           ) => {
             edgeApiRef.current?.startDraw(
               card,
@@ -116,9 +119,11 @@ export function CanvasCards({
               event.clientX,
               event.clientY,
               mode === "click" ? "mousedown" : "mouseup",
+              fromBlock,
             );
           }}
           promotedKey={promotedKey}
+          highlightedRowIds={highlightedRowIds}
           onFocusCard={onFocusCard}
           onExtractRow={onExtractRow}
           onWrapSelected={onWrapSelected}

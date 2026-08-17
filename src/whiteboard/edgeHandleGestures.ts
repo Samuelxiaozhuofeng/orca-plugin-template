@@ -339,6 +339,11 @@ export function startEndpointHandleDrag(
               toSide: snap.side,
               fromSide: live.fromSide ?? start.curve.fromSide,
             };
+      // Rehanging the source onto another card leaves any row anchor behind:
+      // it points at a row inside the card this line no longer starts from.
+      if (opts.which === "from" && next.from !== live.from) {
+        delete next.fromBlock;
+      }
       opts.onCommit(replaceEdge(edges, opts.edgeId, next));
     },
     onCancel: () => {

@@ -250,6 +250,7 @@ export function edgesMatchIgnoringLinked(
     if (
       item.from !== other.from ||
       item.to !== other.to ||
+      item.fromBlock !== other.fromBlock ||
       item.label !== other.label ||
       item.arrow !== other.arrow ||
       item.fromSide !== other.fromSide ||

@@ -33,7 +33,11 @@ function endpointsChanged(
   left: WhiteboardEdge,
   right: WhiteboardEdge,
 ): boolean {
-  return left.from !== right.from || left.to !== right.to;
+  return (
+    left.from !== right.from ||
+    left.to !== right.to ||
+    left.fromBlock !== right.fromBlock
+  );
 }
 
 /** Pure: which edges to unlink / link. Side effects stay in `syncEdgeLinks`. */

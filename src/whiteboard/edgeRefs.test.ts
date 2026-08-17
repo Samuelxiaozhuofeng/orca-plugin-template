@@ -247,4 +247,64 @@ const propKey3 = referenceRelationKey(
 check(propKey3 !== propKey1, "plugin property array changes invalidate the fingerprint");
 check(propStats3.walked === 1, "only the dirty property-ref card is walked");
 
+// --- Multi-row implicit reference dashed lines ---
+const card1 = card(1);
+const card2 = card(2);
+const card3 = card(3);
+
+const multiRowBlocks = {
+  1: {
+    children: [11, 12],
+    refs: [],
+  },
+  11: {
+    children: [],
+    refs: [inlineRef(2), inlineRef(3)],
+  },
+  12: {
+    children: [],
+    refs: [inlineRef(2)],
+  },
+  2: { children: [], refs: [] },
+  3: { children: [], refs: [] },
+};
+
+const multiRowResult = collectReferenceEdges(
+  [card1, card2, card3],
+  multiRowBlocks,
+  new Set(),
+);
+check(multiRowResult.edges.length === 3, "generates 3 reference edges across multiple rows");
+
+const row11To2 = multiRowResult.edges.find(
+  (e) => e.from === 1 && e.to === 2 && e.fromBlock === 11,
+);
+const row12To2 = multiRowResult.edges.find(
+  (e) => e.from === 1 && e.to === 2 && e.fromBlock === 12,
+);
+const row11To3 = multiRowResult.edges.find(
+  (e) => e.from === 1 && e.to === 3 && e.fromBlock === 11,
+);
+check(row11To2 != null, "generates edge from row 11 to card 2");
+check(row12To2 != null, "generates edge from row 12 to card 2");
+check(row11To3 != null, "generates edge from row 11 to card 3");
+
+// Suppress only row 11 -> card 2
+const partialDrawn = new Set(["1:2:11"]);
+const partialResult = collectReferenceEdges(
+  [card1, card2, card3],
+  multiRowBlocks,
+  partialDrawn,
+);
+check(
+  partialResult.edges.length === 2,
+  "suppressing row 11 -> card 2 leaves row 12 -> card 2 and row 11 -> card 3",
+);
+check(
+  partialResult.edges.some(
+    (e) => e.from === 1 && e.to === 2 && e.fromBlock === 12,
+  ),
+  "row 12 -> card 2 remains intact",
+);
+
 console.log("edgeRefs.test.ts ok");

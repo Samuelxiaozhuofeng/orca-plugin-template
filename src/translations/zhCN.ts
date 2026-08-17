@@ -96,6 +96,7 @@ const zhCN = {
   "Added as a separate card on the whiteboard": "已在白板上单独成卡",
   "Fit content height": "适应内容高度",
   "Connect to another card": "连到其他卡片",
+  "Connect from this block": "从该块连线",
   "Open in side panel": "在侧边面板打开",
   "Open in this panel": "在当前面板打开",
   "Locate on whiteboard": "在白板上定位",

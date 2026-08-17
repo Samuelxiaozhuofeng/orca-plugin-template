@@ -1,7 +1,7 @@
 import type { Block, ContentFragment, DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n";
 import { REF_TYPE_INLINE } from "./edgeRefs";
-import type { WhiteboardEdge } from "./edges";
+import { edgeSourceBlock, type WhiteboardEdge } from "./edges";
 import { cacheBlockList, fetchBlock, insertLastChildTextBlock } from "./newCard";
 import {
   createInlineRef,
@@ -47,8 +47,9 @@ async function alreadyLinked(fromId: DbId, toId: DbId): Promise<boolean> {
 }
 
 export async function linkEdgeToNote(edge: WhiteboardEdge): Promise<void> {
-  if (await alreadyLinked(edge.from, edge.to)) return;
-  const child = await insertLastChildTextBlock(edge.from);
+  const sourceId = edgeSourceBlock(edge);
+  if (await alreadyLinked(sourceId, edge.to)) return;
+  const child = await insertLastChildTextBlock(sourceId);
   let refId: DbId;
   try {
     refId = await createInlineRef(child.id, edge.to);
