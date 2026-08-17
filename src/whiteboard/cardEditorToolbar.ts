@@ -1,102 +1,41 @@
 /**
- * Orca portals the selection toolbar into the card's .orca-block-editor
- * as position:absolute, so card overflow clips a narrow card. We do not
- * move the node (Orca resolves the target editor from that subtree).
- * Instead we switch it to position:fixed. The canvas transform is then
- * the containing block: intermediate overflow no longer clips, left/top
- * are canvas-local, and a 1/scale transform keeps the bar's visual size
- * constant. applyViewToDom uses origin 0 0 + translate + scale.
+ * Orca portals the selection toolbar and completion popups (@ / /) into the
+ * card's .orca-block-editor subtree as position:absolute, so card overflow
+ * clips them and canvas zoom distorts their size.
+ *
+ * We do not move the nodes (Orca resolves the target editor and block context
+ * from that subtree). Instead we switch them to position:fixed. The canvas
+ * transform is then the containing block: intermediate overflow (card-body,
+ * block-editor, card) no longer clips, left/top are canvas-local, and a
+ * 1/scale transform keeps the visual size at 1:1.
  */
 
-export const EDITOR_TOOLBAR_GAP = 8;
-export const EDITOR_TOOLBAR_PAD = 8;
-export const EDITOR_TOOLBAR_FALLBACK_W = 360;
-export const EDITOR_TOOLBAR_FALLBACK_H = 44;
+import {
+  EDITOR_POPUP_FALLBACK_H,
+  EDITOR_POPUP_FALLBACK_W,
+  EDITOR_POPUP_GAP,
+  EDITOR_POPUP_PAD,
+  EDITOR_TOOLBAR_FALLBACK_H,
+  EDITOR_TOOLBAR_FALLBACK_W,
+  EDITOR_TOOLBAR_GAP,
+  EDITOR_TOOLBAR_PAD,
+  canvasScaleFromMatrix,
+  placeEditorFloating,
+  viewportToCanvasLocal,
+  type ToolbarBox,
+} from "./cardEditorFloatingLayout.ts";
+
+export * from "./cardEditorFloatingLayout.ts";
 
 export const FIXED_TOOLBAR_CLASS = "owb-editor-toolbar-fixed";
 
 const TOOLBAR_SELECTOR = ".orca-editor-toolbar";
+const POPUP_SELECTOR = ".orca-popup";
+const FLOATING_SELECTOR = `${TOOLBAR_SELECTOR}, ${POPUP_SELECTOR}`;
+const EDITOR_SELECTOR = ".orca-block-editor";
 const CARD_SELECTOR = ".owb-card";
 const CANVAS_SELECTOR = ".owb-canvas";
 const VIEWPORT_SELECTOR = ".owb-viewport";
-
-export type ToolbarBox = { x: number; y: number; width: number; height: number };
-
-export type ToolbarPlace = {
-  left: number;
-  top: number;
-  side: "above" | "below";
-};
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
-
-/** Viewport-space left/top for a toolbar that should hug a selection rect. */
-export function placeEditorToolbar(opts: {
-  selection: ToolbarBox;
-  toolbar: { width: number; height: number };
-  viewport: { width: number; height: number; left?: number; top?: number };
-  gap?: number;
-  pad?: number;
-}): ToolbarPlace {
-  const gap = opts.gap ?? EDITOR_TOOLBAR_GAP;
-  const pad = opts.pad ?? EDITOR_TOOLBAR_PAD;
-  const { selection, toolbar, viewport } = opts;
-  const vpLeft = viewport.left ?? 0;
-  const vpTop = viewport.top ?? 0;
-
-  const minLeft = vpLeft + pad;
-  const maxLeft = vpLeft + viewport.width - toolbar.width - pad;
-  const left = clamp(selection.x, minLeft, Math.max(minLeft, maxLeft));
-
-  const minTop = vpTop + pad;
-  const maxTop = vpTop + viewport.height - toolbar.height - pad;
-  const aboveTop = selection.y - gap - toolbar.height;
-  if (aboveTop >= minTop) {
-    return {
-      left,
-      top: Math.min(aboveTop, Math.max(minTop, maxTop)),
-      side: "above",
-    };
-  }
-  return {
-    left,
-    top: clamp(
-      selection.y + selection.height + gap,
-      minTop,
-      Math.max(minTop, maxTop),
-    ),
-    side: "below",
-  };
-}
-
-/** Uniform scale of a 2D matrix (hypot of the first column). */
-export function canvasScaleFromMatrix(matrix: {
-  a: number;
-  b: number;
-}): number {
-  const scale = Math.hypot(matrix.a, matrix.b);
-  return scale > 0 && Number.isFinite(scale) ? scale : 1;
-}
-
-/**
- * Map a viewport point into .owb-canvas local space.
- * Matches applyViewToDom: origin 0 0, then translate + scale.
- * canvasOrigin is canvas.getBoundingClientRect() (transformed origin).
- */
-export function viewportToCanvasLocal(
-  x: number,
-  y: number,
-  canvasOrigin: { left: number; top: number },
-  scale: number,
-): { x: number; y: number } {
-  const s = scale === 0 || !Number.isFinite(scale) ? 1 : scale;
-  return {
-    x: (x - canvasOrigin.left) / s,
-    y: (y - canvasOrigin.top) / s,
-  };
-}
 
 type PinRecord = {
   el: HTMLElement;
@@ -144,14 +83,16 @@ function onMutations(records: MutationRecord[]): void {
       }
     }
   } catch {
-    /* host class names or a detached tree — leave the toolbar alone */
+    /* host class names or a detached tree — leave the floating UI alone */
   }
 }
 
 function scanExisting(): void {
   try {
     document
-      .querySelectorAll(`${CARD_SELECTOR} ${TOOLBAR_SELECTOR}`)
+      .querySelectorAll(
+        `${CARD_SELECTOR} ${TOOLBAR_SELECTOR}, ${CARD_SELECTOR} ${POPUP_SELECTOR}`,
+      )
       .forEach((el) => {
         if (el instanceof HTMLElement) pin(el);
       });
@@ -174,11 +115,17 @@ function collect(node: Node, into: HTMLElement[]): void {
   // Cheap gate: this observer sees every DOM change in the host app, and
   // nothing outside a card is ever pinned.
   if (node.closest(CARD_SELECTOR) == null) return;
-  if (node.matches(TOOLBAR_SELECTOR)) {
-    into.push(node);
+  if (node.matches(FLOATING_SELECTOR)) {
+    if (node.parentElement?.closest(FLOATING_SELECTOR) == null) {
+      into.push(node);
+    }
   }
-  node.querySelectorAll(TOOLBAR_SELECTOR).forEach((el) => {
-    if (el instanceof HTMLElement && el.closest(CARD_SELECTOR) != null) {
+  node.querySelectorAll(FLOATING_SELECTOR).forEach((el) => {
+    if (
+      el instanceof HTMLElement &&
+      el.closest(CARD_SELECTOR) != null &&
+      el.parentElement?.closest(FLOATING_SELECTOR) == null
+    ) {
       into.push(el);
     }
   });
@@ -187,7 +134,7 @@ function collect(node: Node, into: HTMLElement[]): void {
 function forgetTree(node: Node): void {
   if (!(node instanceof HTMLElement)) return;
   if (pinned.has(node)) unpin(node);
-  node.querySelectorAll(TOOLBAR_SELECTOR).forEach((el) => {
+  node.querySelectorAll(FLOATING_SELECTOR).forEach((el) => {
     if (el instanceof HTMLElement) unpin(el);
   });
 }
@@ -196,6 +143,10 @@ function pin(el: HTMLElement): void {
   if (pinned.has(el)) return;
   if (el.closest(CARD_SELECTOR) == null) return;
   if (el.closest(CANVAS_SELECTOR) == null) return;
+  if (el.parentElement?.closest(FLOATING_SELECTOR) != null) return;
+  // Only the editor's own floating UI. Other host popups that happen to sit
+  // over a card (hover previews, block pickers) keep their own placement.
+  if (el.closest(EDITOR_SELECTOR) == null) return;
 
   const rec: PinRecord = { el, styleWatch: null };
   try {
@@ -275,17 +226,33 @@ function applyPlace(el: HTMLElement): void {
   }
   const canvas = el.closest(CANVAS_SELECTOR);
   if (!(canvas instanceof HTMLElement)) return;
-  const selection = readSelectionClientRect();
-  if (selection == null) return;
+
+  const isPopup = el.matches(POPUP_SELECTOR);
+  const anchor = readAnchorClientRect(el, isPopup ? "popup" : "toolbar");
+  if (anchor == null) return;
 
   const scale = readCanvasScale(canvas);
   const canvasRect = canvas.getBoundingClientRect();
   const viewport = readBoardViewport(canvas, canvasRect);
-  const toolbar = {
-    width: el.offsetWidth || EDITOR_TOOLBAR_FALLBACK_W,
-    height: el.offsetHeight || EDITOR_TOOLBAR_FALLBACK_H,
+
+  const floating = {
+    width:
+      el.offsetWidth ||
+      (isPopup ? EDITOR_POPUP_FALLBACK_W : EDITOR_TOOLBAR_FALLBACK_W),
+    height:
+      el.offsetHeight ||
+      (isPopup ? EDITOR_POPUP_FALLBACK_H : EDITOR_TOOLBAR_FALLBACK_H),
   };
-  const placed = placeEditorToolbar({ selection, toolbar, viewport });
+
+  const placed = placeEditorFloating({
+    anchor,
+    floating,
+    viewport,
+    prefer: isPopup ? "below" : "above",
+    gap: isPopup ? EDITOR_POPUP_GAP : EDITOR_TOOLBAR_GAP,
+    pad: isPopup ? EDITOR_POPUP_PAD : EDITOR_TOOLBAR_PAD,
+  });
+
   const local = viewportToCanvasLocal(
     placed.left,
     placed.top,
@@ -344,21 +311,94 @@ function readBoardViewport(
   };
 }
 
-function readSelectionClientRect(): ToolbarBox | null {
+function readAnchorClientRect(
+  el: HTMLElement,
+  mode: "toolbar" | "popup",
+): ToolbarBox | null {
   try {
+    const card = el.closest(CARD_SELECTOR);
     const sel = document.getSelection();
-    if (sel == null || sel.rangeCount === 0) return null;
-    const range = sel.getRangeAt(0);
-    if (range.collapsed) return null;
-    const first = range.getClientRects()[0] ?? range.getBoundingClientRect();
-    if (first == null || (first.width === 0 && first.height === 0)) return null;
-    return {
-      x: first.left,
-      y: first.top,
-      width: first.width,
-      height: first.height,
-    };
+    if (sel != null && sel.rangeCount > 0) {
+      const range = sel.getRangeAt(0);
+      const anchorNode =
+        range.startContainer instanceof Element
+          ? range.startContainer
+          : range.startContainer.parentElement;
+
+      // Only use the active selection if it belongs to the card holding this element
+      if (card == null || (anchorNode != null && card.contains(anchorNode))) {
+        if (mode === "toolbar") {
+          if (!range.collapsed) {
+            const first =
+              range.getClientRects()[0] ?? range.getBoundingClientRect();
+            if (first != null && (first.width > 0 || first.height > 0)) {
+              return {
+                x: first.left,
+                y: first.top,
+                width: first.width,
+                height: first.height,
+              };
+            }
+          }
+        } else {
+          // popup mode: range can be collapsed (cursor) or non-collapsed
+          const rects = range.getClientRects();
+          if (rects.length > 0) {
+            const first = rects[0];
+            if (first != null && (first.width > 0 || first.height > 0)) {
+              return {
+                x: first.left,
+                y: first.top,
+                width: first.width,
+                height: first.height,
+              };
+            }
+          }
+          const b = range.getBoundingClientRect();
+          if (b != null && (b.width > 0 || b.height > 0)) {
+            return {
+              x: b.left,
+              y: b.top,
+              width: b.width,
+              height: b.height,
+            };
+          }
+          if (anchorNode != null) {
+            const nodeRect = anchorNode.getBoundingClientRect();
+            if (
+              nodeRect != null &&
+              (nodeRect.width > 0 || nodeRect.height > 0)
+            ) {
+              return {
+                x: nodeRect.left,
+                y: nodeRect.top,
+                width: nodeRect.width,
+                height: nodeRect.height,
+              };
+            }
+          }
+        }
+      }
+    }
+
+    if (mode === "popup" && card != null) {
+      const focusedBlock = card.querySelector(
+        ".orca-block.is-focused, .orca-block-active, .orca-block-editor-main",
+      );
+      if (focusedBlock instanceof HTMLElement) {
+        const b = focusedBlock.getBoundingClientRect();
+        if (b != null && (b.width > 0 || b.height > 0)) {
+          return {
+            x: b.left,
+            y: b.top,
+            width: b.width,
+            height: b.height,
+          };
+        }
+      }
+    }
   } catch {
-    return null;
+    /* ignore */
   }
+  return null;
 }

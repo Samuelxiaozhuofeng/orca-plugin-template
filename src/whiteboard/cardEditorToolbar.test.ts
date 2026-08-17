@@ -1,9 +1,13 @@
 import {
   placeEditorToolbar,
+  placeEditorPopup,
+  placeEditorFloating,
   viewportToCanvasLocal,
   canvasScaleFromMatrix,
   EDITOR_TOOLBAR_GAP,
   EDITOR_TOOLBAR_PAD,
+  EDITOR_POPUP_GAP,
+  EDITOR_POPUP_PAD,
 } from "./cardEditorToolbar.ts";
 
 function check(cond: boolean, message: string): void {
@@ -123,3 +127,88 @@ const onCanvas = viewportToCanvasLocal(
 near(placed.left, 200, "place stays in viewport space");
 near(onCanvas.x, (200 - 40) / 2, "placed left converts to canvas local");
 near(onCanvas.y, (placed.top - 60) / 2, "placed top converts to canvas local");
+
+// Popup tests (.orca-popup completion panel)
+const popup = { width: 200, height: 180 };
+const pGap = EDITOR_POPUP_GAP;
+const pPad = EDITOR_POPUP_PAD;
+
+const popupMid = placeEditorPopup({
+  anchor: { x: 185, y: 164, width: 0, height: 20 },
+  popup,
+  viewport,
+});
+check(popupMid.side === "below", "popup prefers below the cursor");
+near(popupMid.top, 164 + 20 + pGap, "below: cursor.y + cursor.height + pGap");
+near(popupMid.left, 185, "left-align to the cursor caret");
+
+const popupNearBottom = placeEditorPopup({
+  anchor: { x: 185, y: 500, width: 0, height: 20 },
+  popup,
+  viewport,
+});
+check(popupNearBottom.side === "above", "too close to bottom → flip above cursor");
+near(popupNearBottom.top, 500 - pGap - popup.height, "above: cursor.y − pGap − height");
+near(popupNearBottom.left, 185, "flip does not change left alignment");
+
+const popupLeftEdge = placeEditorPopup({
+  anchor: { x: 2, y: 200, width: 0, height: 20 },
+  popup,
+  viewport,
+});
+near(popupLeftEdge.left, pPad, "clamp popup to left padding");
+
+const popupRightEdge = placeEditorPopup({
+  anchor: { x: 750, y: 200, width: 0, height: 20 },
+  popup,
+  viewport,
+});
+near(popupRightEdge.left, 800 - 200 - pPad, "clamp popup to right padding");
+
+const popupOffsetVp = placeEditorPopup({
+  anchor: { x: 90, y: 200, width: 0, height: 20 },
+  popup,
+  viewport: offsetVp,
+});
+near(popupOffsetVp.left, 100 + pPad, "clamp popup uses offset viewport origin");
+near(popupOffsetVp.top, 200 + 20 + pGap, "popup top uses cursor in offset viewport");
+
+const popupRealTrace = placeEditorPopup({
+  anchor: { x: 185, y: 164, width: 0, height: 20 },
+  popup: { width: 199, height: 167 },
+  viewport: { left: 0, top: 0, width: 1200, height: 900 },
+});
+const popupRealCanvas = viewportToCanvasLocal(
+  popupRealTrace.left,
+  popupRealTrace.top,
+  { left: -5043.44, top: 1414.5 },
+  0.847821,
+);
+near(popupRealTrace.left, 185, "real trace viewport left matches caret");
+near(popupRealTrace.top, 164 + 20 + pGap, "real trace viewport top sits below caret");
+near(
+  popupRealCanvas.x,
+  (185 - -5043.44) / 0.847821,
+  "real trace local x properly maps with zoom scale",
+);
+near(
+  popupRealCanvas.y,
+  (188 - 1414.5) / 0.847821,
+  "real trace local y properly maps with zoom scale",
+);
+
+const genericAbove = placeEditorFloating({
+  anchor: { x: 200, y: 300, width: 80, height: 18 },
+  floating: toolbar,
+  viewport,
+  prefer: "above",
+});
+near(genericAbove.top, mid.top, "placeEditorFloating with prefer: above matches toolbar");
+
+const genericBelow = placeEditorFloating({
+  anchor: { x: 185, y: 164, width: 0, height: 20 },
+  floating: popup,
+  viewport,
+  prefer: "below",
+});
+near(genericBelow.top, popupMid.top, "placeEditorFloating with prefer: below matches popup");

@@ -104,7 +104,8 @@ export const CARD_EDITOR_CSS = `
 }
 
 /* Stay in the editor tree. fixed + canvas transform escapes card overflow. */
-.owb-card .orca-editor-toolbar.owb-editor-toolbar-fixed {
+.owb-card .orca-editor-toolbar.owb-editor-toolbar-fixed,
+.owb-card .orca-popup.owb-editor-toolbar-fixed {
   position: fixed !important;
   translate: 0 !important;
   transform-origin: top left;
