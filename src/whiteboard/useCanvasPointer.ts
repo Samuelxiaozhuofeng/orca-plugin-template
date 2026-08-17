@@ -63,6 +63,7 @@ type Refs = {
   settings: { current: WhiteboardSettings };
   editing: { current: DbId | null };
   selected: { current: DbId[] };
+  selectedAreas: { current: string[] };
   cards: { current: WhiteboardCard[] };
   areas: { current: WhiteboardArea[] };
   liveView: { current: CanvasView };
@@ -76,7 +77,7 @@ export function useCanvasPointer(opts: {
   pointerToWorld: (clientX: number, clientY: number) => { x: number; y: number };
   startPan: (startX: number, startY: number) => void;
   setSelected: (next: DbId[]) => void;
-  setSelectedArea: (id: string | null) => void;
+  setSelectedAreas: (next: string[]) => void;
   onCreateArea: (box: CardRect) => void;
   onExitDrawArea: () => void;
   onPatchCards: PatchCardsFn;
@@ -100,7 +101,7 @@ export function useCanvasPointer(opts: {
     pointerToWorld,
     startPan,
     setSelected,
-    setSelectedArea,
+    setSelectedAreas,
     onCreateArea,
     onExitDrawArea,
     onPatchCards,
@@ -310,8 +311,10 @@ export function useCanvasPointer(opts: {
     const world = pointerToWorld(event.clientX, event.clientY);
     const areaId = hitAreaAt(world.x, world.y, refs.areas.current);
     if (areaId != null && !event.shiftKey) {
-      setSelectedArea(areaId);
+      setSelectedAreas([areaId]);
+      refs.selectedAreas.current = [areaId];
       setSelected([]);
+      refs.selected.current = [];
       const area = refs.areas.current.find((item) => item.id === areaId);
       const areaEl = canvas.querySelector<HTMLElement>(
         `[data-area-id="${areaId}"]`,
@@ -335,7 +338,10 @@ export function useCanvasPointer(opts: {
       }
       return;
     }
-    setSelectedArea(null);
+    if (!event.shiftKey) {
+      setSelectedAreas([]);
+      refs.selectedAreas.current = [];
+    }
     dismissEdgeToolbar();
     startMarquee({
       startX: event.clientX,
@@ -346,14 +352,20 @@ export function useCanvasPointer(opts: {
       marqueeEl: marquee,
       cards: refs.cards.current,
       selected: refs.selected.current,
+      areas: refs.areas.current,
+      selectedAreas: refs.selectedAreas.current,
       pointerToWorld,
       onCommit: (result) => {
         if (!mountedRef.current) return;
         if (result.kind === "click") {
-          if (!event.shiftKey) setSelected([]);
+          if (!event.shiftKey) {
+            setSelected([]);
+            setSelectedAreas([]);
+          }
           return;
         }
         setSelected(result.ids);
+        setSelectedAreas(result.areaIds);
       },
     });
   };
@@ -386,11 +398,16 @@ export function useCanvasPointer(opts: {
       return;
     }
 
+    const additive = event.shiftKey || event.metaKey || event.ctrlKey;
+
     if (route.kind === "rightCard") {
       event.preventDefault();
       event.stopPropagation();
       focusViewport();
-      setSelectedArea(null);
+      if (!additive) {
+        setSelectedAreas([]);
+        refs.selectedAreas.current = [];
+      }
       const canMove =
         refs.editing.current !== card.blockId && selectCardOnPointer(card, event);
       if (canMove) beginMoveSelection(event.clientX, event.clientY);
@@ -421,7 +438,10 @@ export function useCanvasPointer(opts: {
     event.preventDefault();
     event.stopPropagation();
     focusViewport();
-    setSelectedArea(null);
+    if (!additive) {
+      setSelectedAreas([]);
+      refs.selectedAreas.current = [];
+    }
     if (!selectCardOnPointer(card, event)) return;
     const onIdleClick = route.enterEditOnClick
       ? () => {

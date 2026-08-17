@@ -1,5 +1,5 @@
 import type { DbId } from "../orca.d.ts";
-import { canRedo, canUndo } from "./boardHistory";
+import { canRedo, canUndo, holdHistory } from "./boardHistory";
 import {
   handleWhiteboardKey,
   isWhiteboardShortcutTarget,
@@ -40,7 +40,7 @@ export function useCanvasKeys(opts: {
   onExitDrawArea: () => void;
   selectCards: (ids: DbId[]) => void;
   selectArea: (id: string | null) => void;
-  deleteSelectedArea: () => boolean;
+  deleteSelectedAreas: () => boolean;
   setSelectedEdge: (id: string | null) => void;
   endEdit: () => void;
   onViewChange: (view: CanvasView) => void;
@@ -111,12 +111,18 @@ export function useCanvasKeys(opts: {
                 });
               return;
             }
-            if (ctx.deleteSelectedArea()) return;
+            const removedAreas = ctx.deleteSelectedAreas();
             const ids = ctx.selectedRef.current;
             if (ids.length === 0) return;
-            void ctx.onRemoveCards(ids, opts).then((ok: boolean) => {
-              if (ok) ctx.selectCards([]);
-            });
+            // Deleting areas already recorded a snapshot that covers cards
+            // too, so one undo must take the whole Backspace back.
+            const release = removedAreas ? holdHistory() : null;
+            void ctx
+              .onRemoveCards(ids, opts)
+              .then((ok: boolean) => {
+                if (ok) ctx.selectCards([]);
+              })
+              .finally(() => release?.());
           },
           undo: ctx.onUndo,
           redo: ctx.onRedo,

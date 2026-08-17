@@ -53,26 +53,17 @@ type Args = {
   editingRef: { current: DbId | null };
   selectedRef: { current: DbId[] };
   selectedEdgeRef: { current: string | null };
-  selectedAreaRef: { current: string | null };
+  selectedAreasRef: { current: string[] };
   cardsRef: { current: WhiteboardCard[] };
   edgesRef: { current: WhiteboardEdge[] };
   areasRef: { current: WhiteboardArea[] };
   edgeApiRef: { current: EdgeLayerApi | null };
   onPatchCards: PatchCardsFn;
-  onRemoveCards: (
-    ids: DbId[],
-    opts?: { permanent?: boolean },
-  ) => Promise<boolean>;
+  onRemoveCards: (ids: DbId[], opts?: { permanent?: boolean }) => Promise<boolean>;
   onAddCards: (cards: WhiteboardCard[]) => Promise<boolean>;
-  onCommitEdges: (
-    next: WhiteboardEdge[],
-    cardIds?: ReadonlySet<DbId>,
-  ) => Promise<boolean>;
+  onCommitEdges: (next: WhiteboardEdge[], cardIds?: ReadonlySet<DbId>) => Promise<boolean>;
   onCommitAreas: (next: WhiteboardArea[]) => Promise<boolean>;
-  onCommitCardsAndAreas: (
-    cards: WhiteboardCard[],
-    areas: WhiteboardArea[],
-  ) => Promise<boolean>;
+  onCommitCardsAndAreas: (cards: WhiteboardCard[], areas: WhiteboardArea[]) => Promise<boolean>;
   onExitDrawArea: () => void;
   onUndo: () => void;
   onRedo: () => void;
@@ -97,7 +88,7 @@ export function useCanvasBoard({
   editingRef,
   selectedRef,
   selectedEdgeRef,
-  selectedAreaRef,
+  selectedAreasRef,
   cardsRef,
   edgesRef,
   areasRef,
@@ -132,19 +123,20 @@ export function useCanvasBoard({
   }, []);
 
   const {
-    selectedArea,
+    selectedAreas,
     selectArea,
+    selectAreas,
     wrapSelected,
     createAreaAt,
     renameArea,
     resizeArea,
     moveAreaBy,
-    deleteSelectedArea,
+    deleteSelectedAreas,
   } = useCanvasAreas({
     panelId,
     boardBlockId,
     areas,
-    selectedAreaRef,
+    selectedAreasRef,
     selectedRef,
     cardsRef,
     edgesRef,
@@ -157,8 +149,7 @@ export function useCanvasBoard({
   const selectCards = useCallback((ids: DbId[]) => {
     setSelected(ids);
     setSelectedEdge(null);
-    selectArea(null);
-  }, [selectArea]);
+  }, []);
 
   const selectEdge = useCallback((id: string | null) => {
     setSelectedEdge(id);
@@ -461,7 +452,7 @@ export function useCanvasBoard({
     onExitDrawArea,
     selectCards,
     selectArea,
-    deleteSelectedArea,
+    deleteSelectedAreas,
     setSelectedEdge,
     endEdit,
     onViewChange,
@@ -472,12 +463,13 @@ export function useCanvasBoard({
     editingId,
     selected,
     selectedEdge,
-    selectedArea,
+    selectedAreas,
     edgeDrop,
     setEdgeDrop,
     selectCards,
     selectEdge,
     selectArea,
+    selectAreas,
     wrapSelected,
     createAreaAt,
     renameArea,

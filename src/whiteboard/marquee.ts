@@ -1,5 +1,10 @@
 import type { DbId } from "../orca.d.ts";
 import {
+  hitAreaIds,
+  unionAreaIds,
+  type WhiteboardArea,
+} from "./areas";
+import {
   normalizeRect,
   rectsIntersect,
   unionIds,
@@ -11,7 +16,7 @@ export const CLICK_THRESHOLD_PX = 3;
 
 export type MarqueeCommit =
   | { kind: "click" }
-  | { kind: "select"; ids: DbId[] };
+  | { kind: "select"; ids: DbId[]; areaIds: string[] };
 
 function screenRect(
   viewport: HTMLElement,
@@ -39,21 +44,30 @@ export function paintMarquee(el: HTMLElement | null, rect: CardRect | null): voi
 
 export function setMarqueeHits(
   canvas: HTMLElement | null,
-  ids: ReadonlySet<DbId>,
+  cardIds: ReadonlySet<DbId>,
+  areaIds?: ReadonlySet<string>,
 ): void {
   if (canvas == null) return;
   const cards = canvas.querySelectorAll<HTMLElement>(".owb-card");
   for (const card of cards) {
     const raw = card.dataset.blockId;
     const id = raw == null ? Number.NaN : Number(raw);
-    card.classList.toggle("is-marquee-hit", Number.isFinite(id) && ids.has(id));
+    card.classList.toggle("is-marquee-hit", Number.isFinite(id) && cardIds.has(id));
+  }
+  const areas = canvas.querySelectorAll<HTMLElement>(".owb-area");
+  for (const area of areas) {
+    const id = area.dataset.areaId;
+    area.classList.toggle(
+      "is-marquee-hit",
+      id != null && areaIds != null && areaIds.has(id),
+    );
   }
 }
 
 export function clearMarqueeHits(canvas: HTMLElement | null): void {
   if (canvas == null) return;
   canvas
-    .querySelectorAll(".owb-card.is-marquee-hit")
+    .querySelectorAll(".owb-card.is-marquee-hit, .owb-area.is-marquee-hit")
     .forEach((el) => el.classList.remove("is-marquee-hit"));
 }
 
@@ -119,6 +133,8 @@ export function startMarquee(opts: {
   marqueeEl: HTMLElement;
   cards: readonly WhiteboardCard[];
   selected: readonly DbId[];
+  areas: readonly WhiteboardArea[];
+  selectedAreas: readonly string[];
   pointerToWorld: (clientX: number, clientY: number) => { x: number; y: number };
   onCommit: (result: MarqueeCommit) => void;
 }): void {
@@ -128,14 +144,14 @@ export function startMarquee(opts: {
   let last: { x: number; y: number } = { x: opts.startX, y: opts.startY };
 
   opts.viewport.classList.add("is-marqueeing");
-  // `is-selected` is owned by React (Card.tsx). Clearing it imperatively here is
-  // only a preview of the pending selection, so remember what we cleared and put
-  // it back when the gesture ends — otherwise a card that stays selected keeps
-  // the class stripped, since React's diff sees no className change to re-apply.
+  // `is-selected` is owned by React (Card.tsx / AreaLayer.tsx). Clearing it
+  // imperatively here is only a preview of the pending selection, so remember
+  // what we cleared and put it back when the gesture ends — otherwise an element
+  // that stays selected keeps the class stripped, since React sees no change.
   const clearedSelection: HTMLElement[] = [];
   if (!opts.additive) {
     opts.canvas
-      .querySelectorAll<HTMLElement>(".owb-card.is-selected")
+      .querySelectorAll<HTMLElement>(".owb-card.is-selected, .owb-area.is-selected")
       .forEach((el) => {
         el.classList.remove("is-selected");
         clearedSelection.push(el);
@@ -149,7 +165,9 @@ export function startMarquee(opts: {
     paintMarquee(opts.marqueeEl, screen);
     const now = opts.pointerToWorld(last.x, last.y);
     const world = normalizeRect(startWorld.x, startWorld.y, now.x, now.y);
-    setMarqueeHits(opts.canvas, new Set(hitIds(opts.cards, world)));
+    const cardHits = new Set(hitIds(opts.cards, world));
+    const areaHits = new Set(hitAreaIds(opts.areas, world));
+    setMarqueeHits(opts.canvas, cardHits, areaHits);
   };
 
   const detach = () => {
@@ -188,10 +206,14 @@ export function startMarquee(opts: {
     }
     const now = opts.pointerToWorld(event.clientX, event.clientY);
     const world = normalizeRect(startWorld.x, startWorld.y, now.x, now.y);
-    const hits = hitIds(opts.cards, world);
+    const cardHits = hitIds(opts.cards, world);
+    const areaHits = hitAreaIds(opts.areas, world);
     opts.onCommit({
       kind: "select",
-      ids: opts.additive ? unionIds(opts.selected, hits) : hits,
+      ids: opts.additive ? unionIds(opts.selected, cardHits) : cardHits,
+      areaIds: opts.additive
+        ? unionAreaIds(opts.selectedAreas, areaHits)
+        : areaHits,
     });
   };
 
@@ -205,3 +227,4 @@ export function startMarquee(opts: {
   window.addEventListener("mousemove", onMove);
   window.addEventListener("mouseup", onUp);
 }
+

@@ -112,7 +112,7 @@ export function Canvas({
   const editingRef = useRef<DbId | null>(null);
   const selectedRef = useRef<DbId[]>([]);
   const selectedEdgeRef = useRef<string | null>(null);
-  const selectedAreaRef = useRef<string | null>(null);
+  const selectedAreasRef = useRef<string[]>([]);
   const cardsRef = useRef(cards);
   const edgesRef = useRef(edges);
   const areasRef = useRef(areas);
@@ -170,12 +170,13 @@ export function Canvas({
     editingId,
     selected,
     selectedEdge,
-    selectedArea,
+    selectedAreas,
     edgeDrop,
     setEdgeDrop,
     selectCards,
     selectEdge,
     selectArea,
+    selectAreas,
     wrapSelected,
     createAreaAt,
     renameArea,
@@ -197,35 +198,13 @@ export function Canvas({
     lodSimplified,
     selectedSet,
   } = useCanvasBoard({
-    panelId,
-    boardBlockId,
-    cards: viewCards,
-    inoperableIds: extraHidden,
-    edges,
-    areas,
-    view,
-    viewportSize,
-    viewportRef,
-    editingRef,
-    selectedRef,
-    selectedEdgeRef,
-    selectedAreaRef,
-    cardsRef,
-    edgesRef,
-    areasRef,
-    edgeApiRef,
-    onPatchCards,
-    onRemoveCards,
-    onAddCards,
-    onCommitEdges,
-    onCommitAreas,
-    onCommitCardsAndAreas,
-    onExitDrawArea,
-    onUndo,
-    onRedo,
-    liveViewRef,
-    focusApiRef,
-    onViewChange,
+    panelId, boardBlockId, cards: viewCards, inoperableIds: extraHidden,
+    edges, areas, view, viewportSize, viewportRef,
+    editingRef, selectedRef, selectedEdgeRef, selectedAreasRef,
+    cardsRef, edgesRef, areasRef, edgeApiRef,
+    onPatchCards, onRemoveCards, onAddCards, onCommitEdges, onCommitAreas,
+    onCommitCardsAndAreas, onExitDrawArea, onUndo, onRedo,
+    liveViewRef, focusApiRef, onViewChange,
     searchOpen: overlay.searchOpen || filter.open,
     present: presentActions,
   });
@@ -306,6 +285,7 @@ export function Canvas({
       settings: settingsRef,
       editing: editingRef,
       selected: selectedRef,
+      selectedAreas: selectedAreasRef,
       cards: cardsRef,
       liveView: liveViewRef,
       tool: toolRef,
@@ -315,7 +295,7 @@ export function Canvas({
     pointerToWorld,
     startPan,
     setSelected: selectCards,
-    setSelectedArea: selectArea,
+    setSelectedAreas: selectAreas,
     onCreateArea: createAreaAt,
     onExitDrawArea,
     onPatchCards,
@@ -377,10 +357,8 @@ export function Canvas({
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
         onDrop={onDrop}
-        onDragEnterCapture={onDragEnterCapture}
-        onDragOverCapture={onDragOverCapture}
-        onDragLeaveCapture={onDragLeaveCapture}
-        onDropCapture={onDropCapture}
+        onDragEnterCapture={onDragEnterCapture} onDragOverCapture={onDragOverCapture}
+        onDragLeaveCapture={onDragLeaveCapture} onDropCapture={onDropCapture}
         onClickCapture={(event: React.MouseEvent<HTMLDivElement>) => {
           tryFocusCardFromRefClick(
             event,
@@ -412,7 +390,7 @@ export function Canvas({
           <AreaLayer
             panelId={panelId}
             areas={areas}
-            selectedId={selectedArea}
+            selectedIds={selectedAreas}
             view={view}
             viewportSize={viewportSize}
             ghostRef={areaGhostRef}

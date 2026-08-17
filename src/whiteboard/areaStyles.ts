@@ -26,7 +26,8 @@ export const AREA_CSS = `
     color-mix(in oklab, var(--owb-area-ink) 48%, transparent);
 }
 
-.owb-area.is-selected {
+.owb-area.is-selected,
+.owb-area.is-marquee-hit {
   background: color-mix(in oklab, var(--owb-area-ink) 12%, transparent);
   box-shadow:
     inset 0 0 0 calc(1.5px * var(--owb-area-inv)) var(--owb-area-ink),
@@ -129,7 +130,8 @@ export const AREA_CSS = `
   background: color-mix(in oklab, var(--owb-area-ink) 18%, transparent);
 }
 
-.owb-area.is-selected .owb-area-title {
+.owb-area.is-selected .owb-area-title,
+.owb-area.is-marquee-hit .owb-area-title {
   color: var(--orca-color-text-1);
   border-color: color-mix(in oklab, var(--owb-area-ink) 55%, transparent);
 }

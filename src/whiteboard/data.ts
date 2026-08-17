@@ -73,6 +73,7 @@ export {
   planWrapAreaFromCards,
   readAreas,
   removeArea,
+  removeAreas,
   shouldPersistAreas,
   tryReadAreas,
   writeAreas,

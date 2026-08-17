@@ -15,7 +15,8 @@ import {
   nextAreaId,
   planAreaMove,
   planWrapAreaFromCards,
-  removeArea,
+  removeAreas,
+  toggleAreaId,
   type WhiteboardArea,
 } from "./areas";
 import {
@@ -86,7 +87,7 @@ type Args = {
   panelId: string;
   boardBlockId: DbId;
   areas: WhiteboardArea[];
-  selectedAreaRef: { current: string | null };
+  selectedAreasRef: { current: string[] };
   selectedRef: { current: DbId[] };
   cardsRef: { current: WhiteboardCard[] };
   edgesRef: { current: WhiteboardEdge[] };
@@ -99,12 +100,12 @@ type Args = {
   ) => Promise<boolean>;
 };
 
-/** Selected area plus wrap / rename / resize / delete / drag-follow. */
+/** Selected areas plus wrap / rename / resize / delete / drag-follow. */
 export function useCanvasAreas({
   panelId,
   boardBlockId,
   areas,
-  selectedAreaRef,
+  selectedAreasRef,
   selectedRef,
   cardsRef,
   edgesRef,
@@ -113,16 +114,28 @@ export function useCanvasAreas({
   onCommitAreas,
   onCommitCardsAndAreas,
 }: Args) {
-  const [selectedArea, setSelectedArea] = useState<string | null>(null);
-  selectedAreaRef.current = selectedArea;
+  const [selectedAreas, setSelectedAreas] = useState<string[]>([]);
+  selectedAreasRef.current = selectedAreas;
 
   const selectArea = useCallback(
-    (id: string | null) => {
-      setSelectedArea(id);
-      if (id != null) onClearOtherSelection();
+    (id: string | null, opts?: { toggle?: boolean }) => {
+      if (id == null) {
+        setSelectedAreas([]);
+        return;
+      }
+      if (opts?.toggle) {
+        setSelectedAreas((prev: string[]) => toggleAreaId(prev, id));
+      } else {
+        setSelectedAreas([id]);
+        onClearOtherSelection();
+      }
     },
     [onClearOtherSelection],
   );
+
+  const selectAreas = useCallback((ids: readonly string[]) => {
+    setSelectedAreas([...ids]);
+  }, []);
 
   const snapshotNow = useCallback(() => {
     return {
@@ -146,11 +159,13 @@ export function useCanvasAreas({
   );
 
   useEffect(() => {
-    if (selectedArea == null) return;
-    if (!areas.some((area: WhiteboardArea) => area.id === selectedArea)) {
-      setSelectedArea(null);
-    }
-  }, [areas, selectedArea]);
+    if (selectedAreas.length === 0) return;
+    const valid = new Set(areas.map((area: WhiteboardArea) => area.id));
+    setSelectedAreas((prev: string[]) => {
+      const next = prev.filter((id: string) => valid.has(id));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [areas, selectedAreas.length]);
 
   const wrapSelected = useCallback(() => {
     const ids = new Set<DbId>(selectedRef.current);
@@ -247,16 +262,16 @@ export function useCanvasAreas({
     [boardBlockId, onCommitCardsAndAreas, panelId, snapshotNow],
   );
 
-  const deleteSelectedArea = useCallback(() => {
-    const areaId = selectedAreaRef.current;
-    if (areaId == null) return false;
-    void commitAreasStep(removeArea(areasRef.current, areaId)).then(
+  const deleteSelectedAreas = useCallback(() => {
+    const ids = selectedAreasRef.current;
+    if (ids.length === 0) return false;
+    void commitAreasStep(removeAreas(areasRef.current, ids)).then(
       (ok: boolean) => {
-        if (ok) selectArea(null);
+        if (ok) setSelectedAreas([]);
       },
     );
     return true;
-  }, [commitAreasStep, selectArea]);
+  }, [commitAreasStep]);
 
   const setAreaColor = useCallback(
     (id: string, color: string | undefined) => {
@@ -345,14 +360,15 @@ export function useCanvasAreas({
   ]);
 
   return {
-    selectedArea,
+    selectedAreas,
     selectArea,
+    selectAreas,
     wrapSelected,
     createAreaAt,
     renameArea,
     resizeArea,
     moveAreaBy,
-    deleteSelectedArea,
+    deleteSelectedAreas,
     setAreaColor,
     toggleAreaCollapsed,
     addToSlides,

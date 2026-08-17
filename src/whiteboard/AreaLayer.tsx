@@ -24,14 +24,14 @@ const { useEffect, useRef, useState } = window.React;
 type Props = {
   panelId: string;
   areas: readonly WhiteboardArea[];
-  selectedId: string | null;
+  selectedIds: readonly string[];
   view: CanvasView;
   viewportSize: { width: number; height: number };
   ghostRef: { current: HTMLDivElement | null };
   canvasRef: { current: HTMLDivElement | null };
   pointerToWorld: (clientX: number, clientY: number) => { x: number; y: number };
   cards: readonly WhiteboardCard[];
-  onSelect: (id: string | null) => void;
+  onSelect: (id: string, opts?: { toggle?: boolean }) => void;
   onRename: (id: string, name: string) => void;
   onResize: (id: string, box: { x: number; y: number; w: number; h: number }) => void;
   onMove: (id: string, dx: number, dy: number) => void;
@@ -150,7 +150,7 @@ function AreaBox({
   canvasRef: { current: HTMLDivElement | null };
   pointerToWorld: (clientX: number, clientY: number) => { x: number; y: number };
   cards: readonly WhiteboardCard[];
-  onSelect: (id: string) => void;
+  onSelect: (id: string, opts?: { toggle?: boolean }) => void;
   onBeginEdit: (id: string) => void;
   onCommitName: (id: string, name: string) => void;
   onCancelEdit: () => void;
@@ -184,8 +184,13 @@ function AreaBox({
     if (event.button !== 0) return;
     event.preventDefault();
     event.stopPropagation();
+    const additive = event.shiftKey || event.metaKey || event.ctrlKey;
     const wasSelected = selected;
-    onSelect(area.id);
+    if (additive) {
+      onSelect(area.id, { toggle: true });
+    } else if (!wasSelected) {
+      onSelect(area.id);
+    }
     if (editing) return;
     const canvas = canvasRef.current;
     const el = event.currentTarget.parentElement;
@@ -199,7 +204,7 @@ function AreaBox({
       cards,
       pointerToWorld,
       onClick: () => {
-        if (wasSelected) onBeginEdit(area.id);
+        if (!additive && wasSelected) onBeginEdit(area.id);
       },
       onFrame: onMoveFrame,
       onEnd: (dx, dy) => onMove(area.id, dx, dy),
@@ -380,7 +385,7 @@ function AreaBox({
 export function AreaLayer({
   panelId,
   areas,
-  selectedId,
+  selectedIds,
   view,
   viewportSize,
   ghostRef,
@@ -402,10 +407,11 @@ export function AreaLayer({
     }
   }, [areas, editingId]);
 
+  const selectedSet = new Set(selectedIds);
   const visible = sortAreasBackToFront(
     areas.filter(
       (area) =>
-        area.id === selectedId ||
+        selectedSet.has(area.id) ||
         area.id === editingId ||
         cardIntersectsViewport(areaCullBox(area), view, viewportSize, 0),
     ),
@@ -418,7 +424,7 @@ export function AreaLayer({
         <AreaBox
           key={area.id}
           area={area}
-          selected={area.id === selectedId}
+          selected={selectedSet.has(area.id)}
           editing={area.id === editingId}
           canvasRef={canvasRef}
           pointerToWorld={pointerToWorld}

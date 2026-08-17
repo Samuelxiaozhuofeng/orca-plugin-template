@@ -1,11 +1,17 @@
 import {
   AREA_PAD,
   AREA_TITLE_H,
+  areaCullBox,
+  areaEnclosedInRect,
   cardInArea,
+  hitAreaIds,
   planAreaFromCards,
   planAreaMove,
   planWrapAreaFromCards,
   removeArea,
+  removeAreas,
+  toggleAreaId,
+  unionAreaIds,
   type WhiteboardArea,
 } from "./areas.ts";
 
@@ -63,12 +69,31 @@ const cards = [
   { blockId: 2, kind: "block" as const, x: 80, y: 10, w: 40, h: 40 },
 ];
 const before = cards.map((item) => ({ ...item }));
-const areas: WhiteboardArea[] = [frame, { ...frame, id: "area-2", x: 400 }];
+const areas: WhiteboardArea[] = [
+  frame,
+  { ...frame, id: "area-2", x: 400 },
+  { ...frame, id: "area-3", x: 800 },
+];
 const next = removeArea(areas, "area-1");
-check(next.length === 1 && next[0].id === "area-2", "delete drops only that area");
+check(next.length === 2 && next[0].id === "area-2", "delete drops only that area");
 check(
   JSON.stringify(cards) === JSON.stringify(before),
   "delete area does not mutate cards",
+);
+
+// Multi-delete: remove multiple areas at once, cards stay untouched
+const nextMulti = removeAreas(areas, ["area-1", "area-3"]);
+check(
+  nextMulti.length === 1 && nextMulti[0].id === "area-2",
+  "multi-delete drops all specified areas",
+);
+check(
+  JSON.stringify(cards) === JSON.stringify(before),
+  "multi-delete area does not mutate cards",
+);
+check(
+  removeAreas(areas, []).length === 3,
+  "multi-delete with empty set drops nothing",
 );
 
 const inside = { blockId: 1, kind: "block" as const, x: 10, y: 10, w: 40, h: 40 };
@@ -100,4 +125,88 @@ const overlapMove = planAreaMove(frame, 12, 0, [shared], [frame, overlap]);
 check(overlapMove.cards[0].x === 42, "card in both areas follows the dragged one");
 check(overlapMove.areas[1].x === 20, "the other overlapping area stays put");
 
+// --- Marquee selection check ---
+// Rule 1: Expanded areas are selected ONLY when fully enclosed by the marquee.
+const areaA: WhiteboardArea = { id: "a", name: "A", x: 100, y: 100, w: 200, h: 150 };
+const areaB: WhiteboardArea = { id: "b", name: "B", x: 400, y: 100, w: 200, h: 150 };
+
+// Marquee fully covers areaA
+const marqueeFullA = { x: 50, y: 50, w: 300, h: 250 };
+check(
+  JSON.stringify(hitAreaIds([areaA, areaB], marqueeFullA)) === JSON.stringify(["a"]),
+  "fully enclosed area is selected",
+);
+
+// Marquee partially covers areaA (intersects right half)
+const marqueePartialA = { x: 200, y: 100, w: 150, h: 150 };
+check(
+  hitAreaIds([areaA, areaB], marqueePartialA).length === 0,
+  "partially intersecting area is NOT selected",
+);
+
+// Marquee covers both areaA and areaB fully
+const marqueeBoth = { x: 50, y: 50, w: 600, h: 250 };
+check(
+  JSON.stringify(hitAreaIds([areaA, areaB], marqueeBoth)) === JSON.stringify(["a", "b"]),
+  "multiple fully enclosed areas are selected",
+);
+
+// Marquee completely outside
+const marqueeOutside = { x: 800, y: 800, w: 100, h: 100 };
+check(
+  hitAreaIds([areaA, areaB], marqueeOutside).length === 0,
+  "marquee outside every area selects nothing",
+);
+
+// Rule 2: Collapsed area handling:
+// A collapsed area's body is hidden (height 0), and only its visible title chip (at x, y - lift, w, lift)
+// is rendered on canvas. Therefore, marquee selects a collapsed area if and only if the marquee
+// fully encloses its visible title chip box (areaCullBox).
+const collapsedArea: WhiteboardArea = {
+  id: "collapsed-1",
+  name: "C",
+  x: 100,
+  y: 100,
+  w: 200,
+  h: 150,
+  collapsed: true,
+};
+const chipBox = areaCullBox(collapsedArea); // { x: 100, y: 100 - 36, w: 200, h: 36 }
+
+// Marquee fully encloses the collapsed title chip
+const marqueeFullChip = { x: 80, y: 50, w: 250, h: 100 };
+check(
+  JSON.stringify(hitAreaIds([collapsedArea], marqueeFullChip)) === JSON.stringify(["collapsed-1"]),
+  "marquee fully enclosing collapsed area title chip selects it",
+);
+
+// Marquee only partially covers the collapsed title chip
+const marqueePartialChip = { x: 150, y: 50, w: 100, h: 100 };
+check(
+  hitAreaIds([collapsedArea], marqueePartialChip).length === 0,
+  "marquee partially intersecting collapsed area title chip does NOT select it",
+);
+
+// Marquee covers where the old expanded body was, but misses the title chip
+const marqueeOldBody = { x: 100, y: 110, w: 200, h: 100 };
+check(
+  hitAreaIds([collapsedArea], marqueeOldBody).length === 0,
+  "marquee over collapsed area body space does not select collapsed area",
+);
+
+// --- Selection set helpers (toggle, union) ---
+check(
+  JSON.stringify(toggleAreaId(["a", "b"], "c")) === JSON.stringify(["a", "b", "c"]),
+  "toggle adds absent area ID",
+);
+check(
+  JSON.stringify(toggleAreaId(["a", "b", "c"], "b")) === JSON.stringify(["a", "c"]),
+  "toggle removes present area ID",
+);
+check(
+  JSON.stringify(unionAreaIds(["a", "b"], ["b", "c"])) === JSON.stringify(["a", "b", "c"]),
+  "union merges area IDs without duplicates",
+);
+
 console.log("areaPlan.test.ts ok");
+

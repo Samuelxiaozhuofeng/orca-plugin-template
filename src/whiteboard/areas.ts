@@ -343,6 +343,29 @@ export function removeArea(
   return areas.filter((area) => area.id !== id);
 }
 
+/** Areas-only multi-delete. Never takes or returns cards. */
+export function removeAreas(
+  areas: readonly WhiteboardArea[],
+  ids: readonly string[] | ReadonlySet<string>,
+): WhiteboardArea[] {
+  const set = ids instanceof Set ? ids : new Set(ids);
+  if (set.size === 0) return areas as WhiteboardArea[];
+  return areas.filter((area) => !set.has(area.id));
+}
+
+export function toggleAreaId(ids: readonly string[], id: string): string[] {
+  return ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id];
+}
+
+export function unionAreaIds(
+  left: readonly string[],
+  right: readonly string[],
+): string[] {
+  const set = new Set(left);
+  for (const id of right) set.add(id);
+  return [...set];
+}
+
 export function areaIsCollapsed(
   area: { collapsed?: boolean },
 ): boolean {
@@ -401,3 +424,43 @@ export function countCardsInArea(
   }
   return n;
 }
+
+/** Inclusive full containment: box must be fully within outer rect. */
+export function areaEnclosedInRect(
+  box: { x: number; y: number; w: number; h: number },
+  outer: { x: number; y: number; w: number; h: number },
+): boolean {
+  return (
+    box.x >= outer.x &&
+    box.y >= outer.y &&
+    box.x + box.w <= outer.x + outer.w &&
+    box.y + box.h <= outer.y + outer.h
+  );
+}
+
+/**
+ * Marquee target box. Expanded areas use their full frame; collapsed areas
+ * use their visible title chip (areaCullBox).
+ */
+export function areaMarqueeBox(area: WhiteboardArea): {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+} {
+  return areaCullBox(area);
+}
+
+/**
+ * Marquee selection: an area is selected only when it is fully enclosed
+ * by the marquee rectangle in world coordinates.
+ */
+export function hitAreaIds(
+  areas: readonly WhiteboardArea[],
+  world: { x: number; y: number; w: number; h: number },
+): string[] {
+  return areas
+    .filter((area) => areaEnclosedInRect(areaMarqueeBox(area), world))
+    .map((area) => area.id);
+}
+
