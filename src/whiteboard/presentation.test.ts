@@ -150,25 +150,25 @@ let cCur: PresentCursor = { slideIndex: 0, cardIndex: -1, zoomed: false };
 
 cCur = stepCard(cCur, slides, 1);
 check(
-  cCur.slideIndex === 0 && cCur.cardIndex === 0 && cCur.zoomed === false,
+  cCur.slideIndex === 0 && cCur.cardIndex === 0 && cCur.zoomed === true,
   "stepCard +1 moves from -1 to 0",
 );
 
 cCur = stepCard(cCur, slides, 1);
 check(
-  cCur.slideIndex === 0 && cCur.cardIndex === 1 && cCur.zoomed === false,
+  cCur.slideIndex === 0 && cCur.cardIndex === 1 && cCur.zoomed === true,
   "stepCard +1 moves from 0 to 1",
 );
 
 cCur = stepCard(cCur, slides, 1);
 check(
-  cCur.slideIndex === 0 && cCur.cardIndex === 2 && cCur.zoomed === false,
+  cCur.slideIndex === 0 && cCur.cardIndex === 2 && cCur.zoomed === true,
   "stepCard +1 moves from 1 to 2",
 );
 
 cCur = stepCard(cCur, slides, 1);
 check(
-  cCur.slideIndex === 0 && cCur.cardIndex === 3 && cCur.zoomed === false,
+  cCur.slideIndex === 0 && cCur.cardIndex === 3 && cCur.zoomed === true,
   "stepCard +1 moves from 2 to 3 (last card)",
 );
 
@@ -182,7 +182,7 @@ check(
 // From -1, stepCard -1 jumps to last card (index 3)
 cCur = stepCard(cCur, slides, -1);
 check(
-  cCur.slideIndex === 0 && cCur.cardIndex === 3 && cCur.zoomed === false,
+  cCur.slideIndex === 0 && cCur.cardIndex === 3 && cCur.zoomed === true,
   "stepCard -1 from -1 jumps to last card (3)",
 );
 

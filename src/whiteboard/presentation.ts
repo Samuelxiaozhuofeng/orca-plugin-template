@@ -129,7 +129,9 @@ export function stepSlide(
 
 /** Step through the current area's cards: +1 advances in cycle (-1 → 0 → … → n-1 → -1),
  *  -1 goes back in cycle (… → 0 → -1 → n-1). Never crosses into another slide;
- *  returns `cursor` itself when the area holds no cards. Stepping cards clears zoomed state. */
+ *  returns `cursor` itself when the area holds no cards.
+ *  Landing on a card zooms straight in — walking the cards is the whole point,
+ *  so it should not cost an extra keystroke. Wrapping back to -1 zooms out. */
 export function stepCard(
   cursor: PresentCursor,
   slides: readonly Slide[],
@@ -150,8 +152,15 @@ export function stepCard(
     return cursor;
   }
 
-  if (nextCardIndex === cursor.cardIndex && !cursor.zoomed) return cursor;
-  return { slideIndex: cursor.slideIndex, cardIndex: nextCardIndex, zoomed: false };
+  const nextZoomed = nextCardIndex >= 0;
+  if (nextCardIndex === cursor.cardIndex && nextZoomed === cursor.zoomed) {
+    return cursor;
+  }
+  return {
+    slideIndex: cursor.slideIndex,
+    cardIndex: nextCardIndex,
+    zoomed: nextZoomed,
+  };
 }
 
 /** Enter toggles the zoom on the current card; from the whole-area view it

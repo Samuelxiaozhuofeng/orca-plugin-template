@@ -181,13 +181,12 @@ export function usePresentation(opts: {
     [focusCurrent],
   );
 
+  // Stepping cards now zooms by default, so a layered Escape would mean two
+  // presses to leave almost every time. Escape ends the slideshow; Enter is
+  // what pulls back out to the whole section.
   const escape = useCallback(() => {
-    if (cursorRef.current.zoomed) {
-      goTo({ ...cursorRef.current, zoomed: false });
-    } else {
-      stop();
-    }
-  }, [goTo, stop]);
+    stop();
+  }, [stop]);
 
   const toggleZoomAction = useCallback(() => {
     goTo(toggleZoom(cursorRef.current, slidesRef.current));
