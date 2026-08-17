@@ -57,6 +57,7 @@ export type WhiteboardKeyActions = {
     prev: () => void;
     nextCard: () => void;
     prevCard: () => void;
+    toggleZoom: () => void;
     exit: () => void;
     firstSlide?: () => void;
     lastSlide?: () => void;
@@ -86,6 +87,11 @@ export function handleWhiteboardKey(
     if (event.key === "Escape") {
       event.preventDefault();
       actions.present.exit();
+      return true;
+    }
+    if (event.key === "Enter") {
+      event.preventDefault();
+      actions.present.toggleZoom();
       return true;
     }
     if (

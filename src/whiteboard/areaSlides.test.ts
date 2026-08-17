@@ -2,6 +2,7 @@ import {
   planAddToSlides,
   planMoveSlide,
   planRemoveFromSlides,
+  planReorderSlides,
   slideAreas,
 } from "./areaSlides.ts";
 import { type WhiteboardArea } from "./areas.ts";
@@ -151,4 +152,34 @@ check(
   "moving non-existent area returns null",
 );
 
+// 5. planReorderSlides: move slide fromIndex to toIndex in the sequence
+// Move 1st item (index 0) to 3rd position (index 2): area-1 moves to end -> area-2=1, area-3=2, area-1=3
+const reordered0to2 = planReorderSlides(state123, 0, 2);
+check(reordered0to2 != null, "reorder index 0 to 2");
+check(reordered0to2!.find((a) => a.id === "area-2")?.slide === 1, "area-2 is now slide 1");
+check(reordered0to2!.find((a) => a.id === "area-3")?.slide === 2, "area-3 is now slide 2");
+check(reordered0to2!.find((a) => a.id === "area-1")?.slide === 3, "area-1 is now slide 3");
+
+// Move 3rd item (index 2) to 1st position (index 0): area-3 moves to start -> area-3=1, area-1=2, area-2=3
+const reordered2to0 = planReorderSlides(state123, 2, 0);
+check(reordered2to0 != null, "reorder index 2 to 0");
+check(reordered2to0!.find((a) => a.id === "area-3")?.slide === 1, "area-3 is now slide 1");
+check(reordered2to0!.find((a) => a.id === "area-1")?.slide === 2, "area-1 is now slide 2");
+check(reordered2to0!.find((a) => a.id === "area-2")?.slide === 3, "area-2 is now slide 3");
+
+// Drag to same position -> returns null
+check(planReorderSlides(state123, 1, 1) == null, "reordering to same position returns null");
+
+// Out of bounds fromIndex -> returns null
+check(planReorderSlides(state123, -1, 1) == null, "negative fromIndex returns null");
+check(planReorderSlides(state123, 3, 1) == null, "out-of-range fromIndex returns null");
+
+// Out of bounds toIndex -> returns null
+check(planReorderSlides(state123, 1, -1) == null, "negative toIndex returns null");
+check(planReorderSlides(state123, 1, 3) == null, "out-of-range toIndex returns null");
+
+// Empty sequence -> returns null
+check(planReorderSlides(initial, 0, 1) == null, "reordering empty slide sequence returns null");
+
 console.log("areaSlides.test.ts ok");
+

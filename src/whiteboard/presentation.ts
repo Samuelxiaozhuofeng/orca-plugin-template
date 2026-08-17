@@ -98,11 +98,17 @@ export function buildSlides(
   return slides;
 }
 
-/** Cursor into the sequence. `cardIndex` -1 means "frame the whole area". */
-export type PresentCursor = { slideIndex: number; cardIndex: number };
+/** Cursor into the sequence. `cardIndex` -1 means "frame the whole area".
+ *  `zoomed` indicates whether the current card is zoomed in to fill the screen. */
+export type PresentCursor = {
+  slideIndex: number;
+  cardIndex: number;
+  zoomed: boolean;
+};
 
 /** Next / previous slide. Stops at either end, returning `cursor` itself so the
- *  caller can test for "no change" by identity. Changing slide resets the card. */
+ *  caller can test for "no change" by identity. Changing slide resets the card
+ *  and clears the zoomed state. */
 export function stepSlide(
   cursor: PresentCursor,
   slides: readonly Slide[],
@@ -111,15 +117,19 @@ export function stepSlide(
   if (slides.length === 0) return cursor;
   const nextSlideIndex = cursor.slideIndex + delta;
   if (nextSlideIndex < 0 || nextSlideIndex >= slides.length) return cursor;
-  if (nextSlideIndex === cursor.slideIndex && cursor.cardIndex === -1) {
+  if (
+    nextSlideIndex === cursor.slideIndex &&
+    cursor.cardIndex === -1 &&
+    !cursor.zoomed
+  ) {
     return cursor;
   }
-  return { slideIndex: nextSlideIndex, cardIndex: -1 };
+  return { slideIndex: nextSlideIndex, cardIndex: -1, zoomed: false };
 }
 
 /** Step through the current area's cards: +1 advances in cycle (-1 → 0 → … → n-1 → -1),
  *  -1 goes back in cycle (… → 0 → -1 → n-1). Never crosses into another slide;
- *  returns `cursor` itself when the area holds no cards. */
+ *  returns `cursor` itself when the area holds no cards. Stepping cards clears zoomed state. */
 export function stepCard(
   cursor: PresentCursor,
   slides: readonly Slide[],
@@ -140,8 +150,52 @@ export function stepCard(
     return cursor;
   }
 
-  if (nextCardIndex === cursor.cardIndex) return cursor;
-  return { slideIndex: cursor.slideIndex, cardIndex: nextCardIndex };
+  if (nextCardIndex === cursor.cardIndex && !cursor.zoomed) return cursor;
+  return { slideIndex: cursor.slideIndex, cardIndex: nextCardIndex, zoomed: false };
+}
+
+/** Enter toggles the zoom on the current card; from the whole-area view it
+ *  jumps to the first card already zoomed. Null-ish cases return `cursor`. */
+export function toggleZoom(
+  cursor: PresentCursor,
+  slides: readonly Slide[],
+): PresentCursor {
+  if (slides.length === 0) return cursor;
+  if (cursor.slideIndex < 0 || cursor.slideIndex >= slides.length) return cursor;
+  const slide = slides[cursor.slideIndex];
+  if (!slide || slide.cards.length === 0) return cursor;
+
+  if (cursor.cardIndex === -1) {
+    return { slideIndex: cursor.slideIndex, cardIndex: 0, zoomed: true };
+  }
+  return {
+    slideIndex: cursor.slideIndex,
+    cardIndex: cursor.cardIndex,
+    zoomed: !cursor.zoomed,
+  };
+}
+
+/** Ids revealed so far on the current slide, plus which one is current.
+ *  Null when nothing is being revealed (cardIndex === -1), which means
+ *  "show every card normally". */
+export function revealState(
+  cursor: PresentCursor,
+  slides: readonly Slide[],
+): { revealedIds: Set<DbId>; currentId: DbId | null } | null {
+  if (cursor.cardIndex === -1) return null;
+  if (slides.length === 0) return null;
+  if (cursor.slideIndex < 0 || cursor.slideIndex >= slides.length) return null;
+  const slide = slides[cursor.slideIndex];
+  if (!slide || slide.cards.length === 0) return null;
+
+  const revealedIds = new Set<DbId>();
+  const limit = Math.min(cursor.cardIndex, slide.cards.length - 1);
+  for (let i = 0; i <= limit; i++) {
+    revealedIds.add(slide.cards[i].blockId);
+  }
+  const currentCard = slide.cards[cursor.cardIndex];
+  const currentId = currentCard ? currentCard.blockId : null;
+  return { revealedIds, currentId };
 }
 
 /** Clamp the cursor back into range after slides or cards disappear.
@@ -161,9 +215,15 @@ export function clampCursor(
     cardCount === 0
       ? -1
       : Math.max(-1, Math.min(cursor.cardIndex, cardCount - 1));
+  const zoomed = cardIndex === -1 ? false : cursor.zoomed;
 
-  if (cursor.slideIndex === slideIndex && cursor.cardIndex === cardIndex) {
+  if (
+    cursor.slideIndex === slideIndex &&
+    cursor.cardIndex === cardIndex &&
+    cursor.zoomed === zoomed
+  ) {
     return cursor;
   }
-  return { slideIndex, cardIndex };
+  return { slideIndex, cardIndex, zoomed };
 }
+

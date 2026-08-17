@@ -111,6 +111,7 @@ export default function BoardPanel({ panelId, blockId }: Props) {
     view,
     focusApiRef,
     setView,
+    panelRef,
   });
   const presentingRef = useRef(presentation.active);
   presentingRef.current = presentation.active;
@@ -313,7 +314,8 @@ export default function BoardPanel({ panelId, blockId }: Props) {
       className={[
         "owb-panel",
         presentation.active ? "is-presenting" : "",
-        presentation.focusCardId != null ? "is-card-focus" : "",
+        presentation.reveal != null ? "is-revealing" : "",
+        presentation.fullscreenMode === "cover" ? "is-present-cover" : "",
       ]
         .filter(Boolean)
         .join(" ")}
@@ -351,7 +353,7 @@ export default function BoardPanel({ panelId, blockId }: Props) {
         focusApiRef={focusApiRef}
         presenting={presentation.active}
         presentation={presentation}
-        presentFocusId={presentation.focusCardId}
+        presentReveal={presentation.reveal}
       />
       {!presentation.active ? (
         <BoardToolbar

@@ -1,4 +1,5 @@
 import type { DbId } from "../orca.d.ts";
+import type { WhiteboardArea } from "./areas";
 import type { useCanvasOverlayState } from "./CanvasOverlays";
 import type { CanvasFocusApi } from "./cardFocus";
 import type { UnifySizeMode } from "./cardBatch";
@@ -16,6 +17,7 @@ export type CanvasOverlayProps = {
   selected: DbId[];
   selectCards: (ids: DbId[]) => void;
   edges: WhiteboardEdge[];
+  areas?: WhiteboardArea[];
   focusApiRef: { current: CanvasFocusApi | null };
   onAddCards: (cards: WhiteboardCard[]) => Promise<boolean>;
   onCommitEdges: (
@@ -46,6 +48,7 @@ export function buildCanvasOverlayProps(opts: {
   selected: DbId[];
   selectCards: (ids: DbId[]) => void;
   edges: WhiteboardEdge[];
+  areas?: WhiteboardArea[];
   focusApiRef: { current: CanvasFocusApi | null };
   onAddCards: (cards: WhiteboardCard[]) => Promise<boolean>;
   onCommitEdges: (
@@ -74,6 +77,7 @@ export function buildCanvasOverlayProps(opts: {
     selected: opts.selected,
     selectCards: opts.selectCards,
     edges: opts.edges,
+    areas: opts.areas,
     focusApiRef: opts.focusApiRef,
     onAddCards: opts.onAddCards,
     onCommitEdges: opts.onCommitEdges,

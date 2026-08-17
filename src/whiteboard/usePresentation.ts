@@ -7,11 +7,19 @@ import type { WhiteboardCard } from "./data.ts";
 import {
   buildSlides,
   clampCursor,
+  revealState,
   stepCard,
   stepSlide,
+  toggleZoom,
   type PresentCursor,
   type Slide,
 } from "./presentation.ts";
+import {
+  enterPresentFullscreen,
+  exitPresentFullscreen,
+  onFullscreenExit,
+  type FullscreenMode,
+} from "./presentFullscreen.ts";
 import type { CanvasView } from "./viewTransform.ts";
 
 const { useCallback, useEffect, useMemo, useRef, useState } = window.React;
@@ -26,9 +34,12 @@ export type PresentationState = {
   active: boolean;
   cursor: PresentCursor;
   slides: Slide[];
-  focusCardId: DbId | null;
+  reveal: { revealedIds: Set<DbId>; currentId: DbId | null } | null;
+  fullscreenMode: FullscreenMode | null;
   start: () => void;
   stop: () => void;
+  escape: () => void;
+  toggleZoom: () => void;
   next: () => void;
   prev: () => void;
   nextCard: () => void;
@@ -52,7 +63,8 @@ export function usePresentKeyActions(
             prev: presentation.prev,
             nextCard: presentation.nextCard,
             prevCard: presentation.prevCard,
-            exit: presentation.stop,
+            toggleZoom: presentation.toggleZoom,
+            exit: presentation.escape,
             firstSlide: presentation.firstSlide,
             lastSlide: presentation.lastSlide,
           }
@@ -67,13 +79,23 @@ export function usePresentation(opts: {
   view: CanvasView;
   focusApiRef: { current: CanvasFocusApi | null };
   setView: (view: CanvasView) => void;
+  panelRef: { current: HTMLElement | null };
 }): PresentationState {
-  const { areas, cards, view, focusApiRef, setView } = opts;
+  const { areas, cards, view, focusApiRef, setView, panelRef } = opts;
   const [active, setActive] = useState(false);
   const [cursor, setCursor] = useState<PresentCursor>({
     slideIndex: 0,
     cardIndex: -1,
+    zoomed: false,
   });
+  const [fullscreenMode, setFullscreenMode] = useState<FullscreenMode | null>(
+    null,
+  );
+  const activeRef = useRef(active);
+  activeRef.current = active;
+  const fullscreenModeRef = useRef(fullscreenMode);
+  fullscreenModeRef.current = fullscreenMode;
+
   const savedViewRef = useRef<CanvasView | null>(null);
   const slides = useMemo(() => buildSlides(areas, cards), [areas, cards]);
   const slidesRef = useRef(slides);
@@ -87,9 +109,7 @@ export function usePresentation(opts: {
     (cur: PresentCursor, currentSlides: readonly Slide[]) => {
       const slide = currentSlides[cur.slideIndex];
       if (!slide) return;
-      if (cur.cardIndex === -1) {
-        focusApiRef.current?.fitBoxes([slide.box], SLIDE_FIT);
-      } else {
+      if (cur.zoomed && cur.cardIndex >= 0) {
         const card = slide.cards[cur.cardIndex];
         if (card != null) {
           focusApiRef.current?.fitBoxes(
@@ -97,32 +117,52 @@ export function usePresentation(opts: {
             CARD_FIT,
           );
         }
+      } else {
+        focusApiRef.current?.fitBoxes([slide.box], SLIDE_FIT);
       }
     },
     [focusApiRef],
   );
 
-  const focusCardId = useMemo<DbId | null>(() => {
-    if (!active || cursor.cardIndex < 0) return null;
-    const currentSlide = slides[cursor.slideIndex];
-    if (!currentSlide) return null;
-    const card = currentSlide.cards[cursor.cardIndex];
-    return card ? card.blockId : null;
+  const reveal = useMemo<{
+    revealedIds: Set<DbId>;
+    currentId: DbId | null;
+  } | null>(() => {
+    if (!active) return null;
+    return revealState(cursor, slides);
   }, [active, cursor, slides]);
 
   const start = useCallback(() => {
     const currentSlides = slidesRef.current;
     if (currentSlides.length === 0) return;
     savedViewRef.current = viewRef.current;
-    const initialCursor = { slideIndex: 0, cardIndex: -1 };
+    const initialCursor: PresentCursor = {
+      slideIndex: 0,
+      cardIndex: -1,
+      zoomed: false,
+    };
     cursorRef.current = initialCursor;
     setCursor(initialCursor);
     setActive(true);
     focusCurrent(initialCursor, currentSlides);
-  }, [focusCurrent]);
+    void enterPresentFullscreen(panelRef.current).then((mode) => {
+      if (!activeRef.current) {
+        void exitPresentFullscreen(mode);
+        return;
+      }
+      fullscreenModeRef.current = mode;
+      setFullscreenMode(mode);
+    });
+  }, [focusCurrent, panelRef]);
 
   const stop = useCallback(() => {
     setActive(false);
+    const mode = fullscreenModeRef.current;
+    fullscreenModeRef.current = null;
+    setFullscreenMode(null);
+    if (mode != null) {
+      void exitPresentFullscreen(mode);
+    }
     if (savedViewRef.current != null) {
       setView(savedViewRef.current);
     }
@@ -140,6 +180,18 @@ export function usePresentation(opts: {
     },
     [focusCurrent],
   );
+
+  const escape = useCallback(() => {
+    if (cursorRef.current.zoomed) {
+      goTo({ ...cursorRef.current, zoomed: false });
+    } else {
+      stop();
+    }
+  }, [goTo, stop]);
+
+  const toggleZoomAction = useCallback(() => {
+    goTo(toggleZoom(cursorRef.current, slidesRef.current));
+  }, [goTo]);
 
   const next = useCallback(() => {
     goTo(stepSlide(cursorRef.current, slidesRef.current, 1));
@@ -160,17 +212,27 @@ export function usePresentation(opts: {
   const firstSlide = useCallback(() => {
     if (slidesRef.current.length === 0) return;
     const cur = cursorRef.current;
-    if (cur.slideIndex === 0 && cur.cardIndex === -1) return;
-    goTo({ slideIndex: 0, cardIndex: -1 });
+    if (cur.slideIndex === 0 && cur.cardIndex === -1 && !cur.zoomed) return;
+    goTo({ slideIndex: 0, cardIndex: -1, zoomed: false });
   }, [goTo]);
 
   const lastSlide = useCallback(() => {
     const lastIndex = slidesRef.current.length - 1;
     if (lastIndex < 0) return;
     const cur = cursorRef.current;
-    if (cur.slideIndex === lastIndex && cur.cardIndex === -1) return;
-    goTo({ slideIndex: lastIndex, cardIndex: -1 });
+    if (cur.slideIndex === lastIndex && cur.cardIndex === -1 && !cur.zoomed) return;
+    goTo({ slideIndex: lastIndex, cardIndex: -1, zoomed: false });
   }, [goTo]);
+
+  // Only meaningful when we actually took native fullscreen: in "cover" mode
+  // document.fullscreenElement is always null, so any unrelated fullscreen
+  // change elsewhere in the app would read as "the user left our slideshow".
+  useEffect(() => {
+    if (!active || fullscreenMode !== "native") return;
+    return onFullscreenExit(() => {
+      stop();
+    });
+  }, [active, fullscreenMode, stop]);
 
   useEffect(() => {
     if (!active) return;
@@ -191,9 +253,12 @@ export function usePresentation(opts: {
     active,
     cursor,
     slides,
-    focusCardId,
+    reveal,
+    fullscreenMode,
     start,
     stop,
+    escape,
+    toggleZoom: toggleZoomAction,
     next,
     prev,
     nextCard,

@@ -76,7 +76,7 @@ type Props = {
   focusApiRef: { current: CanvasFocusApi | null };
   presenting?: boolean;
   presentation?: PresentationState;
-  presentFocusId?: DbId | null;
+  presentReveal?: { revealedIds: ReadonlySet<DbId>; currentId: DbId | null } | null;
 };
 
 export function Canvas({
@@ -104,7 +104,7 @@ export function Canvas({
   focusApiRef,
   presenting = false,
   presentation,
-  presentFocusId,
+  presentReveal,
 }: Props) {
   const editingRef = useRef<DbId | null>(null);
   const selectedRef = useRef<DbId[]>([]);
@@ -462,7 +462,7 @@ export function Canvas({
             onExtractRow={extractRow}
             onWrapSelected={wrapSelected}
             onFocusCard={onFocusCard}
-            presentFocusId={presentFocusId ?? presentation?.focusCardId ?? null}
+            presentReveal={presentReveal ?? presentation?.reveal ?? null}
           />
         </div>
         <div ref={guidesRef} className="owb-guides" />

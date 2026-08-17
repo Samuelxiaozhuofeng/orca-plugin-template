@@ -17,7 +17,13 @@ import { placeNewSubBoardOnBoard } from "./collectIntoBoardApply";
 import type { MediaKind } from "./insertMediaCard";
 import { RelationMap } from "./RelationMap";
 
-const { useCallback, useEffect, useRef, useState } = window.React;
+import type { WhiteboardArea } from "./areas";
+import { areaChromeFor, areasForPanel } from "./useCanvasAreas";
+import { registerSlideOutlineAction } from "./slideOutlineAction.ts";
+import { SlideOutline } from "./SlideOutline.tsx";
+import { slideOutlineRows } from "./slideOutline.ts";
+
+const { useCallback, useEffect, useMemo, useRef, useState } = window.React;
 
 /** Search / menu / add-note state, plus find-command registration for this panel. */
 export function useCanvasOverlayState(panelId: string) {
@@ -28,13 +34,25 @@ export function useCanvasOverlayState(panelId: string) {
   } | null>(null);
   const [addNoteAt, setAddNoteAt] = useState<CanvasOrigin | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [outlineOpen, setOutlineOpen] = useState<boolean>(false);
 
   const openSearch = useCallback(() => setSearchOpen(true), []);
   const closeSearch = useCallback(() => setSearchOpen(false), []);
 
+  const toggleOutline = useCallback(
+    () => setOutlineOpen((open: boolean) => !open),
+    [],
+  );
+  const closeOutline = useCallback(() => setOutlineOpen(false), []);
+
   useEffect(
     () => registerFindCardAction(panelId, openSearch),
     [openSearch, panelId],
+  );
+
+  useEffect(
+    () => registerSlideOutlineAction(panelId, toggleOutline),
+    [toggleOutline, panelId],
   );
 
   const openBoardMenu = useCallback(
@@ -46,6 +64,7 @@ export function useCanvasOverlayState(panelId: string) {
   );
 
   return {
+    panelId,
     menuPointRef,
     boardMenuAt,
     setBoardMenuAt,
@@ -54,6 +73,9 @@ export function useCanvasOverlayState(panelId: string) {
     searchOpen,
     openSearch,
     closeSearch,
+    outlineOpen,
+    toggleOutline,
+    closeOutline,
     openBoardMenu,
   };
 }
@@ -68,6 +90,7 @@ type SharedProps = {
   selected: DbId[];
   selectCards: (ids: DbId[]) => void;
   edges: WhiteboardEdge[];
+  areas?: WhiteboardArea[];
   focusApiRef: { current: CanvasFocusApi | null };
   onAddCards: (cards: WhiteboardCard[]) => Promise<boolean>;
   onCommitEdges: (
@@ -95,6 +118,7 @@ export function CanvasViewportOverlays({
   selected,
   selectCards,
   edges,
+  areas,
   edgeDrop,
   hiddenCardCount,
   shownCount,
@@ -119,7 +143,41 @@ export function CanvasViewportOverlays({
   refEdgesTruncated: boolean;
   onCloseEdgeDrop: () => void;
 }) {
-  const { searchOpen, closeSearch } = overlay;
+  const { searchOpen, closeSearch, outlineOpen, closeOutline, panelId } = overlay;
+  const panelAreas = areas ?? (panelId ? areasForPanel(panelId) : []);
+  const outlineRows = useMemo(
+    () => slideOutlineRows(panelAreas, cards),
+    [panelAreas, cards],
+  );
+
+  const handleOutlinePick = useCallback(
+    (areaId: string) => {
+      const chrome = areaChromeFor(panelId);
+      chrome?.selectArea?.(areaId);
+      const target = panelAreas.find((a) => a.id === areaId);
+      if (target) {
+        focusApiRef.current?.fitBoxes([
+          { x: target.x, y: target.y, w: target.w, h: target.h },
+        ]);
+      }
+    },
+    [focusApiRef, panelAreas, panelId],
+  );
+
+  const handleOutlineRemove = useCallback(
+    (areaId: string) => {
+      areaChromeFor(panelId)?.removeFromSlides(areaId);
+    },
+    [panelId],
+  );
+
+  const handleOutlineReorder = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      areaChromeFor(panelId)?.reorderSlides(fromIndex, toIndex);
+    },
+    [panelId],
+  );
+
   return (
     <>
       <EdgeDropMenu
@@ -181,6 +239,15 @@ export function CanvasViewportOverlays({
             focusApiRef.current?.focusCard(cardBlockId);
           }}
           onClose={closeSearch}
+        />
+      ) : null}
+      {outlineOpen ? (
+        <SlideOutline
+          rows={outlineRows}
+          onPick={handleOutlinePick}
+          onRemove={handleOutlineRemove}
+          onReorder={handleOutlineReorder}
+          onClose={closeOutline}
         />
       ) : null}
       <SelectionToolbar

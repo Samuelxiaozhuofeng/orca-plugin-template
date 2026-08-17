@@ -87,7 +87,7 @@ type Props = {
   onFocusCard?: (blockId: DbId) => void;
   onExtractRow?: (blockId: DbId, sourceCard: WhiteboardCard) => void;
   onWrapSelected?: () => void;
-  presentFocusId?: DbId | null;
+  presentReveal?: { revealedIds: ReadonlySet<DbId>; currentId: DbId | null } | null;
 };
 
 type CardBox = { x: number; y: number; w: number; h: number };
@@ -115,7 +115,7 @@ export function Card({
   promotedKey = "",
   onFocusCard,
   onExtractRow,
-  presentFocusId,
+  presentReveal,
 }: Props) {
   const cardRef = useRef<HTMLDivElement | null>(null);
   const extractRowRef = useRef<DbId | null>(null);
@@ -302,8 +302,10 @@ export function Card({
     onEndEdit();
   }, [liveEditing, noteGone, onEndEdit]);
 
-  const isPresentFocus =
-    presentFocusId != null && card.blockId === presentFocusId;
+  const isPresentDim =
+    presentReveal != null && !presentReveal.revealedIds.has(card.blockId);
+  const isPresentCurrent =
+    presentReveal != null && card.blockId === presentReveal.currentId;
 
   const className = [
     "owb-card",
@@ -314,7 +316,8 @@ export function Card({
     mediaKind ? "is-media" : "",
     mediaKind ? `owb-card-media-${mediaKind}` : "",
     card.color ? `owb-card-theme-${card.color}` : "",
-    isPresentFocus ? "is-present-focus" : "",
+    isPresentDim ? "is-present-dim" : "",
+    isPresentCurrent ? "is-present-current" : "",
   ]
     .filter(Boolean)
     .join(" ");

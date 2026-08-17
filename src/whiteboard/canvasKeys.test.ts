@@ -202,6 +202,7 @@ const presentActions = {
     prev: () => presentLog.push("prev"),
     nextCard: () => presentLog.push("nextCard"),
     prevCard: () => presentLog.push("prevCard"),
+    toggleZoom: () => presentLog.push("toggleZoom"),
     exit: () => presentLog.push("exit"),
     firstSlide: () => presentLog.push("firstSlide"),
     lastSlide: () => presentLog.push("lastSlide"),
@@ -215,13 +216,14 @@ check(handleWhiteboardKey(event("ArrowLeft"), presentActions) === true, "ArrowLe
 check(handleWhiteboardKey(event("PageUp"), presentActions) === true, "PageUp calls prev");
 check(handleWhiteboardKey(event("ArrowDown"), presentActions) === true, "ArrowDown calls nextCard");
 check(handleWhiteboardKey(event("ArrowUp"), presentActions) === true, "ArrowUp calls prevCard");
+check(handleWhiteboardKey(event("Enter"), presentActions) === true, "Enter calls toggleZoom");
 check(handleWhiteboardKey(event("Escape"), presentActions) === true, "Escape calls exit");
 check(handleWhiteboardKey(event("Home"), presentActions) === true, "Home calls firstSlide");
 check(handleWhiteboardKey(event("End"), presentActions) === true, "End calls lastSlide");
 
 check(
   presentLog.join(",") ===
-    "next,next,next,prev,prev,nextCard,prevCard,exit,firstSlide,lastSlide",
+    "next,next,next,prev,prev,nextCard,prevCard,toggleZoom,exit,firstSlide,lastSlide",
   "presentation shortcuts fire in order and do not trigger nudge/escape",
 );
 check(
@@ -233,4 +235,12 @@ check(
 check(handleWhiteboardKey(event("1"), presentActions) === true, "1 still paints in presentation mode");
 check(presentActions.log.join(",") === "color:blue", "non-nav keys execute normally");
 
+// Non-presentation mode: Enter is not intercepted
+const nonPresent = actions();
+check(
+  handleWhiteboardKey(event("Enter"), nonPresent) === false,
+  "Enter is not handled outside presentation mode",
+);
+
 console.log("canvasKeys tests passed");
+

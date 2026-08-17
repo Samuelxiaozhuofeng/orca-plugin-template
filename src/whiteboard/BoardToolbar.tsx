@@ -6,6 +6,7 @@ import { boardName } from "./data";
 import { nextZoomScale } from "./fitView";
 import { openBoardAsOutline } from "./pageBoardRedirect";
 import { CardFilterPopover } from "./CardFilterPopover";
+import { invokeSlideOutlineOnActivePanel } from "./slideOutlineAction.ts";
 import { useCardFilterControls } from "./useCardFilter";
 import {
   DEFAULT_VIEW,
@@ -118,6 +119,14 @@ export function BoardToolbar({
         {filter.open ? <CardFilterPopover controls={filter} /> : null}
       </div>
       <div className="owb-toolbar-sep" />
+      <button
+        type="button"
+        className="owb-toolbar-btn"
+        title={t("Slideshow outline")}
+        onClick={invokeSlideOutlineOnActivePanel}
+      >
+        <i className="ti ti-list-numbers" />
+      </button>
       <button
         type="button"
         className="owb-toolbar-btn"

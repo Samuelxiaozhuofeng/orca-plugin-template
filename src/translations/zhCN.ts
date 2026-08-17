@@ -302,6 +302,11 @@ const zhCN = {
   "Slide ${n}": "第 ${n} 页",
   "Start slideshow": "开始演示",
   "Exit slideshow": "退出演示",
+  "Slideshow outline": "演示大纲",
+  "Right-click a section to add it to the slideshow":
+    "右键区域框可以把它加入演示",
+  "Untitled section": "未命名区域",
+  Close: "关闭",
   "Add sections to the slideshow first": "先把区域加入演示序列",
   "Card ${i} of ${n}": "卡片 ${i}/${n}",
   "Find cards…": "查找卡片…",

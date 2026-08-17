@@ -92,3 +92,33 @@ export function planMoveSlide(
     reordered.map((area) => area.id),
   );
 }
+
+/** Move the slide at `fromIndex` to `toIndex` in the sequence and renumber
+ *  1..n. Indexes are positions in `slideAreas(areas)`, not slide numbers.
+ *  Null when either index is out of range or nothing would move. */
+export function planReorderSlides(
+  areas: readonly WhiteboardArea[],
+  fromIndex: number,
+  toIndex: number,
+): WhiteboardArea[] | null {
+  if (fromIndex === toIndex) return null;
+  const current = slideAreas(areas);
+  if (
+    fromIndex < 0 ||
+    fromIndex >= current.length ||
+    toIndex < 0 ||
+    toIndex >= current.length
+  ) {
+    return null;
+  }
+
+  const reordered = [...current];
+  const [moved] = reordered.splice(fromIndex, 1);
+  reordered.splice(toIndex, 0, moved);
+
+  return renumberSlides(
+    areas,
+    reordered.map((area) => area.id),
+  );
+}
+

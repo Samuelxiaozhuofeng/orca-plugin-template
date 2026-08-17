@@ -9,6 +9,7 @@ import {
   planAddToSlides,
   planMoveSlide,
   planRemoveFromSlides,
+  planReorderSlides,
 } from "./areaSlides";
 import {
   nextAreaId,
@@ -34,13 +35,20 @@ type AreaChrome = {
   addToSlides: (id: string) => void;
   moveSlide: (id: string, delta: number) => void;
   removeFromSlides: (id: string) => void;
+  reorderSlides: (fromIndex: number, toIndex: number) => void;
+  selectArea?: (id: string | null) => void;
 };
 
 const chromeByPanel = new Map<string, AreaChrome>();
 const fullCardsByPanel = new Map<string, WhiteboardCard[]>();
+const areasByPanel = new Map<string, WhiteboardArea[]>();
 
 export function areaChromeFor(panelId: string): AreaChrome | undefined {
   return chromeByPanel.get(panelId);
+}
+
+export function areasForPanel(panelId: string): WhiteboardArea[] {
+  return areasByPanel.get(panelId) ?? [];
 }
 
 /** Full board cards, including members of collapsed sections. */
@@ -298,20 +306,43 @@ export function useCanvasAreas({
     [commitAreasStep],
   );
 
+  const reorderSlides = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      const next = planReorderSlides(areasRef.current, fromIndex, toIndex);
+      if (next == null) return;
+      void commitAreasStep(next);
+    },
+    [commitAreasStep],
+  );
+
+  areasByPanel.set(panelId, areas);
+
   chromeByPanel.set(panelId, {
     setColor: setAreaColor,
     toggleCollapsed: toggleAreaCollapsed,
     addToSlides,
     moveSlide,
     removeFromSlides,
+    reorderSlides,
+    selectArea,
   });
   useEffect(() => {
     return () => {
       const current = chromeByPanel.get(panelId);
       if (current?.setColor === setAreaColor) chromeByPanel.delete(panelId);
       fullCardsByPanel.delete(panelId);
+      areasByPanel.delete(panelId);
     };
-  }, [panelId, setAreaColor, toggleAreaCollapsed, addToSlides, moveSlide, removeFromSlides]);
+  }, [
+    panelId,
+    setAreaColor,
+    toggleAreaCollapsed,
+    addToSlides,
+    moveSlide,
+    removeFromSlides,
+    reorderSlides,
+    selectArea,
+  ]);
 
   return {
     selectedArea,
@@ -327,5 +358,6 @@ export function useCanvasAreas({
     addToSlides,
     moveSlide,
     removeFromSlides,
+    reorderSlides,
   };
 }
