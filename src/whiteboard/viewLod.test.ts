@@ -120,8 +120,12 @@ const nearest = pickMountedCards(
   },
 );
 check(
-  nearest.cards.map((item) => item.blockId).join(",") === "3,1",
+  nearest.cards.map((item) => item.blockId).sort().join(",") === "1,3",
   "uncapped overflow prefers cards nearest the viewport centre",
+);
+check(
+  nearest.cards.map((item) => item.blockId).join(",") === "1,3",
+  "mounted cards keep the input order, not viewport-distance order",
 );
 
 check(

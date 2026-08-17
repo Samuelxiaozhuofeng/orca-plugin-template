@@ -181,11 +181,23 @@ export function useCanvasBoard({
   }, [edges, selectedEdge]);
 
   const lodSimplified = isLodSimplified(view.scale);
+  // Cards mounted on the previous frame get a wider keep-band, so panning
+  // across the cull boundary does not remount them (and restart their media).
+  const mountedIdsRef = useRef<Set<DbId>>(new Set<DbId>());
   const shownPlan = useMemo(
-    () => planShownCards(cards, view, viewportSize, { editingId }),
+    () =>
+      planShownCards(cards, view, viewportSize, {
+        editingId,
+        mountedIds: mountedIdsRef.current,
+      }),
     [cards, editingId, view, viewportSize],
   );
   const shownCards = shownPlan.cards;
+  useEffect(() => {
+    mountedIdsRef.current = new Set(
+      shownCards.map((card: WhiteboardCard) => card.blockId),
+    );
+  }, [shownCards]);
   const hiddenCardCount = shownPlan.hiddenCount;
   const selectedSet = useMemo(() => new Set(selected), [selected]);
 

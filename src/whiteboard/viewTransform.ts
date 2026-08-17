@@ -246,31 +246,65 @@ export function pickMountedCards<T extends WhiteboardCard>(
   );
   const rankedRest = sortByViewportCenter(rest, opts.view, opts.viewport);
 
-  const cards: T[] = [];
-  for (const card of editing) cards.push(card);
+  const keep = new Set<DbId>();
+  for (const card of editing) keep.add(card.blockId);
   for (const card of rankedPreferred) {
-    if (cards.length >= cap) break;
-    cards.push(card);
+    if (keep.size >= cap) break;
+    keep.add(card.blockId);
   }
   for (const card of rankedRest) {
-    if (cards.length >= cap) break;
-    cards.push(card);
+    if (keep.size >= cap) break;
+    keep.add(card.blockId);
   }
+
+  // Emit in the incoming card order, never in viewport-distance order.
+  // Distance ranking only decides *which* cards survive the cap; using it as
+  // render order would reshuffle the DOM on every pan/zoom frame, and moving a
+  // node re-attaches it — which restarts any <video>/<audio> inside a card.
+  const cards = visible.filter((card) => keep.has(card.blockId));
   return { cards, hiddenCount: Math.max(0, visible.length - cards.length) };
 }
+
+/** Extra screenfuls an already-mounted card keeps before it is dropped. */
+export const MOUNT_STICKY_SCREENS = 1;
 
 /**
  * Cards that actually mount. Only the viewport (plus the card being edited)
  * may pin; selection never does.
+ *
+ * `mountedIds` are the cards mounted on the previous frame. They survive in a
+ * wider band than fresh cards enter, so a card sitting on the cull boundary is
+ * not unmounted and remounted on every jitter of a pan or zoom (which would
+ * reload and restart any media inside it).
  */
 export function planShownCards<T extends WhiteboardCard>(
   cards: T[],
   view: CanvasView,
   viewport: { width: number; height: number },
-  opts: { cap?: number; editingId?: DbId | null } = {},
+  opts: {
+    cap?: number;
+    editingId?: DbId | null;
+    mountedIds?: ReadonlySet<DbId> | null;
+  } = {},
 ): MountedCards<T> {
   const editingId = opts.editingId ?? null;
-  const visible = visibleCards(cards, view, viewport, editingId);
+  const margin = marginScreensForScale(view.scale);
+  const mounted = opts.mountedIds;
+  const visible =
+    mounted != null && mounted.size > 0
+      ? cards.filter(
+          (card) =>
+            card.blockId === editingId ||
+            cardIntersectsViewport(
+              card,
+              view,
+              viewport,
+              mounted.has(card.blockId)
+                ? margin + MOUNT_STICKY_SCREENS
+                : margin,
+            ),
+        )
+      : visibleCards(cards, view, viewport, editingId, margin);
   return pickMountedCards(visible, {
     cap: opts.cap,
     editingId,

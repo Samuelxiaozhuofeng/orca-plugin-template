@@ -29,6 +29,7 @@ import {
 import { CardErrorBoundary } from "./CardErrorBoundary";
 import { attachCardRefHoverPreview } from "./hoverPreview";
 import { attachMediaRefJump } from "./mediaRefJump";
+import { attachMediaAutoplayGuard } from "./mediaAutoplay";
 
 const { useEffect, useRef } = window.React;
 
@@ -64,7 +65,9 @@ export function CardBlockTree({
     if (el == null) return;
     const detachPreview = attachCardRefHoverPreview(el);
     const detachJump = attachMediaRefJump(el);
+    const detachAutoplay = attachMediaAutoplayGuard(el);
     return () => {
+      detachAutoplay();
       detachJump();
       detachPreview();
     };
