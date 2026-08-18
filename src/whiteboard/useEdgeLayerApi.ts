@@ -22,7 +22,7 @@ import {
 import type { ReferenceEdge } from "./edgeRefs";
 import { CardRowObserverManager } from "./edgeRowObservers";
 import { reconcileLiveBoxes } from "./edgeLiveBoxes";
-import { resolveSourceBox, RowBoxCache } from "./edgeRowBoxes";
+import { RowBoxCache } from "./edgeRowBoxes";
 
 const { useCallback, useEffect, useLayoutEffect, useMemo, useRef } =
   window.React;
@@ -309,13 +309,13 @@ export function useEdgeLayerApi(opts: {
         fromBlock != null
           ? rowCacheRef.current.measure(canvas, card.blockId, fromBlock, cardBox)
           : null;
-      const fromBox = resolveSourceBox(cardBox, rowBox);
       selectRef.current(null);
       const session = startDrawEdge({
         fromId: card.blockId,
         fromBlock,
         fromSide: side,
-        fromBox,
+        fromCardBox: cardBox,
+        fromRowBox: rowBox,
         cards: () =>
           cardsRef.current.map((item: WhiteboardCard) => ({
             blockId: item.blockId,

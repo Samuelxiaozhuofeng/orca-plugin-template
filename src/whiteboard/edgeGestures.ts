@@ -7,7 +7,7 @@ import {
   type Point,
 } from "./edgeGeometry";
 import { edgeDedupeKey, type EdgeBend, type Side } from "./edges";
-import { resolveSourceBox } from "./edgeRowBoxes";
+import { resolveRowAnchorBox } from "./edgeRowBoxes";
 
 export type BoxedCard = { blockId: DbId } & CardBox;
 
@@ -85,16 +85,14 @@ export function paintEdgesForBoxes(
     if (fromCardBox == null || to == null) continue;
     const els = getEls(edge.id);
     if (els == null) continue;
-    const fromBox =
+    const rowBox =
       edge.fromBlock != null && getRowBox != null
-        ? resolveSourceBox(
-            fromCardBox,
-            getRowBox(edge.from, edge.fromBlock, fromCardBox),
-          )
-        : fromCardBox;
+        ? getRowBox(edge.from, edge.fromBlock, fromCardBox)
+        : null;
+    const source = resolveRowAnchorBox(fromCardBox, rowBox, to, edge.fromSide);
     paintCurveDom(
       els,
-      curveForBoxes(fromBox, to, edge.fromSide, edge.toSide, edge.bend),
+      curveForBoxes(source.box, to, source.side, edge.toSide, edge.bend),
     );
   }
 }
@@ -172,7 +170,8 @@ export function startDrawEdge(opts: {
   fromId: DbId;
   fromBlock?: DbId;
   fromSide?: Side;
-  fromBox: CardBox;
+  fromCardBox: CardBox;
+  fromRowBox?: CardBox | null;
   cards: () => readonly BoxedCard[];
   canvas: HTMLElement;
   ghost: SVGPathElement;
@@ -241,7 +240,13 @@ export function startDrawEdge(opts: {
         ? cards.find((card) => card.blockId === hit)
         : cursorBox(world);
     if (dest == null) return;
-    const curve = curveForBoxes(opts.fromBox, dest, opts.fromSide, undefined);
+    const source = resolveRowAnchorBox(
+      opts.fromCardBox,
+      opts.fromRowBox,
+      dest,
+      opts.fromSide,
+    );
+    const curve = curveForBoxes(source.box, dest, source.side, undefined);
     setGhostPath(opts.ghost, curve.d);
   };
 

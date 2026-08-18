@@ -1,10 +1,23 @@
 import type { DbId } from "../orca.d.ts";
-import type { CardBox } from "./edgeGeometry.ts";
+import { pickSide, type CardBox } from "./edgeGeometry.ts";
+import type { Side } from "./edges.ts";
 
 export type RowOffset = {
   relY: number;
   h: number;
 };
+
+function isValidRowBox(rowBox?: CardBox | null): rowBox is CardBox {
+  return (
+    rowBox != null &&
+    Number.isFinite(rowBox.x) &&
+    Number.isFinite(rowBox.y) &&
+    Number.isFinite(rowBox.w) &&
+    Number.isFinite(rowBox.h) &&
+    rowBox.w > 0 &&
+    rowBox.h > 0
+  );
+}
 
 /**
  * Degrades to the card box if rowBox is null, undefined, or contains non-finite dimensions.
@@ -13,18 +26,35 @@ export function resolveSourceBox(
   cardBox: CardBox,
   rowBox?: CardBox | null,
 ): CardBox {
-  if (
-    rowBox == null ||
-    !Number.isFinite(rowBox.x) ||
-    !Number.isFinite(rowBox.y) ||
-    !Number.isFinite(rowBox.w) ||
-    !Number.isFinite(rowBox.h) ||
-    rowBox.w <= 0 ||
-    rowBox.h <= 0
-  ) {
+  if (!isValidRowBox(rowBox)) {
     return cardBox;
   }
   return rowBox;
+}
+
+/**
+ * Resolves source box and side for row-level connections.
+ *
+ * Rules:
+ * 1. If rowBox is invalid, returns { box: cardBox, side: explicitSide }.
+ * 2. Otherwise side = explicitSide ?? pickSide(cardBox, toBox).
+ * 3. If side is "l" or "r", returns { box: rowBox, side }.
+ * 4. If side is "t" or "b", returns { box: cardBox, side }.
+ */
+export function resolveRowAnchorBox(
+  cardBox: CardBox,
+  rowBox: CardBox | null | undefined,
+  toBox: CardBox,
+  explicitSide?: Side,
+): { box: CardBox; side?: Side } {
+  if (!isValidRowBox(rowBox)) {
+    return { box: cardBox, side: explicitSide };
+  }
+  const side = explicitSide ?? pickSide(cardBox, toBox);
+  if (side === "l" || side === "r") {
+    return { box: rowBox, side };
+  }
+  return { box: cardBox, side };
 }
 
 /**

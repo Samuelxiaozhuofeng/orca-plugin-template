@@ -5,7 +5,7 @@ import { EdgeLabelLayer, EdgeMenuPopup } from "./EdgeOverlay";
 import { EdgeToolbar } from "./EdgeToolbar";
 import { nextEdgeToolbarOpen } from "./edgeToolbarLayout";
 import { edgeHasNoteLink } from "./edgeLink";
-import { resolveSourceBox } from "./edgeRowBoxes";
+import { resolveRowAnchorBox } from "./edgeRowBoxes";
 import {
   type EdgeArrow,
   type WhiteboardEdge,
@@ -242,8 +242,8 @@ export function EdgeLayer({
             fromCardBox,
           )
         : null;
-    const fromBox = resolveSourceBox(fromCardBox, rowBox);
-    return curveForBoxes(fromBox, to, edge.fromSide, edge.toSide, edge.bend);
+    const source = resolveRowAnchorBox(fromCardBox, rowBox, to, edge.fromSide);
+    return curveForBoxes(source.box, to, source.side, edge.toSide, edge.bend);
   };
 
   const markersFor = (arrow: EdgeArrow) => {
