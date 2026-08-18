@@ -43,10 +43,13 @@ register(
 
 const {
   addLinkRefId,
+  EDGE_LINK_BACK_PROP,
   EDGE_LINK_PROP,
   findExistingEdgeLink,
   isPluginPropertyRef,
   parseLinkRefIds,
+  readEdgeLinkBackPropIds,
+  readEdgeLinkPropIds,
   REF_TYPE_PROPERTY,
   removeLinkRefId,
 } = await import("./edgeLink.ts");
@@ -57,6 +60,7 @@ function check(cond: boolean, message: string): void {
 }
 
 check(EDGE_LINK_PROP === "whiteboard.link", "property name is stable");
+check(EDGE_LINK_BACK_PROP === "whiteboard.linkBack", "back-link property name is stable");
 check(REF_TYPE_PROPERTY === 2, "property refs use type 2");
 
 check(parseLinkRefIds([10, 20, 10]).join(",") === "10,20", "parse drops duplicate ids");

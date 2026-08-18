@@ -21,6 +21,7 @@ import { buildCanvasOverlayProps } from "./canvasOverlayProps";
 import { CanvasCards } from "./CanvasCards";
 import { EdgeLayer, type EdgeLayerApi } from "./EdgeLayer";
 import type { CardBox } from "./edgeGeometry";
+import { useEdgeBackLinkBackfill } from "./edgeBackLink";
 import { useReferenceEdges } from "./edgeRefs";
 import type { WhiteboardEdge } from "./edges";
 import { useWhiteboardSettings } from "./settings";
@@ -219,6 +220,8 @@ export function Canvas({
       blurCardEditor(viewportRef.current);
     };
   }, []);
+
+  useEdgeBackLinkBackfill(boardBlockId, edges, settings.bidirectionalEdgeLinks);
 
   const visible = visibleAfterCollapsedAreas(areas, cards, shownCards, edges);
   const { edges: refEdges, truncated: refEdgesTruncated } = useReferenceEdges(

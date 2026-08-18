@@ -48,7 +48,7 @@ const {
   REF_TYPE_INLINE,
   REF_WALK_MAX_BLOCKS,
 } = await import("./edgeRefs.ts");
-const { EDGE_LINK_PROP, REF_TYPE_PROPERTY } = await import("./edgeLink.ts");
+const { EDGE_LINK_BACK_PROP, EDGE_LINK_PROP, REF_TYPE_PROPERTY } = await import("./edgeLink.ts");
 
 function check(cond: boolean, message: string): void {
   if (!cond) throw new Error(message);
@@ -199,6 +199,17 @@ const orphanProp = {
 };
 const fromOrphan = collectReferenceEdges([cardA, cardB], orphanProp, noneDrawn);
 check(fromOrphan.edges.length === 0, "property refs outside the plugin array are ignored");
+
+const backLinkOnly = {
+  1: {
+    children: [],
+    refs: [propertyRef(100, 2)],
+    properties: [{ name: EDGE_LINK_BACK_PROP, type: 2, value: [100] }],
+  },
+  2: { children: [], refs: [] },
+};
+const fromBackLinkOnly = collectReferenceEdges([cardA, cardB], backLinkOnly, noneDrawn);
+check(fromBackLinkOnly.edges.length === 0, "whiteboard.linkBack property refs are not drawn as reference edges");
 
 const alreadyDrawn = collectReferenceEdges(
   [cardA, cardB],

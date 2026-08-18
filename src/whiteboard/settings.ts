@@ -20,6 +20,7 @@ export type WhiteboardSettings = {
   boardTag: string;
   openWhiteboardPagesAsCanvas: boolean;
   autoLinkEdges: boolean;
+  bidirectionalEdgeLinks: boolean;
   edgeLinkMode: EdgeLinkMode;
 };
 
@@ -32,6 +33,7 @@ const DEFAULTS: WhiteboardSettings = {
   boardTag: DEFAULT_BOARD_TAG,
   openWhiteboardPagesAsCanvas: true,
   autoLinkEdges: true,
+  bidirectionalEdgeLinks: true,
   edgeLinkMode: "property",
 };
 
@@ -121,6 +123,14 @@ export function whiteboardSettingsSchema(): PluginSettingsSchema {
       type: "boolean",
       defaultValue: DEFAULTS.autoLinkEdges,
     },
+    bidirectionalEdgeLinks: {
+      label: t("Link both ends of an arrow"),
+      description: t(
+        "Also write a reference back from the target note, so both notes show each other in their backlinks. Off: only the source note points at the target.",
+      ),
+      type: "boolean",
+      defaultValue: DEFAULTS.bidirectionalEdgeLinks,
+    },
     edgeLinkMode: {
       label: t("How to store the reference"),
       description: t(
@@ -154,6 +164,7 @@ export function readWhiteboardSettings(
     boardTag: typeof raw?.boardTag === "string" ? raw.boardTag : DEFAULTS.boardTag,
     openWhiteboardPagesAsCanvas: raw?.openWhiteboardPagesAsCanvas !== false,
     autoLinkEdges: raw?.autoLinkEdges !== false,
+    bidirectionalEdgeLinks: raw?.bidirectionalEdgeLinks !== false,
     edgeLinkMode: raw?.edgeLinkMode === "child" ? "child" : "property",
   };
 }

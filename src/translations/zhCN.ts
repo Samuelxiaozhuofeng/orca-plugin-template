@@ -164,6 +164,9 @@ const zhCN = {
   "Create a note reference when connecting cards": "画线时自动建立笔记引用",
   "Automatically create a note reference when you draw an arrow. Turn this off to keep lines decorative.":
     "从一张卡片拉出箭头时，自动在笔记里建立引用。关掉后箭头只是装饰线，不改笔记。",
+  "Link both ends of an arrow": "箭头两端互建引用",
+  "Also write a reference back from the target note, so both notes show each other in their backlinks. Off: only the source note points at the target.":
+    "同时在终点笔记写一条反向引用，两边笔记的反链区都能看到对方。关闭后只从起点指向终点。",
   "How to store the reference": "引用的落地方式",
   "Property: no extra text in the source note. Child block: insert a child under the source note (older method).":
     "「属性」：源笔记正文不变。「子块」：在源笔记下插入一条引用（旧做法）。",

@@ -101,5 +101,17 @@ check(
   readWhiteboardSettings({ edgeLinkMode: "nope" }).edgeLinkMode === "property",
   "unknown link mode falls back to property",
 );
+check(
+  readWhiteboardSettings(undefined).bidirectionalEdgeLinks === true,
+  "bidirectional link defaults on",
+);
+check(
+  readWhiteboardSettings({}).bidirectionalEdgeLinks === true,
+  "missing bidirectional link is on",
+);
+check(
+  readWhiteboardSettings({ bidirectionalEdgeLinks: false }).bidirectionalEdgeLinks === false,
+  "bidirectional link can be turned off",
+);
 
 console.log("settings tests passed");

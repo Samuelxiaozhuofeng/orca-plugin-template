@@ -1,13 +1,21 @@
 import type { Block, BlockRef, DbId } from "../orca.d.ts";
 import { t } from "../libs/l10n";
+import {
+  linkEdgeBackByProperty,
+  unlinkEdgeBackByProperty,
+} from "./edgeBackLink";
 import { edgeSourceBlock, type WhiteboardEdge } from "./edges";
 import { cacheBlockList, fetchBlock } from "./newCard";
 import { cacheReturnedBlocks } from "./noteWrite";
+import { currentWhiteboardSettings } from "./settings";
 
 export { edgeSourceBlock };
 
-/** Property that holds this plugin's arrow references. Type is BlockRefs (2). */
+/** Property that holds this plugin's forward arrow references. Type is BlockRefs (2). */
 export const EDGE_LINK_PROP = "whiteboard.link";
+
+/** Property that holds this plugin's reverse arrow references. Type is BlockRefs (2). */
+export const EDGE_LINK_BACK_PROP = "whiteboard.linkBack";
 
 /** `RefType.Property` — not an inline / alias reference. */
 export const REF_TYPE_PROPERTY = 2;
@@ -86,14 +94,31 @@ export function isPluginPropertyRef(
   return ref.type === REF_TYPE_PROPERTY && propIds.includes(ref.id);
 }
 
+export function readPropertyRefIds(
+  block:
+    | { properties?: readonly { name: string; value?: unknown }[] }
+    | undefined,
+  propName: string,
+): DbId[] {
+  const prop = block?.properties?.find((item) => item.name === propName);
+  if (prop == null) return [];
+  return parseLinkRefIds(prop.value);
+}
+
 export function readEdgeLinkPropIds(
   block:
     | { properties?: readonly { name: string; value?: unknown }[] }
     | undefined,
 ): DbId[] {
-  const prop = block?.properties?.find((item) => item.name === EDGE_LINK_PROP);
-  if (prop == null) return [];
-  return parseLinkRefIds(prop.value);
+  return readPropertyRefIds(block, EDGE_LINK_PROP);
+}
+
+export function readEdgeLinkBackPropIds(
+  block:
+    | { properties?: readonly { name: string; value?: unknown }[] }
+    | undefined,
+): DbId[] {
+  return readPropertyRefIds(block, EDGE_LINK_BACK_PROP);
 }
 
 /** True when this line has a note reference (property or the older child block). */
@@ -103,7 +128,7 @@ export function edgeHasNoteLink(edge: WhiteboardEdge): boolean {
 
 const lanes = new Map<DbId, Promise<unknown>>();
 
-function enqueueBlock<T>(blockId: DbId, run: () => Promise<T>): Promise<T> {
+export function enqueueBlock<T>(blockId: DbId, run: () => Promise<T>): Promise<T> {
   const queued = (lanes.get(blockId) ?? Promise.resolve()).then(run, run);
   const tracked = queued.then(
     () => {},
@@ -132,7 +157,7 @@ function asDbId(value: unknown): DbId | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-async function createPropertyRef(
+export async function createPropertyRef(
   fromId: DbId,
   toId: DbId,
   alias: string,
@@ -153,8 +178,9 @@ async function createPropertyRef(
   return refId;
 }
 
-async function writeEdgeLinkProp(
+export async function writePropertyRefs(
   fromId: DbId,
+  propName: string,
   ids: readonly DbId[],
   alsoRefresh?: DbId,
 ): Promise<void> {
@@ -163,7 +189,7 @@ async function writeEdgeLinkProp(
     [fromId],
     [
       {
-        name: EDGE_LINK_PROP,
+        name: propName,
         type: PROP_TYPE_BLOCK_REFS,
         value: [...ids],
       },
@@ -174,20 +200,36 @@ async function writeEdgeLinkProp(
   orca.broadcasts.broadcast("orca.refresh-blocks", refresh);
 }
 
+export async function writeEdgeLinkProp(
+  fromId: DbId,
+  ids: readonly DbId[],
+  alsoRefresh?: DbId,
+): Promise<void> {
+  return writePropertyRefs(fromId, EDGE_LINK_PROP, ids, alsoRefresh);
+}
+
+export async function writeEdgeBackLinkProp(
+  targetId: DbId,
+  ids: readonly DbId[],
+  alsoRefresh?: DbId,
+): Promise<void> {
+  return writePropertyRefs(targetId, EDGE_LINK_BACK_PROP, ids, alsoRefresh);
+}
+
 export async function linkEdgeByProperty(edge: WhiteboardEdge): Promise<DbId> {
   const sourceId = edgeSourceBlock(edge);
-  return enqueueBlock(sourceId, async () => {
+  const refId = await enqueueBlock(sourceId, async () => {
     const source = await fetchBlock(sourceId);
     const current = readEdgeLinkPropIds(source);
     const existing = findExistingEdgeLink(source.refs ?? [], current, edge.to);
     if (existing != null) return existing;
 
     const alias = edge.label?.trim() ?? "";
-    const refId = await createPropertyRef(sourceId, edge.to, alias);
+    const createdRefId = await createPropertyRef(sourceId, edge.to, alias);
     const fresh = await fetchBlock(sourceId);
     const latest = readEdgeLinkPropIds(fresh);
-    const next = addLinkRefId(latest, refId);
-    if (linkRefIdsEqual(latest, next)) return refId;
+    const next = addLinkRefId(latest, createdRefId);
+    if (linkRefIdsEqual(latest, next)) return createdRefId;
     try {
       await writeEdgeLinkProp(sourceId, next, edge.to);
     } catch (error) {
@@ -201,8 +243,22 @@ export async function linkEdgeByProperty(edge: WhiteboardEdge): Promise<DbId> {
       }
       throw error;
     }
-    return refId;
+    return createdRefId;
   });
+
+  const settings = currentWhiteboardSettings();
+  if (settings.bidirectionalEdgeLinks) {
+    try {
+      await linkEdgeBackByProperty(edge);
+    } catch (backError) {
+      console.error(
+        "[whiteboard] failed to create note back-reference",
+        backError,
+      );
+    }
+  }
+
+  return refId;
 }
 
 export async function unlinkEdgeByProperty(edge: WhiteboardEdge): Promise<void> {
@@ -226,4 +282,13 @@ export async function unlinkEdgeByProperty(edge: WhiteboardEdge): Promise<void> 
     if (linkRefIdsEqual(current, next)) return;
     await writeEdgeLinkProp(sourceId, next, edge.to);
   });
+
+  try {
+    await unlinkEdgeBackByProperty(edge);
+  } catch (backError) {
+    console.error(
+      "[whiteboard] failed to remove note back-reference",
+      backError,
+    );
+  }
 }

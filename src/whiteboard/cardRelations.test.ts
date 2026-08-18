@@ -52,7 +52,7 @@ const {
   RELATION_SNIPPET_MAX,
 } = await import("./cardRelations.ts");
 const { REF_TYPE_INLINE } = await import("./edgeRefs.ts");
-const { EDGE_LINK_PROP, REF_TYPE_PROPERTY } = await import("./edgeLink.ts");
+const { EDGE_LINK_BACK_PROP, EDGE_LINK_PROP, REF_TYPE_PROPERTY } = await import("./edgeLink.ts");
 
 function check(cond: boolean, message: string): void {
   if (!cond) throw new Error(message);
@@ -116,6 +116,27 @@ const pluginOn = collectCardRelations(
 );
 check(pluginOn.total === 1, "plugin property ref is counted");
 check(pluginOn.shown[0]?.onBoard === true, "plugin target on the board is on-board");
+
+const backLinkTarget = collectCardRelations(
+  1,
+  cards,
+  {
+    1: {
+      children: [],
+      refs: [propRef(50, 1, 2)],
+      backRefs: [{ id: 60, type: REF_TYPE_PROPERTY, from: 2, to: 1 }],
+      properties: [{ name: EDGE_LINK_PROP, type: 2, value: [50] }],
+    },
+    2: {
+      children: [],
+      refs: [{ id: 60, type: REF_TYPE_PROPERTY, from: 2, to: 1 }],
+      backRefs: [propRef(50, 1, 2)],
+      properties: [{ name: EDGE_LINK_BACK_PROP, type: 2, value: [60] }],
+    },
+  },
+);
+check(backLinkTarget.total === 1, "card 1 sees 1 relation");
+check(backLinkTarget.shown[0]?.dir === "out", "card 1 sees card 2 as strictly 'out', not 'both'");
 
 const foreign = collectCardRelations(
   1,
