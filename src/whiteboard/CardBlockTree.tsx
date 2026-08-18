@@ -15,6 +15,7 @@ import {
 import {
   CARD_CHILD_INDENT_PX,
   cardTreePlanEqual,
+  FOLDING_HANDLE_SELECTOR,
   planCardBlockTree,
 } from "./cardTreePlan";
 import {
@@ -198,7 +199,7 @@ export function CardBlockTree({
         const target = event.target as HTMLElement | null;
         if (
           target?.closest(
-            `.${EXTRACT_BULLET_CLASS}, .${CARD_ROW_FOCUS_CLASS}, .owb-row-connect-btn`,
+            `.${EXTRACT_BULLET_CLASS}, .${CARD_ROW_FOCUS_CLASS}, .owb-row-connect-btn, ${FOLDING_HANDLE_SELECTOR}`,
           )
         ) {
           event.stopPropagation();
@@ -228,7 +229,7 @@ export function CardBlockTree({
                 ? (event) => {
                     if (
                       (event.target as HTMLElement | null)?.closest(
-                        `.${EXTRACT_BULLET_CLASS}, .owb-row-connect-btn`,
+                        `.${EXTRACT_BULLET_CLASS}, .owb-row-connect-btn, ${FOLDING_HANDLE_SELECTOR}`,
                       )
                     ) {
                       return;

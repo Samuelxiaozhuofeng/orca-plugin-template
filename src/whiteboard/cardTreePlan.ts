@@ -15,6 +15,10 @@ export const HOST_OWN_CHILD_TYPES = new Set([
 
 export const CARD_CHILD_INDENT_PX = 12;
 
+/** Host outline fold triangle selector on Orca block elements. */
+export const FOLDING_HANDLE_CLASS = "orca-block-folding-handle";
+export const FOLDING_HANDLE_SELECTOR = ".orca-block-folding-handle";
+
 export type CardTreeBlock = {
   children?: DbId[];
   properties?: readonly { name: string; value?: unknown }[];
@@ -77,8 +81,8 @@ export function cardTreePlanEqual(
 }
 
 /**
- * Depth-first nodes to show on a read-only card. Ignores `_repr.fold`
- * so a folded outline still lists children. Does not walk into types
+ * Depth-first nodes to show on a read-only card. Respects `_repr.fold`
+ * so a folded node does not list its children. Does not walk into types
  * that render their own children. `promoted` ids (other cards on this
  * board) become a one-line placeholder; their subtrees are not walked.
  * The root is never a placeholder, even if listed in `promoted`.
@@ -105,7 +109,7 @@ export function planCardBlockTree(
     const block = blocks[id];
     const hostOwn = hostDrawsOwnChildren(block);
     out.push({ id, depth, hostOwn, promoted: false });
-    if (hostOwn || block == null) return;
+    if (hostOwn || isBlockFolded(block) || block == null) return;
     for (const child of block.children ?? []) {
       walk(child, depth + 1);
     }

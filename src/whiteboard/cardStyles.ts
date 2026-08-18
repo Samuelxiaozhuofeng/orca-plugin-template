@@ -227,10 +227,11 @@ export const CARD_CSS = `
   margin-top: 0;
 }
 
-/* Read-only cards always expand children; hide the host fold caret
-   so clicking the card cannot write the note fold flag. */
+/* Read-only cards sync folding with outline; the host fold caret is visible
+   and clickable. */
 .owb-card:not(.is-editing) .orca-block-folding-handle {
-  display: none !important;
+  pointer-events: auto;
+  cursor: pointer;
 }
 
 .owb-card-block-tree {

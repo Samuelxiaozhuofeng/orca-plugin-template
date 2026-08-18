@@ -146,8 +146,8 @@ check(
     3: { children: [] },
   })
     .map((node) => `${node.id}@${node.depth}`)
-    .join(",") === "1@0,2@1,3@2",
-  "plan lists children of a folded parent",
+    .join(",") === "1@0",
+  "plan hides children of a folded parent",
 );
 check(
   hostDrawsOwnChildren({

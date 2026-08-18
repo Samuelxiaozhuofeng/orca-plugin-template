@@ -4,6 +4,7 @@ import { isExtractPointerTarget } from "./cardExtractDrag";
 import { isOnCardScrollbar } from "./cardGestures";
 import { CARD_ROW_FOCUS_CLASS } from "./cardRowOnBoard";
 import { CARD_BACK_CLASS } from "./cardParentOnBoard";
+import { FOLDING_HANDLE_SELECTOR } from "./cardTreePlan";
 import { CLICK_THRESHOLD_PX } from "./marquee";
 
 const { useEffect } = window.React;
@@ -21,7 +22,7 @@ export const EDITABLE_ONLY_SELECTOR =
 export const EDITABLE_SELECTOR = `${EDITABLE_ONLY_SELECTOR}, input, textarea`;
 
 const CLICK_EDIT_BLOCK =
-  `.owb-card-header, .owb-card-journal-badge, .owb-card-handle, .owb-card-floating-toolbar, .owb-card-load-error, .${CARD_ROW_FOCUS_CLASS}, .${CARD_BACK_CLASS}`;
+  `.owb-card-header, .owb-card-journal-badge, .owb-card-handle, .owb-card-floating-toolbar, .owb-card-load-error, .${CARD_ROW_FOCUS_CLASS}, .${CARD_BACK_CLASS}, ${FOLDING_HANDLE_SELECTOR}`;
 
 export type CardClickEditInput = {
   button: number;
