@@ -9,7 +9,8 @@ import { CLICK_THRESHOLD_PX } from "./marquee";
 
 const { useEffect } = window.React;
 
-const CARET_MAX_FRAMES = 20;
+/** After the hosted editor is ready, retry a few frames if the hit misses. */
+export const CARET_RETRY_FRAMES = 4;
 
 /**
  * Orca's block editor is a single `contenteditable="plaintext-only"` host —
@@ -90,6 +91,40 @@ export function clearPendingCardEditCaret(blockId: DbId): void {
   if (pendingCaret != null && pendingCaret.blockId === blockId) {
     pendingCaret = null;
   }
+}
+
+type EditorReadyListener = (blockId: DbId) => void;
+
+const readyListeners = new Set<EditorReadyListener>();
+let lastEditorReady: { blockId: DbId; at: number } | null = null;
+
+/** Same TTL as the click point: a stale ready belongs to a previous edit. */
+const EDITOR_READY_TTL_MS = CARET_TTL_MS;
+
+/** Hosted editor just grew a visible editable line for this card. */
+export function notifyCardEditorReady(blockId: DbId): void {
+  lastEditorReady = { blockId, at: Date.now() };
+  for (const listener of readyListeners) listener(blockId);
+}
+
+export function isCardEditorJustReady(blockId: DbId): boolean {
+  if (lastEditorReady == null || lastEditorReady.blockId !== blockId) {
+    return false;
+  }
+  if (Date.now() - lastEditorReady.at > EDITOR_READY_TTL_MS) {
+    lastEditorReady = null;
+    return false;
+  }
+  return true;
+}
+
+export function subscribeCardEditorReady(
+  listener: EditorReadyListener,
+): () => void {
+  readyListeners.add(listener);
+  return () => {
+    readyListeners.delete(listener);
+  };
 }
 
 /** Same threshold as card drag: fire `onClick` only if the pointer stayed put. */
@@ -235,7 +270,7 @@ function hitEditorAtPoint(
   }
 }
 
-/** After CardEditor mounts, put the caret at the original click. */
+/** After the hosted editor is ready, put the caret at the original click. */
 export function useCardClickCaret(
   editing: boolean,
   blockId: DbId,
@@ -247,28 +282,34 @@ export function useCardClickCaret(
     if (pending == null) return;
     let frames = 0;
     let raf = 0;
-    let deliveredHit = false;
-    const tick = () => {
+    let started = false;
+    const place = () => {
       frames += 1;
       const placed = tryPlaceCaretAtPoint(
         pending.x,
         pending.y,
         cardRef.current,
       );
-      // Wait a few frames so CardEditor's first-line focus click lands first.
-      if (placed && !deliveredHit && frames >= 8) {
-        deliveredHit = hitEditorAtPoint(
-          pending.x,
-          pending.y,
-          cardRef.current,
-        );
+      if (placed) {
+        hitEditorAtPoint(pending.x, pending.y, cardRef.current);
         tryPlaceCaretAtPoint(pending.x, pending.y, cardRef.current);
+        return;
       }
-      if (frames >= CARET_MAX_FRAMES) return;
-      raf = window.requestAnimationFrame(tick);
+      if (frames < CARET_RETRY_FRAMES) {
+        raf = window.requestAnimationFrame(place);
+      }
     };
-    raf = window.requestAnimationFrame(tick);
+    const start = () => {
+      if (started) return;
+      started = true;
+      place();
+    };
+    if (isCardEditorJustReady(blockId)) start();
+    const unsubscribe = subscribeCardEditorReady((readyId) => {
+      if (readyId === blockId) start();
+    });
     return () => {
+      unsubscribe();
       window.cancelAnimationFrame(raf);
       clearPendingCardEditCaret(blockId);
     };

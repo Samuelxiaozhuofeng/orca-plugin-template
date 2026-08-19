@@ -89,14 +89,33 @@ export const CARD_EDITOR_CSS = `
   display: none !important;
 }
 
-.owb-card:not(.is-editing) .orca-block-children {
-  padding-left: 12px !important;
+/* Host outline indent lives on .orca-repr-children content via
+   --orca-spacing-indent (1.8125rem), not on this legacy class. If a
+   renderer still emits .orca-block-children, match that same step so
+   the two trees do not disagree. !important: host children padding
+   is more specific than a single class. */
+.owb-card .orca-block-children {
+  padding-left: var(--orca-spacing-indent, 1.8125rem) !important;
 }
 
+/* Flattened read-only rows own indent on the node wrapper. Zero the
+   block box so indentLevel leftovers cannot add a second shift. */
 .owb-card:not(.is-editing) .orca-block {
   margin-left: 0 !important;
   padding-left: 0 !important;
 }
+/* Cover the mounting editor. inherit padding so absolute inset:0
+   lines up with in-flow content (absolute is relative to the padding
+   edge). pointer-events stay off so the click caret can hit through. */
+.owb-card-block-tree.owb-card-tree-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  padding: inherit;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
 .owb-card-editor-missing {
   padding: var(--owb-space-2);
   color: var(--orca-color-text-3);

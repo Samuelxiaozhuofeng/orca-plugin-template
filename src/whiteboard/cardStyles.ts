@@ -160,13 +160,14 @@ export const CARD_CSS = `
 
 /* Card Body & Content Container */
 .owb-card-body {
+  position: relative;
   flex: 1 1 auto;
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
   padding: 12px 14px;
-  font-size: 14px;
-  line-height: 1.6;
+  font-size: var(--orca-fontsize-md, 14px);
+  line-height: var(--orca-lineheight-md, 1.6);
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
 }
@@ -242,8 +243,9 @@ export const CARD_CSS = `
   position: relative;
   display: flex;
   align-items: flex-start;
-  gap: 6px;
+  gap: 0;
   min-width: 0;
+  padding-left: calc(var(--owb-row-indent, 0px));
   transition:
     background var(--owb-duration) var(--owb-ease),
     box-shadow var(--owb-duration) var(--owb-ease);
@@ -300,10 +302,6 @@ export const CARD_CSS = `
   border-color: var(--orca-color-primary-5, #00a896);
 }
 
-.owb-card-block-node + .owb-card-block-node {
-  margin-top: 2px;
-}
-
 .owb-card-block-node > .orca-block {
   flex: 1 1 auto;
   min-width: 0;
@@ -323,15 +321,21 @@ export const CARD_CSS = `
   background: color-mix(in oklab, var(--orca-color-primary-5, #00a896) 12%, transparent);
 }
 
-/* Stamped cinnabar ink-drop extract bullet */
+/* Out of flow so the column matches the hosted editor: Orca's
+   .orca-block-handle is position:absolute and does not push text.
+   10px keeps the 7px dot inside the 14px body gutter at depth 0
+   (overflow-x: hidden would clip a -21px native-handle offset). */
 .owb-extract-bullet {
-  flex: 0 0 7px;
+  position: absolute;
+  left: calc(var(--owb-row-indent, 0px) - 10px);
+  top: 0.55em;
+  z-index: 1;
+  flex: none;
   width: 7px;
   height: 7px;
   min-width: 7px;
   min-height: 7px;
-  margin-top: 0.55em;
-  margin-right: 2px;
+  margin: 0;
   border: 1px solid var(--orca-color-border);
   border-radius: 50%;
   background: var(--orca-color-dangerous-5, #d9381e);

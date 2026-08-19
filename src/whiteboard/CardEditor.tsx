@@ -4,8 +4,12 @@ import { CardErrorBoundary } from "./CardErrorBoundary";
 import { markCardEditorInput, parkCardEditorHost } from "./cardEditorFlush";
 import {
   EDITABLE_SELECTOR,
+  notifyCardEditorReady,
   readPendingCardEditCaret,
 } from "./cardClickEdit";
+
+/** Last-resort focus if MutationObserver never sees an editable line. */
+const FOCUS_FALLBACK_MS = 500;
 
 const { useLayoutEffect, useRef } = window.React;
 const { useSnapshot } = window.Valtio;
@@ -50,13 +54,17 @@ function editableAtClick(
 export function CardEditor({
   panelId,
   blockId,
+  onReady,
 }: {
   panelId: string;
   blockId: DbId;
+  onReady?: () => void;
 }) {
   const { panelRenderers } = useSnapshot(orca.state);
   const BlockPanel = panelRenderers.block;
   const slotRef = useRef<HTMLDivElement | null>(null);
+  const onReadyRef = useRef(onReady);
+  onReadyRef.current = onReady;
 
   useLayoutEffect(() => {
     if (BlockPanel == null) return;
@@ -98,20 +106,22 @@ export function CardEditor({
     host.addEventListener("keydown", mark, true);
 
     let cancelled = false;
-    let timer = 0;
-    let attempts = 0;
-    const focusEditor = () => {
-      if (cancelled) return;
-      attempts += 1;
+    let fallbackTimer = 0;
+    let signalled = false;
+    const signalReady = () => {
+      if (signalled || cancelled) return;
+      signalled = true;
+      notifyCardEditorReady(blockId);
+      onReadyRef.current?.();
+    };
+    const focusEditor = (): boolean => {
+      if (cancelled) return false;
       // Aim the focus click at wherever the user clicked. Falling back to the
       // first line is what used to park the caret at the very start of the
       // card no matter where the click landed.
       const aimed = editableAtClick(host, blockId);
       const target = aimed?.el ?? firstEditableLine(host);
-      if (target == null) {
-        if (attempts < 20) timer = window.setTimeout(focusEditor, 25);
-        return;
-      }
+      if (target == null) return false;
       target.focus({ preventScroll: true });
       const rect = target.getBoundingClientRect();
       const clientX = aimed?.x ?? rect.left + 2;
@@ -133,12 +143,33 @@ export function CardEditor({
           err,
         );
       }
+      // Signal last: the caret hook places at the click point on this
+      // signal, and must run after our own focus click, not before it.
+      signalReady();
+      return true;
     };
-    timer = window.setTimeout(focusEditor, 10);
+
+    let observer: MutationObserver | null = null;
+    const stopWatching = () => {
+      observer?.disconnect();
+      observer = null;
+      window.clearTimeout(fallbackTimer);
+    };
+
+    if (!focusEditor()) {
+      observer = new MutationObserver(() => {
+        if (focusEditor()) stopWatching();
+      });
+      observer.observe(host, { childList: true, subtree: true });
+      fallbackTimer = window.setTimeout(() => {
+        stopWatching();
+        focusEditor();
+      }, FOCUS_FALLBACK_MS);
+    }
 
     return () => {
       cancelled = true;
-      window.clearTimeout(timer);
+      stopWatching();
       host.removeEventListener("beforeinput", mark, true);
       host.removeEventListener("input", mark, true);
       host.removeEventListener("compositionend", mark, true);

@@ -6,9 +6,15 @@ import { CardBlockTree } from "./CardBlockTree";
 import { CardEditor } from "./CardEditor";
 import { CardLoadNotice } from "./CardLoadNotice";
 import { requestCardEditCaret } from "./cardClickEdit";
+import { CARD_TREE_OVERLAY_CLASS } from "./cardFitHeight";
 import type { CardLoadCause, CardLoadScope } from "./cardTreeLoad";
 import { CARD_ROW_FOCUS_CLASS } from "./cardRowOnBoard";
 import { openBoard, type WhiteboardCard } from "./data";
+
+const { useEffect, useState } = window.React;
+
+/** If the hosted editor never signals ready, drop the cover tree. */
+const EDITOR_OVERLAY_MS = 600;
 
 export function openBoardFromCardEvent(
   event: { metaKey: boolean; ctrlKey: boolean },
@@ -110,6 +116,20 @@ export function CardBody({
   onFocusCard,
   onStartConnect,
 }: CardBodyProps) {
+  const [editorReady, setEditorReady] = useState(false);
+
+  useEffect(() => {
+    if (!editing) {
+      setEditorReady(false);
+      return;
+    }
+    if (editorReady) return;
+    const timer = window.setTimeout(() => {
+      setEditorReady(true);
+    }, EDITOR_OVERLAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [editing, editorReady]);
+
   if (hosted.board != null) {
     return (
       <BoardCardBody
@@ -119,6 +139,11 @@ export function CardBody({
       />
     );
   }
+
+  const showEditor = editing && !noteGone;
+  const showReadTree =
+    !fillLoadError && !isEmptyJournal && (!showEditor || !editorReady);
+  const treeOverlay = showEditor && showReadTree;
 
   return (
     <div
@@ -143,9 +168,14 @@ export function CardBody({
         onStartEdit(card.blockId);
       }}
     >
-      {editing && !noteGone ? (
-        <CardEditor panelId={panelId} blockId={card.blockId} />
-      ) : fillLoadError && shownNotice != null ? (
+      {showEditor ? (
+        <CardEditor
+          panelId={panelId}
+          blockId={card.blockId}
+          onReady={() => setEditorReady(true)}
+        />
+      ) : null}
+      {fillLoadError && shownNotice != null && !showEditor ? (
         <CardLoadNotice
           scope={shownNotice.scope}
           cause={shownNotice.cause}
@@ -153,22 +183,24 @@ export function CardBody({
           retrying={loadRetrying}
           onRetry={() => onRetryLoad?.(card.blockId)}
         />
-      ) : isEmptyJournal ? (
+      ) : null}
+      {isEmptyJournal && !showEditor ? (
         <div className="owb-card-empty">{t("No notes this day")}</div>
-      ) : (
+      ) : null}
+      {showReadTree ? (
         <CardBlockTree
           key={treeRev}
           panelId={panelId}
           card={card}
           blockId={card.blockId}
           cardHeight={card.h}
-          editing={editing}
+          className={treeOverlay ? CARD_TREE_OVERLAY_CLASS : undefined}
           promotedKey={promotedKey}
           highlightedRowIds={highlightedRowIds}
           onFocusCard={onFocusCard}
           onStartConnect={onStartConnect}
         />
-      )}
+      ) : null}
       {shownNotice != null && !fillLoadError ? (
         <CardLoadNotice
           scope={shownNotice.scope}

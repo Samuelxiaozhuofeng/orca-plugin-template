@@ -26,6 +26,45 @@ export type HeightPatch = {
   patch: { y?: number; h?: number };
 };
 
+/** Read-only tree kept on top while the hosted editor mounts. */
+export const CARD_TREE_OVERLAY_CLASS = "owb-card-tree-overlay";
+
+export type CardFitRootKind =
+  | "tree"
+  | "excerpt"
+  | "empty"
+  | "editor-blocks"
+  | "editor-main"
+  | "editor"
+  | "body";
+
+export type CardFitRootFlags = {
+  liveTree: boolean;
+  overlayTree: boolean;
+  excerpt: boolean;
+  empty: boolean;
+  editorBlocks: boolean;
+  editorMain: boolean;
+  editor: boolean;
+};
+
+/**
+ * Which box should drive auto-height. An overlay tree is a fade cover,
+ * not the live content — if we measured it (or an empty editor shell
+ * sitting under it) the card would jump. Prefer the body in that
+ * window so height stays put until the overlay is gone.
+ */
+export function chooseCardFitRootKind(flags: CardFitRootFlags): CardFitRootKind {
+  if (flags.liveTree) return "tree";
+  if (flags.excerpt) return "excerpt";
+  if (flags.empty) return "empty";
+  if (flags.overlayTree) return "body";
+  if (flags.editorBlocks) return "editor-blocks";
+  if (flags.editorMain) return "editor-main";
+  if (flags.editor) return "editor";
+  return "body";
+}
+
 /**
  * Full visible body content — the flattened tree, excerpt, or hosted
  * editor. Do not use the first `.orca-block`: child rows are siblings
@@ -34,15 +73,42 @@ export type HeightPatch = {
 export function cardFitContentRoot(cardEl: Element): HTMLElement | null {
   const body = cardEl.querySelector(".owb-card-body");
   if (!(body instanceof HTMLElement)) return null;
-  return (
-    (body.querySelector(".owb-card-block-tree") as HTMLElement | null) ??
-    (body.querySelector(".owb-card-excerpt") as HTMLElement | null) ??
-    (body.querySelector(".owb-card-empty") as HTMLElement | null) ??
-    (body.querySelector(".orca-block-editor-blocks") as HTMLElement | null) ??
-    (body.querySelector(".orca-block-editor-main") as HTMLElement | null) ??
-    (body.querySelector(".orca-block-editor") as HTMLElement | null) ??
-    body
+  const liveTree = body.querySelector(
+    `.owb-card-block-tree:not(.${CARD_TREE_OVERLAY_CLASS})`,
   );
+  const overlayTree = body.querySelector(
+    `.owb-card-block-tree.${CARD_TREE_OVERLAY_CLASS}`,
+  );
+  const excerpt = body.querySelector(".owb-card-excerpt");
+  const empty = body.querySelector(".owb-card-empty");
+  const editorBlocks = body.querySelector(".orca-block-editor-blocks");
+  const editorMain = body.querySelector(".orca-block-editor-main");
+  const editor = body.querySelector(".orca-block-editor");
+  const kind = chooseCardFitRootKind({
+    liveTree: liveTree instanceof HTMLElement,
+    overlayTree: overlayTree instanceof HTMLElement,
+    excerpt: excerpt instanceof HTMLElement,
+    empty: empty instanceof HTMLElement,
+    editorBlocks: editorBlocks instanceof HTMLElement,
+    editorMain: editorMain instanceof HTMLElement,
+    editor: editor instanceof HTMLElement,
+  });
+  switch (kind) {
+    case "tree":
+      return liveTree instanceof HTMLElement ? liveTree : body;
+    case "excerpt":
+      return excerpt instanceof HTMLElement ? excerpt : body;
+    case "empty":
+      return empty instanceof HTMLElement ? empty : body;
+    case "editor-blocks":
+      return editorBlocks instanceof HTMLElement ? editorBlocks : body;
+    case "editor-main":
+      return editorMain instanceof HTMLElement ? editorMain : body;
+    case "editor":
+      return editor instanceof HTMLElement ? editor : body;
+    case "body":
+      return body;
+  }
 }
 
 function bodyPadY(body: HTMLElement): number {

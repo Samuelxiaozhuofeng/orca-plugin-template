@@ -13,7 +13,6 @@ import {
   isCardRowOnBoard,
 } from "./cardRowOnBoard";
 import {
-  CARD_CHILD_INDENT_PX,
   cardTreePlanEqual,
   FOLDING_HANDLE_SELECTOR,
   planCardBlockTree,
@@ -129,7 +128,7 @@ type Props = {
   card?: WhiteboardCard;
   blockId: DbId;
   cardHeight: number;
-  editing: boolean;
+  className?: string;
   promotedKey?: string;
   highlightedRowIds?: ReadonlySet<DbId>;
   onFocusCard?: (blockId: DbId) => void;
@@ -158,7 +157,7 @@ export function CardBlockTree({
   card,
   blockId,
   cardHeight,
-  editing,
+  className,
   promotedKey = "",
   highlightedRowIds,
   onFocusCard,
@@ -176,9 +175,7 @@ export function CardBlockTree({
     setGrown(0);
   }
 
-  const nodeBudget = editing
-    ? CARD_TREE_LOAD_MAX_NODES
-    : cardRenderNodeBudget(cardHeight, grown);
+  const nodeBudget = cardRenderNodeBudget(cardHeight, grown);
 
   const budgetRef = useRef(nodeBudget);
   budgetRef.current = nodeBudget;
@@ -245,7 +242,7 @@ export function CardBlockTree({
     <CardErrorBoundary key={blockId}>
     <div
       ref={treeRef}
-      className="owb-card-block-tree"
+      className={["owb-card-block-tree", className].filter(Boolean).join(" ")}
       onMouseDown={(event) => {
         const target = event.target as HTMLElement | null;
         if (
@@ -294,11 +291,12 @@ export function CardBlockTree({
             data-depth={node.depth}
             data-owb-row-id={node.id}
             data-block-id={node.promoted ? undefined : node.id}
-            style={
-              node.depth > 0
-                ? { paddingLeft: node.depth * CARD_CHILD_INDENT_PX }
-                : undefined
-            }
+            style={{
+              ["--owb-row-indent" as string]:
+                node.depth > 0
+                  ? `calc(${node.depth} * var(--orca-spacing-indent, 1.8125rem))`
+                  : "0px",
+            }}
           >
             {isExtractableDepth(node.depth) && !node.promoted ? (
               <span
@@ -346,7 +344,7 @@ export function CardBlockTree({
                 panelId={panelId}
                 blockId={node.id}
                 blockLevel={node.depth}
-                indentLevel={node.depth}
+                indentLevel={0}
                 renderingMode={node.hostOwn ? "normal" : "simple"}
               />
             )}

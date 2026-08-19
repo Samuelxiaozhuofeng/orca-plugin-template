@@ -1,9 +1,11 @@
 import { MIN_CARD_HEIGHT } from "./layout.ts";
 import {
   applyFitPatches,
+  chooseCardFitRootKind,
   overlapsX,
   planContentHeightPatches,
   shouldLockCardHeight,
+  type CardFitRootFlags,
   type FitCard,
 } from "./cardFitHeight.ts";
 
@@ -177,6 +179,40 @@ check(
 check(
   shouldLockCardHeight("w", 200, 180) === false,
   "west handle does not lock even if height changed",
+);
+
+function flags(partial: Partial<CardFitRootFlags>): CardFitRootFlags {
+  return {
+    liveTree: false,
+    overlayTree: false,
+    excerpt: false,
+    empty: false,
+    editorBlocks: false,
+    editorMain: false,
+    editor: false,
+    ...partial,
+  };
+}
+
+check(
+  chooseCardFitRootKind(flags({ liveTree: true })) === "tree",
+  "in-flow tree still wins when it is the only content",
+);
+check(
+  chooseCardFitRootKind(
+    flags({ overlayTree: true, editorBlocks: true, editor: true }),
+  ) === "body",
+  "overlay tree does not drive height; empty editor shells are skipped",
+);
+check(
+  chooseCardFitRootKind(flags({ editorBlocks: true, editor: true })) ===
+    "editor-blocks",
+  "after the overlay is gone the editor content is measured",
+);
+check(
+  chooseCardFitRootKind(flags({ excerpt: true, overlayTree: true })) ===
+    "excerpt",
+  "excerpt still beats an overlay (simplified cards)",
 );
 
 console.log("cardFitHeight.test.ts ok");
