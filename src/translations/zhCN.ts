@@ -377,6 +377,9 @@ const zhCN = {
   "Delete permanently": "永久删除",
   "Deleted ${count} notes and removed from whiteboard.":
     "已永久删除 ${count} 条笔记并移出白板。",
+  "Preload the editor when hovering a card": "悬停时预先准备编辑器",
+  "After you rest the pointer on a card, prepare its editor in the background so clicking in feels faster. Turn this off if the app feels heavy.":
+    "鼠标在卡片上停一会儿，就在后台把编辑器准备好，点进去会更快。如果电脑变卡，可以关掉。",
 };
 
 export default zhCN;

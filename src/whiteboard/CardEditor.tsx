@@ -56,14 +56,24 @@ function editableAtClick(
   }
 }
 
+type CoreHandle = {
+  host: HTMLElement;
+  paint: (isActive: boolean) => void;
+  signalCoverReady: () => void;
+  coveredLines: number;
+  cancelled: boolean;
+};
+
 /** Hosts Orca's live BlockPanel inside a card and tracks typing for flush-on-exit. */
 export function CardEditor({
   panelId,
   blockId,
+  active = true,
   onReady,
 }: {
   panelId: string;
   blockId: DbId;
+  active?: boolean;
   onReady?: () => void;
 }) {
   // Subscribe only to the renderer registry. useSnapshot(orca.state)
@@ -76,6 +86,10 @@ export function CardEditor({
   const onReadyRef = useRef(onReady);
   onReadyRef.current = onReady;
 
+  const coreRef = useRef<CoreHandle | null>(null);
+
+  // Effect A: create host, create root, cover observation, input listeners.
+  // Never unmounts on active toggle.
   useLayoutEffect(() => {
     if (BlockPanel == null) return;
     const slot = slotRef.current;
@@ -90,16 +104,7 @@ export function CardEditor({
     const coveredLines = countCoveredLines(host);
 
     let cancelled = false;
-    let fallbackTimer = 0;
-    let focusSignalled = false;
     let coverSignalled = false;
-
-    const signalFocusReady = () => {
-      if (focusSignalled || cancelled) return;
-      focusSignalled = true;
-      notifyCardEditorReady(blockId);
-    };
-
     let coverRaf = 0;
     let coverDirty = false;
     let sawChange = false;
@@ -164,11 +169,28 @@ export function CardEditor({
       render: (node: React.ReactNode) => void;
       unmount: () => void;
     };
-    root.render(
-      <CardErrorBoundary>
-        <BlockPanel panelId={panelId} blockId={blockId} active />
-      </CardErrorBoundary>,
-    );
+
+    const paint = (isActive: boolean) => {
+      if (cancelled) return;
+      host.className = isActive ? "owb-card-editor" : "owb-card-editor is-prewarm";
+      if (slotRef.current) {
+        slotRef.current.className = isActive
+          ? "owb-card-editor"
+          : "owb-card-editor is-prewarm";
+      }
+      if (isActive) {
+        host.removeAttribute("inert");
+        host.removeAttribute("aria-hidden");
+      } else {
+        host.setAttribute("inert", "");
+        host.setAttribute("aria-hidden", "true");
+      }
+      root.render(
+        <CardErrorBoundary>
+          <BlockPanel panelId={panelId} blockId={blockId} active={isActive} />
+        </CardErrorBoundary>,
+      );
+    };
 
     const mark = (event: Event) => {
       if (event instanceof KeyboardEvent) {
@@ -193,8 +215,77 @@ export function CardEditor({
     host.addEventListener("compositionend", mark, true);
     host.addEventListener("keydown", mark, true);
 
+    const handle: CoreHandle = {
+      host,
+      paint,
+      signalCoverReady,
+      coveredLines,
+      get cancelled() {
+        return cancelled;
+      },
+    };
+    coreRef.current = handle;
+
+    return () => {
+      cancelled = true;
+      coreRef.current = null;
+      stopCoverWatching();
+      host.removeEventListener("beforeinput", mark, true);
+      host.removeEventListener("input", mark, true);
+      host.removeEventListener("compositionend", mark, true);
+      host.removeEventListener("keydown", mark, true);
+      parkCardEditorHost(host, () => {
+        root.unmount();
+        host.remove();
+      });
+    };
+  }, [BlockPanel, blockId, panelId]);
+
+  // Effect B: updates active state, handles focus when active is true.
+  useLayoutEffect(() => {
+    const core = coreRef.current;
+    if (core == null) return;
+    const { host, paint, signalCoverReady, coveredLines } = core;
+
+    paint(active);
+
+    if (!active) return;
+
+    // From prewarm to active: if cover condition already satisfied, lift immediately.
+    if (
+      shouldLiftEditorCover({
+        editorLines: countEditorLines(host),
+        coveredLines,
+        quietFrames: EDITOR_COVER_QUIET_FRAMES,
+        sawChange: true,
+      })
+    ) {
+      signalCoverReady();
+    }
+
+    let focusSignalled = false;
+    let fallbackTimer = 0;
+    let focusObserver: MutationObserver | null = null;
+
+    const stopWatchingFocus = () => {
+      if (focusObserver != null) {
+        focusObserver.disconnect();
+        focusObserver = null;
+      }
+      if (fallbackTimer !== 0) {
+        window.clearTimeout(fallbackTimer);
+        fallbackTimer = 0;
+      }
+    };
+
+    const signalFocusReady = () => {
+      if (focusSignalled || core.cancelled) return;
+      focusSignalled = true;
+      notifyCardEditorReady(blockId);
+    };
+
     const focusEditor = (): boolean => {
-      if (cancelled) return false;
+      if (core.cancelled) return false;
       // Aim the focus click at wherever the user clicked. Falling back to the
       // first line is what used to park the caret at the very start of the
       // card no matter where the click landed.
@@ -228,13 +319,6 @@ export function CardEditor({
       return true;
     };
 
-    let focusObserver: MutationObserver | null = null;
-    const stopWatchingFocus = () => {
-      focusObserver?.disconnect();
-      focusObserver = null;
-      window.clearTimeout(fallbackTimer);
-    };
-
     if (!focusEditor()) {
       focusObserver = new MutationObserver(() => {
         if (focusEditor()) stopWatchingFocus();
@@ -247,24 +331,19 @@ export function CardEditor({
     }
 
     return () => {
-      cancelled = true;
       stopWatchingFocus();
-      stopCoverWatching();
-      host.removeEventListener("beforeinput", mark, true);
-      host.removeEventListener("input", mark, true);
-      host.removeEventListener("compositionend", mark, true);
-      host.removeEventListener("keydown", mark, true);
-      parkCardEditorHost(host, () => {
-        root.unmount();
-        host.remove();
-      });
     };
-  }, [BlockPanel, blockId, panelId]);
+  }, [active, BlockPanel, blockId, panelId]);
 
   if (BlockPanel == null) {
     return <div className="owb-card-editor-missing">{t("Editor unavailable")}</div>;
   }
   // Slot only: BlockPanel lives on an independent root so closing the
   // whiteboard can park it until the host editor finishes committing.
-  return <div ref={slotRef} className="owb-card-editor" />;
+  return (
+    <div
+      ref={slotRef}
+      className={active ? "owb-card-editor" : "owb-card-editor is-prewarm"}
+    />
+  );
 }

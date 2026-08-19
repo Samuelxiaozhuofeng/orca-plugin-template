@@ -22,6 +22,7 @@ export type WhiteboardSettings = {
   autoLinkEdges: boolean;
   bidirectionalEdgeLinks: boolean;
   edgeLinkMode: EdgeLinkMode;
+  prewarmCardEditor: boolean;
 };
 
 const DEFAULTS: WhiteboardSettings = {
@@ -35,6 +36,7 @@ const DEFAULTS: WhiteboardSettings = {
   autoLinkEdges: true,
   bidirectionalEdgeLinks: true,
   edgeLinkMode: "property",
+  prewarmCardEditor: true,
 };
 
 export { migrateControlsMode } from "./controlsMode";
@@ -149,6 +151,14 @@ export function whiteboardSettingsSchema(): PluginSettingsSchema {
         },
       ],
     },
+    prewarmCardEditor: {
+      label: t("Preload the editor when hovering a card"),
+      description: t(
+        "After you rest the pointer on a card, prepare its editor in the background so clicking in feels faster. Turn this off if the app feels heavy.",
+      ),
+      type: "boolean",
+      defaultValue: DEFAULTS.prewarmCardEditor,
+    },
   };
 }
 
@@ -166,6 +176,7 @@ export function readWhiteboardSettings(
     autoLinkEdges: raw?.autoLinkEdges !== false,
     bidirectionalEdgeLinks: raw?.bidirectionalEdgeLinks !== false,
     edgeLinkMode: raw?.edgeLinkMode === "child" ? "child" : "property",
+    prewarmCardEditor: raw?.prewarmCardEditor !== false,
   };
 }
 

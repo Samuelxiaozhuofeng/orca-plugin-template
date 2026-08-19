@@ -77,6 +77,7 @@ type CardBodyProps = {
   treeRev: number;
   hosted: CardBlockView;
   editing: boolean;
+  prewarming?: boolean;
   noteGone: boolean;
   fillLoadError: boolean;
   shownNotice: { scope: CardLoadScope; cause: CardLoadCause } | null;
@@ -102,6 +103,7 @@ export function CardBody({
   treeRev,
   hosted,
   editing,
+  prewarming = false,
   noteGone,
   fillLoadError,
   shownNotice,
@@ -116,17 +118,22 @@ export function CardBody({
 }: CardBodyProps) {
   const [editorReady, setEditorReady] = useState(false);
 
+  const showEditor = editing && !noteGone;
+  const showPrewarm = prewarming && !editing && !noteGone;
+  const mountEditor = showEditor || showPrewarm;
+
   useEffect(() => {
-    if (!editing) {
+    if (!mountEditor) {
       setEditorReady(false);
       return;
     }
     if (editorReady) return;
+    if (!editing) return;
     const timer = window.setTimeout(() => {
       setEditorReady(true);
     }, EDITOR_COVER_MAX_MS);
     return () => window.clearTimeout(timer);
-  }, [editing, editorReady]);
+  }, [mountEditor, editing, editorReady]);
 
   if (hosted.board != null) {
     return (
@@ -138,7 +145,6 @@ export function CardBody({
     );
   }
 
-  const showEditor = editing && !noteGone;
   const showReadTree =
     !fillLoadError && !isEmptyJournal && (!showEditor || !editorReady);
   const treeOverlay = showEditor && showReadTree;
@@ -166,10 +172,11 @@ export function CardBody({
         onStartEdit(card.blockId);
       }}
     >
-      {showEditor ? (
+      {mountEditor ? (
         <CardEditor
           panelId={panelId}
           blockId={card.blockId}
+          active={editing}
           onReady={() => setEditorReady(true)}
         />
       ) : null}

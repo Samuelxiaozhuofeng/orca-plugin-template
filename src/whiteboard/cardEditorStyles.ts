@@ -26,6 +26,15 @@ export const CARD_EDITOR_CSS = `
   padding: 0 !important;
 }
 
+.owb-card-editor.is-prewarm {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  visibility: hidden;
+  pointer-events: none;
+  overflow: hidden;
+}
+
 /* One scroller only: the editor scrolls, the card body does not double up. */
 .owb-card-editor .orca-block-editor {
   overflow-x: hidden;

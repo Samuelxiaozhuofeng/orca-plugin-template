@@ -52,6 +52,9 @@ type Props = {
   loadRetrying?: boolean;
   onRetryLoad?: (blockId: DbId) => void;
   editing: boolean;
+  prewarming?: boolean;
+  onHoverEnter?: (el: HTMLElement) => void;
+  onHoverLeave?: () => void;
   simplified?: boolean;
   selected: boolean;
   showResize: boolean;
@@ -83,6 +86,9 @@ export function Card({
   loadRetrying = false,
   onRetryLoad,
   editing,
+  prewarming = false,
+  onHoverEnter,
+  onHoverLeave,
   simplified = false,
   selected,
   showResize,
@@ -383,6 +389,8 @@ export function Card({
           className={className}
           data-block-id={card.blockId}
           style={{ left: box.x, top: box.y, width: box.w, height: box.h }}
+          onMouseEnter={(event) => onHoverEnter?.(event.currentTarget)}
+          onMouseLeave={() => onHoverLeave?.()}
           onMouseDown={onRootMouseDown}
           onDoubleClick={(event: React.MouseEvent<HTMLDivElement>) => {
             const target = event.target as HTMLElement | null;
@@ -451,6 +459,7 @@ export function Card({
                 treeRev={treeRev}
                 hosted={hosted}
                 editing={liveEditing}
+                prewarming={prewarming}
                 noteGone={noteGone}
                 fillLoadError={fillLoadError}
                 shownNotice={shownNotice}
