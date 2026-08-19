@@ -1,6 +1,6 @@
 {
   "name": "orca-plugin-whiteboard",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Heptabase-style whiteboard for Orca Note: live-editable cards on an infinite canvas, with hand-drawn arrows that can become real note references.",
   "license": "MIT",
   "author": "sam",
