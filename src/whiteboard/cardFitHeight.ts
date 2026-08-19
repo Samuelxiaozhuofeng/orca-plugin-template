@@ -3,6 +3,13 @@ import { MIN_CARD_HEIGHT } from "./layout.ts";
 
 export const FIT_HEIGHT_EPS = 2;
 
+/**
+ * While the hosted editor is still growing its tree, wait this long
+ * after the last height sample before writing. Consecutive frames of
+ * incremental mount then become one patch instead of one per frame.
+ */
+export const AUTO_HEIGHT_SETTLE_MS = 180;
+
 /** Vertical (or corner) resize that actually changed height should lock it. */
 export function shouldLockCardHeight(
   handle: string,
@@ -28,6 +35,30 @@ export type HeightPatch = {
 
 /** Read-only tree kept on top while the hosted editor mounts. */
 export const CARD_TREE_OVERLAY_CLASS = "owb-card-tree-overlay";
+
+/** True while the fade cover is still sitting on the mounting editor. */
+export function cardHasHeightCover(cardEl: Element): boolean {
+  return (
+    cardEl.querySelector(
+      `.owb-card-block-tree.${CARD_TREE_OVERLAY_CLASS}`,
+    ) != null
+  );
+}
+
+/**
+ * Fold one measured height into the pending value. `null` means the
+ * sample matches the committed height — drop any pending write.
+ */
+export function foldAutoHeightSample(
+  committed: number,
+  pending: number | null,
+  sample: number,
+  eps: number = FIT_HEIGHT_EPS,
+): number | null {
+  if (Math.abs(sample - committed) < eps) return null;
+  if (pending != null && Math.abs(sample - pending) < eps) return pending;
+  return sample;
+}
 
 export type CardFitRootKind =
   | "tree"

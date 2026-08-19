@@ -1,7 +1,12 @@
 import { MIN_CARD_HEIGHT } from "./layout.ts";
 import {
   applyFitPatches,
+  AUTO_HEIGHT_SETTLE_MS,
+  cardHasHeightCover,
+  CARD_TREE_OVERLAY_CLASS,
   chooseCardFitRootKind,
+  FIT_HEIGHT_EPS,
+  foldAutoHeightSample,
   overlapsX,
   planContentHeightPatches,
   shouldLockCardHeight,
@@ -214,5 +219,48 @@ check(
     "excerpt",
   "excerpt still beats an overlay (simplified cards)",
 );
+
+check(AUTO_HEIGHT_SETTLE_MS > 0, "auto-height settle waits at least one burst");
+
+check(
+  foldAutoHeightSample(800, null, 800) === null,
+  "sample matching the committed height is a no-op",
+);
+check(
+  foldAutoHeightSample(800, null, 801) === null,
+  "sub-epsilon growth does not open a pending write",
+);
+check(
+  foldAutoHeightSample(800, null, 400) === 400,
+  "a large drop while the editor is still empty becomes pending",
+);
+check(
+  foldAutoHeightSample(800, 400, 600) === 600,
+  "a later sample replaces the pending height",
+);
+check(
+  foldAutoHeightSample(800, 600, 601) === 600,
+  "sub-epsilon change keeps the same pending value",
+);
+check(
+  foldAutoHeightSample(800, 600, 800) === null,
+  "growing back to the committed height cancels the pending write",
+);
+check(
+  foldAutoHeightSample(800, 600, 800 + FIT_HEIGHT_EPS - 1) === null,
+  "return to committed within epsilon also cancels",
+);
+
+function fakeCard(cover: boolean): Element {
+  return {
+    querySelector(sel: string) {
+      if (!cover) return null;
+      if (sel.includes(CARD_TREE_OVERLAY_CLASS)) return {};
+      return null;
+    },
+  } as unknown as Element;
+}
+check(cardHasHeightCover(fakeCard(true)) === true, "cover tree is detected");
+check(cardHasHeightCover(fakeCard(false)) === false, "no cover is a miss");
 
 console.log("cardFitHeight.test.ts ok");

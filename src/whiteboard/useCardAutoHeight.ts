@@ -1,8 +1,11 @@
 import type { DbId } from "../orca.d.ts";
 import { cardHasLiveGesture } from "./cardGestures";
 import {
+  AUTO_HEIGHT_SETTLE_MS,
   cardFitContentRoot,
+  cardHasHeightCover,
   FIT_HEIGHT_EPS,
+  foldAutoHeightSample,
   measureCardFitHeight,
 } from "./cardFitHeight";
 
@@ -61,34 +64,65 @@ export function useCardAutoHeight({
     if (el == null) return;
 
     let raf = 0;
-    const emit = () => {
-      raf = 0;
-      if (isLocked() || cardHasLiveGesture(el)) return;
-      const nextH = measureCardFitHeight(el);
-      if (Math.abs(nextH - heightRef.current) < FIT_HEIGHT_EPS) return;
-      onHeightRef.current(nextH, false);
-    };
+    let settleTimer = 0;
+    let pendingH: number | null = null;
+    let observedRoot: HTMLElement | null = null;
+
     const schedule = () => {
       if (raf !== 0) return;
       raf = window.requestAnimationFrame(emit);
     };
 
     const ro = new ResizeObserver(schedule);
-    const attachSize = () => {
+    /** False while the fade cover is up: do not measure. */
+    const attachSize = (): boolean => {
+      if (cardHasHeightCover(el)) {
+        if (observedRoot != null) {
+          ro.disconnect();
+          ro.observe(el);
+          observedRoot = null;
+        }
+        return false;
+      }
+      const root = cardFitContentRoot(el);
+      const target = root != null && root !== el ? root : null;
+      if (target === observedRoot) return true;
       ro.disconnect();
       ro.observe(el);
-      const root = cardFitContentRoot(el);
-      if (root != null) ro.observe(root);
-      for (const node of el.querySelectorAll(
-        ".owb-card-block-node, .orca-block, .orca-block-editor-blocks",
-      )) {
-        ro.observe(node);
+      if (target != null) {
+        ro.observe(target);
       }
+      observedRoot = target;
+      return true;
+    };
+
+    const emit = () => {
+      raf = 0;
+      if (isLocked() || cardHasLiveGesture(el)) return;
+      // Cover is still up: measuring the 100%-tall editor shell would
+      // shrink then grow as Orca fills the tree. Hold the current height.
+      if (!attachSize()) return;
+      pendingH = foldAutoHeightSample(
+        heightRef.current,
+        pendingH,
+        measureCardFitHeight(el),
+      );
+      window.clearTimeout(settleTimer);
+      settleTimer = 0;
+      if (pendingH == null) return;
+      settleTimer = window.setTimeout(() => {
+        settleTimer = 0;
+        const nextH = pendingH;
+        pendingH = null;
+        if (nextH == null) return;
+        if (isLocked() || cardHasLiveGesture(el)) return;
+        if (Math.abs(nextH - heightRef.current) < FIT_HEIGHT_EPS) return;
+        onHeightRef.current(nextH, false);
+      }, AUTO_HEIGHT_SETTLE_MS);
     };
 
     const body = el.querySelector(".owb-card-body");
     const mo = new MutationObserver(() => {
-      attachSize();
       schedule();
     });
     if (body != null) {
@@ -98,11 +132,13 @@ export function useCardAutoHeight({
         characterData: true,
       });
     }
+    ro.observe(el);
     attachSize();
     schedule();
 
     return () => {
       if (raf !== 0) window.cancelAnimationFrame(raf);
+      window.clearTimeout(settleTimer);
       ro.disconnect();
       mo.disconnect();
     };

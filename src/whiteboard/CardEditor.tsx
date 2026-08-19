@@ -7,6 +7,12 @@ import {
   notifyCardEditorReady,
   readPendingCardEditCaret,
 } from "./cardClickEdit";
+import {
+  countCoveredLines,
+  countEditorLines,
+  EDITOR_COVER_QUIET_FRAMES,
+  shouldLiftEditorCover,
+} from "./editorCover";
 
 /** Last-resort focus if MutationObserver never sees an editable line. */
 const FOCUS_FALLBACK_MS = 500;
@@ -60,7 +66,11 @@ export function CardEditor({
   blockId: DbId;
   onReady?: () => void;
 }) {
-  const { panelRenderers } = useSnapshot(orca.state);
+  // Subscribe only to the renderer registry. useSnapshot(orca.state)
+  // listens to the whole store; a blocks write then snapshots every
+  // note before isChanged can ignore it. During editor mount that
+  // happens once per batch of rows.
+  const panelRenderers = useSnapshot(orca.state.panelRenderers);
   const BlockPanel = panelRenderers.block;
   const slotRef = useRef<HTMLDivElement | null>(null);
   const onReadyRef = useRef(onReady);
@@ -76,6 +86,80 @@ export function CardEditor({
     const host = document.createElement("div");
     host.className = "owb-card-editor";
     slot.appendChild(host);
+
+    const coveredLines = countCoveredLines(host);
+
+    let cancelled = false;
+    let fallbackTimer = 0;
+    let focusSignalled = false;
+    let coverSignalled = false;
+
+    const signalFocusReady = () => {
+      if (focusSignalled || cancelled) return;
+      focusSignalled = true;
+      notifyCardEditorReady(blockId);
+    };
+
+    let coverRaf = 0;
+    let coverDirty = false;
+    let sawChange = false;
+    let quietFrames = 0;
+    let coverObserver: MutationObserver | null = null;
+
+    const stopCoverWatching = () => {
+      if (coverRaf !== 0) {
+        window.cancelAnimationFrame(coverRaf);
+        coverRaf = 0;
+      }
+      coverObserver?.disconnect();
+      coverObserver = null;
+    };
+
+    const signalCoverReady = () => {
+      if (coverSignalled || cancelled) return;
+      coverSignalled = true;
+      stopCoverWatching();
+      onReadyRef.current?.();
+    };
+
+    const tickCover = () => {
+      coverRaf = 0;
+      if (cancelled || coverSignalled) return;
+
+      if (coverDirty) {
+        coverDirty = false;
+        sawChange = true;
+        quietFrames = 0;
+      } else if (sawChange) {
+        quietFrames++;
+      }
+
+      const editorLines = countEditorLines(host);
+      if (
+        shouldLiftEditorCover({
+          editorLines,
+          coveredLines,
+          quietFrames,
+          sawChange,
+        })
+      ) {
+        signalCoverReady();
+        return;
+      }
+
+      if (sawChange && quietFrames < EDITOR_COVER_QUIET_FRAMES) {
+        coverRaf = window.requestAnimationFrame(tickCover);
+      }
+    };
+
+    coverObserver = new MutationObserver(() => {
+      coverDirty = true;
+      if (coverRaf === 0) {
+        coverRaf = window.requestAnimationFrame(tickCover);
+      }
+    });
+    coverObserver.observe(host, { childList: true, subtree: true });
+
     const root = window.createRoot(host) as {
       render: (node: React.ReactNode) => void;
       unmount: () => void;
@@ -99,21 +183,16 @@ export function CardEditor({
         }
       }
       markCardEditorInput();
+      // Any real input means the user is already typing. The cover would
+      // then show stale rows over a live editor, so drop it right away
+      // rather than waiting out the settle window.
+      signalCoverReady();
     };
     host.addEventListener("beforeinput", mark, true);
     host.addEventListener("input", mark, true);
     host.addEventListener("compositionend", mark, true);
     host.addEventListener("keydown", mark, true);
 
-    let cancelled = false;
-    let fallbackTimer = 0;
-    let signalled = false;
-    const signalReady = () => {
-      if (signalled || cancelled) return;
-      signalled = true;
-      notifyCardEditorReady(blockId);
-      onReadyRef.current?.();
-    };
     const focusEditor = (): boolean => {
       if (cancelled) return false;
       // Aim the focus click at wherever the user clicked. Falling back to the
@@ -145,31 +224,32 @@ export function CardEditor({
       }
       // Signal last: the caret hook places at the click point on this
       // signal, and must run after our own focus click, not before it.
-      signalReady();
+      signalFocusReady();
       return true;
     };
 
-    let observer: MutationObserver | null = null;
-    const stopWatching = () => {
-      observer?.disconnect();
-      observer = null;
+    let focusObserver: MutationObserver | null = null;
+    const stopWatchingFocus = () => {
+      focusObserver?.disconnect();
+      focusObserver = null;
       window.clearTimeout(fallbackTimer);
     };
 
     if (!focusEditor()) {
-      observer = new MutationObserver(() => {
-        if (focusEditor()) stopWatching();
+      focusObserver = new MutationObserver(() => {
+        if (focusEditor()) stopWatchingFocus();
       });
-      observer.observe(host, { childList: true, subtree: true });
+      focusObserver.observe(host, { childList: true, subtree: true });
       fallbackTimer = window.setTimeout(() => {
-        stopWatching();
+        stopWatchingFocus();
         focusEditor();
       }, FOCUS_FALLBACK_MS);
     }
 
     return () => {
       cancelled = true;
-      stopWatching();
+      stopWatchingFocus();
+      stopCoverWatching();
       host.removeEventListener("beforeinput", mark, true);
       host.removeEventListener("input", mark, true);
       host.removeEventListener("compositionend", mark, true);

@@ -7,14 +7,12 @@ import { CardEditor } from "./CardEditor";
 import { CardLoadNotice } from "./CardLoadNotice";
 import { requestCardEditCaret } from "./cardClickEdit";
 import { CARD_TREE_OVERLAY_CLASS } from "./cardFitHeight";
+import { EDITOR_COVER_MAX_MS } from "./editorCover";
 import type { CardLoadCause, CardLoadScope } from "./cardTreeLoad";
 import { CARD_ROW_FOCUS_CLASS } from "./cardRowOnBoard";
 import { openBoard, type WhiteboardCard } from "./data";
 
 const { useEffect, useState } = window.React;
-
-/** If the hosted editor never signals ready, drop the cover tree. */
-const EDITOR_OVERLAY_MS = 600;
 
 export function openBoardFromCardEvent(
   event: { metaKey: boolean; ctrlKey: boolean },
@@ -126,7 +124,7 @@ export function CardBody({
     if (editorReady) return;
     const timer = window.setTimeout(() => {
       setEditorReady(true);
-    }, EDITOR_OVERLAY_MS);
+    }, EDITOR_COVER_MAX_MS);
     return () => window.clearTimeout(timer);
   }, [editing, editorReady]);
 

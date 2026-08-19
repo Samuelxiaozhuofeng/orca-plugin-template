@@ -285,14 +285,16 @@ export function useCardClickCaret(
     let started = false;
     const place = () => {
       frames += 1;
-      const placed = tryPlaceCaretAtPoint(
-        pending.x,
-        pending.y,
-        cardRef.current,
-      );
+      const root = cardRef.current;
+      // CardEditor already clicked the aimed line. A second synthetic
+      // click here makes Orca lay the same editor out again.
+      if (root != null && caretAlreadyAtPoint(pending.x, pending.y, root)) {
+        return;
+      }
+      const placed = tryPlaceCaretAtPoint(pending.x, pending.y, root);
       if (placed) {
-        hitEditorAtPoint(pending.x, pending.y, cardRef.current);
-        tryPlaceCaretAtPoint(pending.x, pending.y, cardRef.current);
+        hitEditorAtPoint(pending.x, pending.y, root);
+        tryPlaceCaretAtPoint(pending.x, pending.y, root);
         return;
       }
       if (frames < CARET_RETRY_FRAMES) {
