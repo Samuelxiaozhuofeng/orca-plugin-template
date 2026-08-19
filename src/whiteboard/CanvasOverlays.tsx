@@ -218,7 +218,11 @@ export function CanvasViewportOverlays({
             </div>
           ) : null}
           {refEdgesTruncated ? (
-            <div>{t("Too many reference links; only some are shown.")}</div>
+            <div>
+              {t(
+                "Some cards are too large; deep reference links may be missing.",
+              )}
+            </div>
           ) : null}
         </div>
       ) : null}

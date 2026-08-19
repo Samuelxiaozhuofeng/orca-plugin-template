@@ -23,6 +23,11 @@ import {
   CARD_TREE_LOAD_MAX_NODES,
 } from "./cardTreeLoad";
 import {
+  CARD_NODE_BUDGET_STEP,
+  CARD_ROW_HEIGHT_EST,
+  cardRenderNodeBudget,
+} from "./cardNodeBudget";
+import {
   cachedBlockPlainText,
   cardExcerpt,
   collectBlockTreeIds,
@@ -33,7 +38,7 @@ import { attachCardRefHoverPreview } from "./hoverPreview";
 import { attachMediaRefJump } from "./mediaRefJump";
 import { attachMediaAutoplayGuard } from "./mediaAutoplay";
 
-const { useEffect, useRef } = window.React;
+const { useEffect, useRef, useState } = window.React;
 
 const CONNECT_DRAG_PX = 4;
 
@@ -123,6 +128,8 @@ type Props = {
   panelId: string;
   card?: WhiteboardCard;
   blockId: DbId;
+  cardHeight: number;
+  editing: boolean;
   promotedKey?: string;
   highlightedRowIds?: ReadonlySet<DbId>;
   onFocusCard?: (blockId: DbId) => void;
@@ -150,6 +157,8 @@ export function CardBlockTree({
   panelId,
   card,
   blockId,
+  cardHeight,
+  editing,
   promotedKey = "",
   highlightedRowIds,
   onFocusCard,
@@ -157,6 +166,23 @@ export function CardBlockTree({
 }: Props) {
   const treeRef = useRef<HTMLDivElement | null>(null);
   const boardCardIds = parseIdKey(promotedKey);
+  const [grown, setGrown] = useState<number>(0);
+  const prevBlockIdRef = useRef(blockId);
+  const lastGrownBudgetRef = useRef(0);
+
+  if (prevBlockIdRef.current !== blockId) {
+    prevBlockIdRef.current = blockId;
+    lastGrownBudgetRef.current = 0;
+    setGrown(0);
+  }
+
+  const nodeBudget = editing
+    ? CARD_TREE_LOAD_MAX_NODES
+    : cardRenderNodeBudget(cardHeight, grown);
+
+  const budgetRef = useRef(nodeBudget);
+  budgetRef.current = nodeBudget;
+
   useEffect(() => {
     const el = treeRef.current;
     if (el == null) return;
@@ -170,13 +196,38 @@ export function CardBlockTree({
     };
   }, []);
 
+  useEffect(() => {
+    const el = treeRef.current;
+    if (el == null) return;
+    const scroller = el.closest<HTMLElement>(".owb-card-body");
+    if (scroller == null) return;
+
+    const onScroll = () => {
+      const currentBudget = budgetRef.current;
+      if (currentBudget >= CARD_TREE_LOAD_MAX_NODES) return;
+      if (lastGrownBudgetRef.current === currentBudget) return;
+
+      const remaining =
+        scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight;
+      if (remaining < CARD_ROW_HEIGHT_EST * 3) {
+        lastGrownBudgetRef.current = currentBudget;
+        setGrown((g: number) => g + CARD_NODE_BUDGET_STEP);
+      }
+    };
+
+    scroller.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      scroller.removeEventListener("scroll", onScroll);
+    };
+  }, [blockId]);
+
   const plan = useWatchedValue(
     () =>
       planCardBlockTree(
         blockId,
         liveBlocks(),
         CARD_TREE_LOAD_MAX_DEPTH,
-        CARD_TREE_LOAD_MAX_NODES,
+        nodeBudget,
         boardCardIds,
       ),
     () =>
@@ -186,7 +237,7 @@ export function CardBlockTree({
         CARD_TREE_LOAD_MAX_NODES,
         CARD_TREE_LOAD_MAX_DEPTH,
       ),
-    [panelId, blockId, promotedKey],
+    [panelId, blockId, promotedKey, nodeBudget],
     cardTreePlanEqual,
   );
 

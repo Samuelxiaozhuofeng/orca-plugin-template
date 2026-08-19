@@ -265,8 +265,8 @@ const zhCN = {
   Retry: "重试",
   "Showing ${shown} of ${visible} cards. Zoom in to see all.":
     "这个缩放下只画了 ${shown} / ${visible} 张卡片，放大可看全部。",
-  "Too many reference links; only some are shown.":
-    "引用线太多，这里只画出了一部分。",
+  "Some cards are too large; deep reference links may be missing.":
+    "有卡片内容过多，深层引用可能没有全部画出。",
   "Couldn't load this card. Click to retry": "内容没读出来，点此重试",
   "Some content didn't load. Click to retry": "有部分内容没读出来，点此重试",
   "This note is gone": "这块笔记已经不在了",

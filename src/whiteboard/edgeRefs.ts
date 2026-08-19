@@ -10,7 +10,15 @@ import { edgeDedupeKey, type WhiteboardEdge } from "./edges";
 const { useMemo, useRef } = window.React;
 
 export const REF_TYPE_INLINE = 1;
-export const REF_WALK_MAX_BLOCKS = 2000;
+
+/** Per-card walk budget. A card shows at most 80 blocks; 400 leaves room
+ * for deep subtrees while keeping one huge card from starving the rest. */
+export const REF_WALK_MAX_BLOCKS_PER_CARD = 400;
+
+/** Board-wide ceiling, only to stop a pathological board from freezing the
+ * main thread. Normal boards never reach it. */
+export const REF_WALK_MAX_BLOCKS_TOTAL = 50000;
+
 export const REF_WALK_MAX_DEPTH = 30;
 
 export type ReferenceEdge = {
@@ -30,26 +38,36 @@ export function buildOwnerMap(
   blocks: { [id: number]: Block | undefined },
 ): { owner: Map<DbId, DbId>; truncated: boolean } {
   const owner = new Map<DbId, DbId>();
-  let visits = 0;
+  let totalVisits = 0;
   let truncated = false;
 
-  const walk = (root: DbId, id: DbId, depth: number) => {
-    if (depth > REF_WALK_MAX_DEPTH) return;
-    if (owner.has(id)) return;
-    if (visits >= REF_WALK_MAX_BLOCKS) {
-      truncated = true;
-      return;
-    }
-    visits += 1;
-    owner.set(id, root);
-    const block = blocks[id];
-    if (block?.children == null) return;
-    for (const child of block.children) {
-      walk(root, child, depth + 1);
-    }
-  };
-
   for (const card of cards) {
+    if (totalVisits >= REF_WALK_MAX_BLOCKS_TOTAL) {
+      truncated = true;
+      break;
+    }
+    let cardVisits = 0;
+
+    const walk = (root: DbId, id: DbId, depth: number) => {
+      if (depth > REF_WALK_MAX_DEPTH) return;
+      if (owner.has(id)) return;
+      if (
+        cardVisits >= REF_WALK_MAX_BLOCKS_PER_CARD ||
+        totalVisits >= REF_WALK_MAX_BLOCKS_TOTAL
+      ) {
+        truncated = true;
+        return;
+      }
+      cardVisits += 1;
+      totalVisits += 1;
+      owner.set(id, root);
+      const block = blocks[id];
+      if (block?.children == null) return;
+      for (const child of block.children) {
+        walk(root, child, depth + 1);
+      }
+    };
+
     walk(card.blockId, card.blockId, 0);
   }
   return { owner, truncated };

@@ -161,6 +161,8 @@ export function CardBody({
           panelId={panelId}
           card={card}
           blockId={card.blockId}
+          cardHeight={card.h}
+          editing={editing}
           promotedKey={promotedKey}
           highlightedRowIds={highlightedRowIds}
           onFocusCard={onFocusCard}

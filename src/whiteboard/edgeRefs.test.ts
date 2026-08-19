@@ -46,7 +46,8 @@ const {
   collectReferenceEdges,
   referenceRelationKey,
   REF_TYPE_INLINE,
-  REF_WALK_MAX_BLOCKS,
+  REF_WALK_MAX_BLOCKS_PER_CARD,
+  REF_WALK_MAX_BLOCKS_TOTAL,
 } = await import("./edgeRefs.ts");
 const { EDGE_LINK_BACK_PROP, EDGE_LINK_PROP, REF_TYPE_PROPERTY } = await import("./edgeLink.ts");
 
@@ -107,7 +108,7 @@ check(
 );
 
 const underMaxChildren: number[] = [];
-for (let id = 2; id <= REF_WALK_MAX_BLOCKS; id++) underMaxChildren.push(id);
+for (let id = 2; id <= REF_WALK_MAX_BLOCKS_PER_CARD; id++) underMaxChildren.push(id);
 const underMaxBlocks: Record<number, { children: number[]; refs: unknown[] }> =
   { 1: { children: underMaxChildren, refs: [] } };
 for (const id of underMaxChildren) {
@@ -116,11 +117,11 @@ for (const id of underMaxChildren) {
 const underMax = collectReferenceEdges([card(1)], underMaxBlocks, noneDrawn);
 check(
   underMax.truncated === false,
-  "exactly the walk budget is not truncated",
+  "exactly the per-card walk budget is not truncated",
 );
 
 const overMaxChildren: number[] = [];
-for (let id = 2; id <= REF_WALK_MAX_BLOCKS + 1; id++) overMaxChildren.push(id);
+for (let id = 2; id <= REF_WALK_MAX_BLOCKS_PER_CARD + 1; id++) overMaxChildren.push(id);
 const overMaxBlocks: Record<number, { children: number[]; refs: unknown[] }> = {
   1: { children: overMaxChildren, refs: [] },
 };
@@ -128,7 +129,44 @@ for (const id of overMaxChildren) {
   overMaxBlocks[id] = { children: [], refs: [] };
 }
 const overMax = collectReferenceEdges([card(1)], overMaxBlocks, noneDrawn);
-check(overMax.truncated === true, "one block past the walk budget is truncated");
+check(overMax.truncated === true, "one block past the per-card walk budget is truncated");
+
+const regressionCards = [];
+const regressionBlocks: Record<
+  number,
+  { children: number[]; refs: { type: number; to: number }[] }
+> = {};
+for (let i = 0; i < 31; i++) {
+  const rootId = i * 100 + 1;
+  regressionCards.push(card(rootId));
+  const childIds: number[] = [];
+  for (let j = 1; j <= 95; j++) {
+    const childId = rootId + j;
+    childIds.push(childId);
+    regressionBlocks[childId] = { children: [], refs: [] };
+  }
+  regressionBlocks[rootId] = { children: childIds, refs: [] };
+}
+const lastCardRootId = 30 * 100 + 1;
+const firstCardRootId = 1;
+const lastCardChildId = lastCardRootId + 10;
+regressionBlocks[lastCardChildId].refs = [inlineRef(firstCardRootId)];
+
+const regressionResult = collectReferenceEdges(
+  regressionCards,
+  regressionBlocks,
+  noneDrawn,
+);
+check(
+  regressionResult.truncated === false,
+  "31 cards with 96 blocks each are not truncated under per-card budget",
+);
+check(
+  regressionResult.edges.some(
+    (e) => e.from === lastCardRootId && e.to === firstCardRootId,
+  ),
+  "finds reference edge from the last card to the first card",
+);
 
 const cache = new Map();
 const forest = [card(1), card(2), card(3)];
