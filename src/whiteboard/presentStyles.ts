@@ -68,6 +68,25 @@ export const PRESENT_CSS = `
 }
 .owb-panel.is-presenting .owb-card {
   transition: opacity 200ms ease-out;
+  cursor: default;
+}
+.owb-panel.is-presenting .owb-card-body {
+  cursor: default;
+}
+/* Panning starts on the card itself, so a drag must not smear a text
+   selection across the slide. Clicks still reach refs and links. */
+.owb-panel.is-presenting .owb-card {
+  user-select: none;
+}
+.owb-panel.is-presenting .owb-card input[type="checkbox"],
+.owb-panel.is-presenting .owb-card .orca-checkbox {
+  pointer-events: none !important;
+}
+.owb-panel.is-presenting .owb-card-handle,
+.owb-panel.is-presenting .owb-card-floating-toolbar,
+.owb-panel.is-presenting .owb-card-back,
+.owb-panel.is-presenting .owb-edge-layer {
+  display: none !important;
 }
 .owb-panel.is-presenting .owb-card.is-present-current {
   box-shadow: 0 0 0 2px var(--orca-color-primary-5, #00a896);
@@ -93,6 +112,22 @@ export const PRESENT_CSS = `
   user-select: none;
   pointer-events: auto;
   overflow: hidden;
+}
+
+.owb-slide-outline-resume {
+  cursor: pointer;
+  color: var(--orca-color-primary-5, #00a896);
+  border-bottom: 1px solid var(--orca-color-border-1, rgba(0, 0, 0, 0.08));
+  margin-bottom: 4px;
+}
+.owb-slide-outline-resume .owb-slide-outline-name {
+  color: var(--orca-color-primary-5, #00a896);
+  font-weight: 600;
+}
+.owb-slide-outline-resume-icon {
+  font-size: 14px;
+  margin-right: 6px;
+  flex-shrink: 0;
 }
 
 .owb-slide-outline-header {

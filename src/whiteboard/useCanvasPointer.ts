@@ -85,6 +85,7 @@ export function useCanvasPointer(opts: {
   onMoveFrame?: (boxes: Map<DbId, CardRect>) => void;
   onStartEdit: (blockId: DbId) => void;
   onDismissEdgeToolbar?: () => void;
+  isPresenting?: () => boolean;
   onDropOntoBoard?: (
     targetBoardId: DbId,
     movingIds: readonly DbId[],
@@ -109,6 +110,7 @@ export function useCanvasPointer(opts: {
     onMoveFrame,
     onStartEdit,
     onDismissEdgeToolbar,
+    isPresenting,
     boardBlockId,
     onDropOntoBoard,
   } = opts;
@@ -248,6 +250,14 @@ export function useCanvasPointer(opts: {
     if (target?.closest(CANVAS_CHROME)) return;
     focusViewport();
 
+    if (isPresenting?.() === true) {
+      if (event.button === 0 || event.button === 1) {
+        event.preventDefault();
+        startPan(event.clientX, event.clientY);
+      }
+      return;
+    }
+
     const blank = target?.closest(CANVAS_CHROME) == null;
     const spacePan = refs.spaceHeld.current;
     if (
@@ -374,6 +384,21 @@ export function useCanvasPointer(opts: {
     event: React.MouseEvent<HTMLDivElement>,
     card: WhiteboardCard,
   ) => {
+    if (isPresenting?.() === true) {
+      if (event.button === 1) {
+        event.preventDefault();
+        startPan(event.clientX, event.clientY);
+        return;
+      }
+      // Presented cards cover most of the screen, so a left drag has to pan
+      // there too. No preventDefault: the click still has to reach inline
+      // refs and links, which stay navigable while presenting.
+      if (event.button === 0) {
+        startPan(event.clientX, event.clientY);
+      }
+      return;
+    }
+
     const route = routeCardPointer({
       button: event.button,
       shiftKey: event.shiftKey,

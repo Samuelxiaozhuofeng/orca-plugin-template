@@ -129,6 +129,23 @@ export function handleWhiteboardKey(
       actions.present.lastSlide?.();
       return true;
     }
+    if (
+      (event.key === "+" || event.key === "=" || event.code === "NumpadAdd") &&
+      actions.zoomIn != null
+    ) {
+      event.preventDefault();
+      actions.zoomIn();
+      return true;
+    }
+    if (
+      (event.key === "-" || event.code === "NumpadSubtract") &&
+      actions.zoomOut != null
+    ) {
+      event.preventDefault();
+      actions.zoomOut();
+      return true;
+    }
+    return false;
   }
 
   if (event.key === "Escape") {

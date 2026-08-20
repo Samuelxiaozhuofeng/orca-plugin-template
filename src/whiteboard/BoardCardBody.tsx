@@ -77,6 +77,7 @@ type CardBodyProps = {
   treeRev: number;
   hosted: CardBlockView;
   editing: boolean;
+  presenting?: boolean;
   prewarming?: boolean;
   noteGone: boolean;
   fillLoadError: boolean;
@@ -103,6 +104,7 @@ export function CardBody({
   treeRev,
   hosted,
   editing,
+  presenting = false,
   prewarming = false,
   noteGone,
   fillLoadError,
@@ -152,9 +154,9 @@ export function CardBody({
   return (
     <div
       className="owb-card-body"
-      title={editing ? undefined : t("Click to edit")}
+      title={editing || presenting ? undefined : t("Click to edit")}
       onDoubleClick={(event: React.MouseEvent) => {
-        if (editing) return;
+        if (editing || presenting) return;
         if (
           (event.target as HTMLElement | null)?.closest(
             `.${CARD_ROW_FOCUS_CLASS}`,

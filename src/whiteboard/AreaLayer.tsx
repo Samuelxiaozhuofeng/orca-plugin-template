@@ -31,11 +31,13 @@ type Props = {
   canvasRef: { current: HTMLDivElement | null };
   pointerToWorld: (clientX: number, clientY: number) => { x: number; y: number };
   cards: readonly WhiteboardCard[];
+  presenting?: boolean;
   onSelect: (id: string, opts?: { toggle?: boolean }) => void;
   onRename: (id: string, name: string) => void;
   onResize: (id: string, box: { x: number; y: number; w: number; h: number }) => void;
   onMove: (id: string, dx: number, dy: number) => void;
   onMoveFrame?: (boxes: Map<DbId, { x: number; y: number; w: number; h: number }>) => void;
+  onStartPresent?: (areaId: string) => void;
 };
 
 function areaInk(color: string | undefined): string | undefined {
@@ -54,6 +56,7 @@ function stopChromePointer(event: React.SyntheticEvent): void {
 function AreaMenu({
   area,
   onPickColor,
+  onStartPresent,
   onAddToSlides,
   onMoveSlideEarlier,
   onMoveSlideLater,
@@ -62,6 +65,7 @@ function AreaMenu({
 }: {
   area: WhiteboardArea;
   onPickColor: (next: string | undefined) => void;
+  onStartPresent?: (id: string) => void;
   onAddToSlides: (id: string) => void;
   onMoveSlideEarlier: (id: string) => void;
   onMoveSlideLater: (id: string) => void;
@@ -89,6 +93,14 @@ function AreaMenu({
       <orca.components.MenuSeparator />
       {area.slide != null ? (
         <>
+          <orca.components.MenuText
+            title={t("Start slideshow from here")}
+            onClick={() => {
+              close();
+              onStartPresent?.(area.id);
+            }}
+          />
+          <orca.components.MenuSeparator />
           <orca.components.MenuText
             title={t("Move slide earlier")}
             onClick={() => {
@@ -131,6 +143,7 @@ function AreaBox({
   canvasRef,
   pointerToWorld,
   cards,
+  presenting = false,
   onSelect,
   onBeginEdit,
   onCommitName,
@@ -140,6 +153,7 @@ function AreaBox({
   onMoveFrame,
   onSetColor,
   onToggleCollapsed,
+  onStartPresent,
   onAddToSlides,
   onMoveSlide,
   onRemoveFromSlides,
@@ -150,6 +164,7 @@ function AreaBox({
   canvasRef: { current: HTMLDivElement | null };
   pointerToWorld: (clientX: number, clientY: number) => { x: number; y: number };
   cards: readonly WhiteboardCard[];
+  presenting?: boolean;
   onSelect: (id: string, opts?: { toggle?: boolean }) => void;
   onBeginEdit: (id: string) => void;
   onCommitName: (id: string, name: string) => void;
@@ -159,6 +174,7 @@ function AreaBox({
   onMoveFrame?: (boxes: Map<DbId, { x: number; y: number; w: number; h: number }>) => void;
   onSetColor: (id: string, color: string | undefined) => void;
   onToggleCollapsed: (id: string) => void;
+  onStartPresent?: (id: string) => void;
   onAddToSlides: (id: string) => void;
   onMoveSlide: (id: string, delta: number) => void;
   onRemoveFromSlides: (id: string) => void;
@@ -181,7 +197,7 @@ function AreaBox({
   }, [editing]);
 
   const onTitleMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (event.button !== 0) return;
+    if (presenting || event.button !== 0) return;
     event.preventDefault();
     event.stopPropagation();
     const additive = event.shiftKey || event.metaKey || event.ctrlKey;
@@ -212,7 +228,7 @@ function AreaBox({
   };
 
   const onTitleDoubleClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (event.button !== 0) return;
+    if (presenting || event.button !== 0) return;
     event.preventDefault();
     event.stopPropagation();
     if (editing) return;
@@ -224,7 +240,7 @@ function AreaBox({
     handle: AreaCorner,
     event: React.MouseEvent<HTMLDivElement>,
   ) => {
-    if (event.button !== 0) return;
+    if (presenting || event.button !== 0) return;
     event.preventDefault();
     event.stopPropagation();
     onSelect(area.id);
@@ -245,7 +261,7 @@ function AreaBox({
 
   const className = [
     "owb-area",
-    selected ? "is-selected" : "",
+    selected && !presenting ? "is-selected" : "",
     collapsed ? "is-collapsed" : "",
   ]
     .filter(Boolean)
@@ -273,6 +289,7 @@ function AreaBox({
         <AreaMenu
           area={area}
           onPickColor={(next) => onSetColor(area.id, next)}
+          onStartPresent={onStartPresent}
           onAddToSlides={onAddToSlides}
           onMoveSlideEarlier={(id) => onMoveSlide(id, -1)}
           onMoveSlideLater={(id) => onMoveSlide(id, 1)}
@@ -289,6 +306,7 @@ function AreaBox({
           onContextMenu={(event: React.MouseEvent<HTMLDivElement>) => {
             event.preventDefault();
             event.stopPropagation();
+            if (presenting) return;
             onSelect(area.id);
             open(event);
           }}
@@ -306,21 +324,23 @@ function AreaBox({
                 {area.slide}
               </span>
             ) : null}
-            <button
-              type="button"
-              className="owb-area-collapse"
-              title={collapsed ? t("Expand section") : t("Collapse section")}
-              aria-expanded={!collapsed}
-              onMouseDown={stopChromePointer}
-              onClick={(event: React.MouseEvent<HTMLButtonElement>) => {
-                stopChromePointer(event);
-                onSelect(area.id);
-                onToggleCollapsed(area.id);
-              }}
-            >
-              <i className={collapsed ? "ti ti-chevron-right" : "ti ti-chevron-down"} />
-            </button>
-            {editing ? (
+            {!presenting ? (
+              <button
+                type="button"
+                className="owb-area-collapse"
+                title={collapsed ? t("Expand section") : t("Collapse section")}
+                aria-expanded={!collapsed}
+                onMouseDown={stopChromePointer}
+                onClick={(event: React.MouseEvent<HTMLButtonElement>) => {
+                  stopChromePointer(event);
+                  onSelect(area.id);
+                  onToggleCollapsed(area.id);
+                }}
+              >
+                <i className={collapsed ? "ti ti-chevron-right" : "ti ti-chevron-down"} />
+              </button>
+            ) : null}
+            {editing && !presenting ? (
               <input
                 ref={inputRef}
                 className="owb-area-title-input"
@@ -351,21 +371,23 @@ function AreaBox({
             ) : (
               <span className="owb-area-title-text">{shownLabel}</span>
             )}
-            <button
-              type="button"
-              className="owb-area-color"
-              title={t("Section color")}
-              onMouseDown={stopChromePointer}
-              onClick={(event: React.MouseEvent<HTMLButtonElement>) => {
-                stopChromePointer(event);
-                onSelect(area.id);
-                open(event);
-              }}
-            >
-              <i className="ti ti-palette" />
-            </button>
+            {!presenting ? (
+              <button
+                type="button"
+                className="owb-area-color"
+                title={t("Section color")}
+                onMouseDown={stopChromePointer}
+                onClick={(event: React.MouseEvent<HTMLButtonElement>) => {
+                  stopChromePointer(event);
+                  onSelect(area.id);
+                  open(event);
+                }}
+              >
+                <i className="ti ti-palette" />
+              </button>
+            ) : null}
           </div>
-          {selected && !collapsed
+          {selected && !collapsed && !presenting
             ? AREA_CORNERS.map((handle) => (
                 <div
                   key={handle}
@@ -392,11 +414,13 @@ export function AreaLayer({
   canvasRef,
   pointerToWorld,
   cards,
+  presenting = false,
   onSelect,
   onRename,
   onResize,
   onMove,
   onMoveFrame,
+  onStartPresent,
 }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const chrome = areaChromeFor(panelId);
@@ -429,6 +453,7 @@ export function AreaLayer({
           canvasRef={canvasRef}
           pointerToWorld={pointerToWorld}
           cards={cards}
+          presenting={presenting}
           onSelect={onSelect}
           onBeginEdit={setEditingId}
           onCancelEdit={() => setEditingId(null)}
@@ -441,6 +466,7 @@ export function AreaLayer({
           onMoveFrame={onMoveFrame}
           onSetColor={chrome?.setColor ?? (() => {})}
           onToggleCollapsed={chrome?.toggleCollapsed ?? (() => {})}
+          onStartPresent={onStartPresent}
           onAddToSlides={chrome?.addToSlides ?? (() => {})}
           onMoveSlide={chrome?.moveSlide ?? (() => {})}
           onRemoveFromSlides={chrome?.removeFromSlides ?? (() => {})}

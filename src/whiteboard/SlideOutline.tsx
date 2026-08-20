@@ -5,7 +5,9 @@ const { useEffect, useRef, useState } = window.React;
 
 type Props = {
   rows: readonly SlideOutlineRow[];
+  resumeSlideNumber?: number | null;
   onPick: (areaId: string) => void;
+  onResume?: () => void;
   onRemove: (areaId: string) => void;
   onReorder: (fromIndex: number, toIndex: number) => void;
   onClose: () => void;
@@ -21,7 +23,9 @@ type DragState = {
 
 export function SlideOutline({
   rows,
+  resumeSlideNumber,
   onPick,
+  onResume,
   onRemove,
   onReorder,
   onClose,
@@ -182,6 +186,29 @@ export function SlideOutline({
         </div>
       ) : (
         <div ref={listRef} className="owb-slide-outline-list" role="listbox">
+          {resumeSlideNumber != null ? (
+            <div
+              className="owb-slide-outline-item owb-slide-outline-resume"
+              role="button"
+              tabIndex={0}
+              onClick={() => onResume?.()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onResume?.();
+                }
+              }}
+            >
+              <div className="owb-slide-outline-item-text">
+                <i className="ti ti-player-play owb-slide-outline-resume-icon" />
+                <span className="owb-slide-outline-name">
+                  {t("Resume slideshow (slide ${n})", {
+                    n: String(resumeSlideNumber),
+                  })}
+                </span>
+              </div>
+            </div>
+          ) : null}
           {rows.map((row, index) => {
             const name = row.name.trim() || t("Untitled section");
             const cardsLabel = t("${count} cards", {

@@ -10,11 +10,8 @@ import {
 } from "./cardGestures";
 import { useCardClickCaret } from "./cardClickEdit";
 import { CardTitle } from "./CardTitle";
-import {
-  CardToolbar,
-  openCardInSidePanel,
-  openCardInThisPanel,
-} from "./CardToolbar";
+import { CardToolbar } from "./CardToolbar";
+import { CardMenu } from "./CardMenu";
 import { type WhiteboardCard } from "./data";
 import type { ArrangeAction } from "./selection";
 import { isHostOverlayTarget } from "./hostOverlay";
@@ -39,8 +36,6 @@ import {
   shouldLockCardHeight,
 } from "./cardFitHeight";
 import { useCardAutoHeight } from "./useCardAutoHeight";
-import { invokeCollectSelectedOnActivePanel } from "./collectIntoBoardApply";
-import { invokeWrapSelectedOnActivePanel } from "./useCanvasAreas";
 import { CardErrorBoundary } from "./CardErrorBoundary";
 
 const { useEffect, useLayoutEffect, useRef } = window.React;
@@ -75,6 +70,7 @@ type Props = {
   onExtractRow?: (blockId: DbId, sourceCard: WhiteboardCard) => void;
   onWrapSelected?: () => void;
   presentReveal?: { revealedIds: ReadonlySet<DbId>; currentId: DbId | null } | null;
+  presenting?: boolean;
 };
 
 type CardBox = { x: number; y: number; w: number; h: number };
@@ -107,6 +103,7 @@ export function Card({
   onFocusCard,
   onExtractRow,
   presentReveal,
+  presenting = false,
 }: Props) {
   const cardRef = useRef<HTMLDivElement | null>(null);
   const extractRowRef = useRef<DbId | null>(null);
@@ -320,67 +317,16 @@ export function Card({
       container={bodyRef}
       allowBeyondContainer
       menu={(close) => (
-        <orca.components.Menu>
-          <orca.components.MenuText
-            title={t("Open in side panel")}
-            onClick={() => {
-              close();
-              openCardInSidePanel(card.blockId);
-            }}
-          />
-          <orca.components.MenuText
-            title={t("Open in this panel")}
-            onClick={() => {
-              close();
-              openCardInThisPanel(card.blockId, panelId);
-            }}
-          />
-          {(() => {
-            const rowId = extractRowRef.current;
-            if (
-              onExtractRow == null ||
-              rowId == null ||
-              rowId === card.blockId
-            ) {
-              return null;
-            }
-            return (
-              <orca.components.MenuText
-                title={t("Extract as card")}
-                onClick={() => {
-                  close();
-                  onExtractRow(rowId, card);
-                }}
-              />
-            );
-          })()}
-          {selected && selectedCount >= 1 ? (
-            <orca.components.MenuText
-              title={t("Group into section")}
-              onClick={() => {
-                close();
-                invokeWrapSelectedOnActivePanel();
-              }}
-            />
-          ) : null}
-          {selected && selectedCount >= 2 ? (
-            <orca.components.MenuText
-              title={t("Collect into new whiteboard")}
-              onClick={() => {
-                close();
-                invokeCollectSelectedOnActivePanel();
-              }}
-            />
-          ) : null}
-          <orca.components.MenuSeparator />
-          <orca.components.MenuText
-            title={t("Fit content height")}
-            onClick={() => {
-              close();
-              fitContentHeight();
-            }}
-          />
-        </orca.components.Menu>
+        <CardMenu
+          card={card}
+          panelId={panelId}
+          selected={selected}
+          selectedCount={selectedCount}
+          extractRowId={extractRowRef.current}
+          onExtractRow={onExtractRow}
+          onFitContentHeight={fitContentHeight}
+          close={close}
+        />
       )}
     >
       {(open) => (
@@ -393,6 +339,7 @@ export function Card({
           onMouseLeave={() => onHoverLeave?.()}
           onMouseDown={onRootMouseDown}
           onDoubleClick={(event: React.MouseEvent<HTMLDivElement>) => {
+            if (presenting) return;
             const target = event.target as HTMLElement | null;
             if (
               target?.closest(
@@ -413,6 +360,11 @@ export function Card({
             onStartEdit(card.blockId);
           }}
           onContextMenu={(event) => {
+            if (presenting) {
+              event.preventDefault();
+              event.stopPropagation();
+              return;
+            }
             // Editing: do not intercept. The hosted Orca editor owns
             // contextmenu (and Canvas already skips .owb-card).
             if (liveEditing) return;
@@ -423,14 +375,16 @@ export function Card({
             open(event);
           }}
         >
-          <CardToolbar
-            card={card}
-            fitContentHeight={fitContentHeight}
-            onPatchCard={onPatchCard}
-            onStartConnect={onStartConnect}
-          />
+          {!presenting ? (
+            <CardToolbar
+              card={card}
+              fitContentHeight={fitContentHeight}
+              onPatchCard={onPatchCard}
+              onStartConnect={onStartConnect}
+            />
+          ) : null}
           <CardTitle card={card} editing={liveEditing} isBoard={isBoardCard} />
-          {parentCardId != null ? (
+          {parentCardId != null && !presenting ? (
             <button
               type="button"
               className={CARD_BACK_CLASS}
@@ -459,6 +413,7 @@ export function Card({
                 treeRev={treeRev}
                 hosted={hosted}
                 editing={liveEditing}
+                presenting={presenting}
                 prewarming={prewarming}
                 noteGone={noteGone}
                 fillLoadError={fillLoadError}
@@ -474,7 +429,7 @@ export function Card({
               />
             </CardErrorBoundary>
           )}
-          {showResize
+          {showResize && !presenting
             ? RESIZE_HANDLES.map((handle) => (
                 <div
                   key={handle}

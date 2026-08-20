@@ -7,13 +7,19 @@ import type { WhiteboardCard } from "./data.ts";
 import {
   buildSlides,
   clampCursor,
+  resolveInitialCursor,
   revealState,
   stepCard,
   stepSlide,
   toggleZoom,
   type PresentCursor,
   type Slide,
+  type StartPresentationOpts,
 } from "./presentation.ts";
+import {
+  getRememberedPresentation,
+  rememberPresentation,
+} from "./presentationMemory.ts";
 import {
   enterPresentFullscreen,
   exitPresentFullscreen,
@@ -36,7 +42,7 @@ export type PresentationState = {
   slides: Slide[];
   reveal: { revealedIds: Set<DbId>; currentId: DbId | null } | null;
   fullscreenMode: FullscreenMode | null;
-  start: () => void;
+  start: (opts?: StartPresentationOpts) => void;
   stop: () => void;
   escape: () => void;
   toggleZoom: () => void;
@@ -74,6 +80,7 @@ export function usePresentKeyActions(
 }
 
 export function usePresentation(opts: {
+  boardBlockId?: DbId;
   areas: readonly WhiteboardArea[];
   cards: readonly WhiteboardCard[];
   view: CanvasView;
@@ -81,7 +88,8 @@ export function usePresentation(opts: {
   setView: (view: CanvasView) => void;
   panelRef: { current: HTMLElement | null };
 }): PresentationState {
-  const { areas, cards, view, focusApiRef, setView, panelRef } = opts;
+  const { boardBlockId, areas, cards, view, focusApiRef, setView, panelRef } =
+    opts;
   const [active, setActive] = useState(false);
   const [cursor, setCursor] = useState<PresentCursor>({
     slideIndex: 0,
@@ -132,30 +140,45 @@ export function usePresentation(opts: {
     return revealState(cursor, slides);
   }, [active, cursor, slides]);
 
-  const start = useCallback(() => {
-    const currentSlides = slidesRef.current;
-    if (currentSlides.length === 0) return;
-    savedViewRef.current = viewRef.current;
-    const initialCursor: PresentCursor = {
-      slideIndex: 0,
-      cardIndex: -1,
-      zoomed: false,
-    };
-    cursorRef.current = initialCursor;
-    setCursor(initialCursor);
-    setActive(true);
-    focusCurrent(initialCursor, currentSlides);
-    void enterPresentFullscreen(panelRef.current).then((mode) => {
-      if (!activeRef.current) {
-        void exitPresentFullscreen(mode);
-        return;
-      }
-      fullscreenModeRef.current = mode;
-      setFullscreenMode(mode);
-    });
-  }, [focusCurrent, panelRef]);
+  const start = useCallback(
+    (startOpts?: StartPresentationOpts) => {
+      const currentSlides = slidesRef.current;
+      if (currentSlides.length === 0) return;
+      const saved = getRememberedPresentation(boardBlockId);
+      const initialCursor = resolveInitialCursor(
+        currentSlides,
+        startOpts,
+        saved,
+      );
+      if (!initialCursor) return;
+      savedViewRef.current = viewRef.current;
+      cursorRef.current = initialCursor;
+      setCursor(initialCursor);
+      setActive(true);
+      focusCurrent(initialCursor, currentSlides);
+      void enterPresentFullscreen(panelRef.current).then((mode) => {
+        if (!activeRef.current) {
+          void exitPresentFullscreen(mode);
+          return;
+        }
+        fullscreenModeRef.current = mode;
+        setFullscreenMode(mode);
+      });
+    },
+    [boardBlockId, focusCurrent, panelRef],
+  );
 
   const stop = useCallback(() => {
+    const cur = cursorRef.current;
+    const currentSlides = slidesRef.current;
+    const slide = currentSlides[cur.slideIndex];
+    if (slide != null) {
+      rememberPresentation(boardBlockId, {
+        areaId: slide.areaId,
+        cardIndex: cur.cardIndex,
+        zoomed: cur.zoomed,
+      });
+    }
     setActive(false);
     const mode = fullscreenModeRef.current;
     fullscreenModeRef.current = null;
@@ -166,7 +189,7 @@ export function usePresentation(opts: {
     if (savedViewRef.current != null) {
       setView(savedViewRef.current);
     }
-  }, [setView]);
+  }, [boardBlockId, setView]);
 
   /** Single place where a new cursor is committed: state, then camera.
    * Kept out of the `setCursor` updater — updaters must stay side-effect free. */

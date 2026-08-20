@@ -212,6 +212,7 @@ type Props = {
   onFocusCard: (blockId: DbId) => void;
   presentReveal?: { revealedIds: ReadonlySet<DbId>; currentId: DbId | null } | null;
   highlightedRowIds?: ReadonlySet<DbId>;
+  presenting?: boolean;
 };
 
 export function CanvasCards({
@@ -238,6 +239,7 @@ export function CanvasCards({
   onFocusCard,
   presentReveal,
   highlightedRowIds,
+  presenting = false,
 }: Props) {
   const settings = useWhiteboardSettings();
   const { activePrewarmedId, onCardEnter, onCardLeave } =
@@ -277,8 +279,9 @@ export function CanvasCards({
             simplified={isSimplified}
             selected={selectedSet.has(card.blockId)}
             showResize={
-              selected.length === 0 ||
-              (selected.length === 1 && selectedSet.has(card.blockId))
+              !presenting &&
+              (selected.length === 0 ||
+                (selected.length === 1 && selectedSet.has(card.blockId)))
             }
             onSelectOnly={(blockId) => selectCards([blockId])}
             selectedCount={selected.length}
@@ -295,27 +298,32 @@ export function CanvasCards({
             onContentHeight={onContentHeight}
             onArrange={applyArrange}
             onMoveFrame={onMoveFrame}
-            onStartConnect={(
-              card: WhiteboardCard,
-              event: React.MouseEvent,
-              mode: "drag" | "click",
-              fromBlock?: DbId,
-            ) => {
-              edgeApiRef.current?.startDraw(
-                card,
-                undefined,
-                event.clientX,
-                event.clientY,
-                mode === "click" ? "mousedown" : "mouseup",
-                fromBlock,
-              );
-            }}
+            onStartConnect={
+              presenting
+                ? () => {}
+                : (
+                    card: WhiteboardCard,
+                    event: React.MouseEvent,
+                    mode: "drag" | "click",
+                    fromBlock?: DbId,
+                  ) => {
+                    edgeApiRef.current?.startDraw(
+                      card,
+                      undefined,
+                      event.clientX,
+                      event.clientY,
+                      mode === "click" ? "mousedown" : "mouseup",
+                      fromBlock,
+                    );
+                  }
+            }
             promotedKey={promotedKey}
             highlightedRowIds={highlightedRowIds}
             onFocusCard={onFocusCard}
             onExtractRow={onExtractRow}
             onWrapSelected={onWrapSelected}
             presentReveal={presentReveal}
+            presenting={presenting}
           />
         );
       })}

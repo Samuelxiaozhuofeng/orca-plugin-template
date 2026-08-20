@@ -39,50 +39,19 @@ import { blurCardEditor } from "./cardEditorFlush";
 import { PresentOverlay } from "./PresentOverlay";
 import { deriveTargetHighlightedRows } from "./edgeRowHighlight";
 import {
+  derivePresentationAreas,
+  deriveResumeSlideNumber,
+} from "./canvasPresent";
+import {
   usePresentKeyActions,
   type PresentationState,
 } from "./usePresentation";
+import type { CanvasProps } from "./canvasProps";
 
 export type { CanvasView, CardPatchEntry };
+export type { CanvasProps };
 
 const { useCallback, useLayoutEffect, useMemo, useRef } = window.React;
-
-type Props = {
-  panelId: string;
-  boardBlockId: DbId;
-  cards: WhiteboardCard[];
-  view: CanvasView;
-  zoomLabelRef: { current: HTMLElement | null };
-  onViewChange: (view: CanvasView) => void;
-  onPatchCards: PatchCardsFn;
-  onRemoveCards: (
-    ids: DbId[],
-    opts?: { permanent?: boolean },
-  ) => Promise<boolean>;
-  onAddCards: (cards: WhiteboardCard[]) => Promise<boolean>;
-  onCommitEdges: (
-    next: WhiteboardEdge[],
-    cardIds?: ReadonlySet<DbId>,
-  ) => Promise<boolean>;
-  onCommitAreas: (next: WhiteboardArea[]) => Promise<boolean>;
-  onCommitCardsAndAreas: (
-    cards: WhiteboardCard[],
-    areas: WhiteboardArea[],
-  ) => Promise<boolean>;
-  drawArea: boolean;
-  onExitDrawArea: () => void;
-  onStartDrawArea: () => void;
-  onUndo: () => void;
-  onRedo: () => void;
-  edges: WhiteboardEdge[];
-  areas: WhiteboardArea[];
-  onViewportWidth: (width: number) => void;
-  onPlaceJournalsAt: (origin: CanvasOrigin) => void;
-  focusApiRef: { current: CanvasFocusApi | null };
-  presenting?: boolean;
-  presentation?: PresentationState;
-  presentReveal?: { revealedIds: ReadonlySet<DbId>; currentId: DbId | null } | null;
-};
 
 export function Canvas({
   panelId,
@@ -110,7 +79,7 @@ export function Canvas({
   presenting = false,
   presentation,
   presentReveal,
-}: Props) {
+}: CanvasProps) {
   const editingRef = useRef<DbId | null>(null);
   const selectedRef = useRef<DbId[]>([]);
   const selectedEdgeRef = useRef<string | null>(null);
@@ -315,7 +284,11 @@ export function Canvas({
     onMoveFrame,
     onStartEdit: startEdit,
     onDismissEdgeToolbar: dismissEdgeToolbar,
+    isPresenting: isPresentingFn,
   });
+
+  const layerAreas = derivePresentationAreas(areas, presenting, presentation);
+  const resumeSlideNumber = deriveResumeSlideNumber(boardBlockId, presentation);
 
   const overlayProps = buildCanvasOverlayProps({
     overlay,
@@ -352,6 +325,7 @@ export function Canvas({
         tabIndex={0}
         onMouseDown={onViewportMouseDown}
         onDoubleClick={(event: React.MouseEvent<HTMLDivElement>) => {
+          if (presenting) return;
           const target = event.target as HTMLElement | null;
           if (
             target?.closest(
@@ -381,6 +355,11 @@ export function Canvas({
           );
         }}
         onContextMenu={(event) => {
+          if (presenting) {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          }
           const target = event.target as HTMLElement | null;
           if (
             target?.closest(
@@ -401,7 +380,7 @@ export function Canvas({
         <div ref={canvasRef} className="owb-canvas">
           <AreaLayer
             panelId={panelId}
-            areas={areas}
+            areas={layerAreas}
             selectedIds={selectedAreas}
             view={view}
             viewportSize={viewportSize}
@@ -409,17 +388,19 @@ export function Canvas({
             canvasRef={canvasRef}
             pointerToWorld={pointerToWorld}
             cards={cards}
+            presenting={presenting}
             onSelect={selectArea}
             onRename={renameArea}
             onResize={resizeArea}
             onMove={moveAreaBy}
             onMoveFrame={onMoveFrame}
+            onStartPresent={(areaId) => presentation?.start({ areaId })}
           />
           <EdgeLayer
             panelId={panelId}
             cards={visible.cards}
-            edges={visible.edges}
-            refEdges={refEdges}
+            edges={presenting ? [] : visible.edges}
+            refEdges={presenting ? [] : refEdges}
             viewScale={view.scale}
             viewToken={`${view.x}:${view.y}:${view.scale}`}
             selectedId={selectedEdge}
@@ -457,6 +438,7 @@ export function Canvas({
             onFocusCard={onFocusCard}
             presentReveal={presentReveal ?? presentation?.reveal ?? null}
             highlightedRowIds={highlightedRowIds}
+            presenting={presenting}
           />
         </div>
         <div ref={guidesRef} className="owb-guides" />
@@ -475,6 +457,8 @@ export function Canvas({
             shownCount={shownCards.length}
             refEdgesTruncated={refEdgesTruncated}
             onCloseEdgeDrop={closeEdgeDrop}
+            onStartPresent={presentation?.start}
+            resumeSlideNumber={resumeSlideNumber}
           />
         )}
       </div>

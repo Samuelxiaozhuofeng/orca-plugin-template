@@ -227,14 +227,17 @@ check(
     "next,next,next,prev,prev,nextCard,prevCard,toggleZoom,exit,firstSlide,lastSlide",
   "presentation shortcuts fire in order and do not trigger nudge/escape",
 );
+// In presentation mode: other keys (e.g. undo, color, delete, fit, selectAll) are disabled (return false)
+check(handleWhiteboardKey(event("1"), presentActions) === false, "1 does not paint in presentation mode");
+check(handleWhiteboardKey(event("f"), presentActions) === false, "f does not fit in presentation mode");
+check(handleWhiteboardKey(event("Delete"), presentActions) === false, "Delete is disabled in presentation mode");
+check(handleWhiteboardKey(event("a", { metaKey: true }), presentActions) === false, "Cmd+A is disabled in presentation mode");
+check(handleWhiteboardKey(event("+"), presentActions) === true, "+ still zooms in presentation mode");
+check(handleWhiteboardKey(event("-"), presentActions) === true, "- still zooms in presentation mode");
 check(
-  presentActions.log.length === 0,
-  "nudge/escape/etc log is empty when present handles keys",
+  presentActions.log.join(",") === "zoomIn,zoomOut",
+  "only zoom keys executed on base actions in presentation mode",
 );
-
-// Other keys in presentation mode (e.g. undo, color) still work
-check(handleWhiteboardKey(event("1"), presentActions) === true, "1 still paints in presentation mode");
-check(presentActions.log.join(",") === "color:blue", "non-nav keys execute normally");
 
 // Non-presentation mode: Enter is not intercepted
 const nonPresent = actions();

@@ -22,6 +22,7 @@ import { areaChromeFor, areasForPanel } from "./useCanvasAreas";
 import { registerSlideOutlineAction } from "./slideOutlineAction.ts";
 import { SlideOutline } from "./SlideOutline.tsx";
 import { slideOutlineRows } from "./slideOutline.ts";
+import type { StartPresentationOpts } from "./presentation.ts";
 
 const { useCallback, useEffect, useMemo, useRef, useState } = window.React;
 
@@ -136,12 +137,16 @@ export function CanvasViewportOverlays({
   filterMatched,
   filterTotal,
   onClearFilter,
+  onStartPresent,
+  resumeSlideNumber,
 }: SharedProps & {
   edgeDrop: DrawDropEmpty | null;
   hiddenCardCount: number;
   shownCount: number;
   refEdgesTruncated: boolean;
   onCloseEdgeDrop: () => void;
+  onStartPresent?: (opts?: StartPresentationOpts) => void;
+  resumeSlideNumber?: number | null;
 }) {
   const { searchOpen, closeSearch, outlineOpen, closeOutline, panelId } = overlay;
   const panelAreas = areas ?? (panelId ? areasForPanel(panelId) : []);
@@ -152,17 +157,16 @@ export function CanvasViewportOverlays({
 
   const handleOutlinePick = useCallback(
     (areaId: string) => {
-      const chrome = areaChromeFor(panelId);
-      chrome?.selectArea?.(areaId);
-      const target = panelAreas.find((a) => a.id === areaId);
-      if (target) {
-        focusApiRef.current?.fitBoxes([
-          { x: target.x, y: target.y, w: target.w, h: target.h },
-        ]);
-      }
+      closeOutline();
+      onStartPresent?.({ areaId });
     },
-    [focusApiRef, panelAreas, panelId],
+    [closeOutline, onStartPresent],
   );
+
+  const handleOutlineResume = useCallback(() => {
+    closeOutline();
+    onStartPresent?.({ resume: true });
+  }, [closeOutline, onStartPresent]);
 
   const handleOutlineRemove = useCallback(
     (areaId: string) => {
@@ -248,7 +252,9 @@ export function CanvasViewportOverlays({
       {outlineOpen ? (
         <SlideOutline
           rows={outlineRows}
+          resumeSlideNumber={resumeSlideNumber}
           onPick={handleOutlinePick}
+          onResume={handleOutlineResume}
           onRemove={handleOutlineRemove}
           onReorder={handleOutlineReorder}
           onClose={closeOutline}

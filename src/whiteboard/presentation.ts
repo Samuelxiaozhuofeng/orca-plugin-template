@@ -236,3 +236,66 @@ export function clampCursor(
   return { slideIndex, cardIndex, zoomed };
 }
 
+export type PresentSavedPosition = {
+  areaId: string;
+  cardIndex: number;
+  zoomed: boolean;
+};
+
+export type StartPresentationOpts =
+  | { areaId?: string; resume?: false }
+  | { resume: true };
+
+/** Find the index of a slide by its area ID, or -1 if not found. */
+export function findSlideIndexByAreaId(
+  slides: readonly Slide[],
+  areaId: string,
+): number {
+  return slides.findIndex((slide) => slide.areaId === areaId);
+}
+
+/** Compute the initial cursor from start options and optional saved position. */
+export function resolveInitialCursor(
+  slides: readonly Slide[],
+  opts?: StartPresentationOpts,
+  saved?: PresentSavedPosition | null,
+): PresentCursor | null {
+  if (slides.length === 0) return null;
+
+  if (opts && "resume" in opts && opts.resume) {
+    if (!saved) return { slideIndex: 0, cardIndex: -1, zoomed: false };
+    const slideIndex = findSlideIndexByAreaId(slides, saved.areaId);
+    if (slideIndex < 0) {
+      return { slideIndex: 0, cardIndex: -1, zoomed: false };
+    }
+    const slide = slides[slideIndex];
+    const cardCount = slide.cards.length;
+    const cardIndex =
+      cardCount === 0
+        ? -1
+        : Math.max(-1, Math.min(saved.cardIndex, cardCount - 1));
+    const zoomed = cardIndex === -1 ? false : saved.zoomed;
+    return { slideIndex, cardIndex, zoomed };
+  }
+
+  if (opts && "areaId" in opts && opts.areaId != null) {
+    const slideIndex = findSlideIndexByAreaId(slides, opts.areaId);
+    if (slideIndex >= 0) {
+      return { slideIndex, cardIndex: -1, zoomed: false };
+    }
+  }
+
+  return { slideIndex: 0, cardIndex: -1, zoomed: false };
+}
+
+/** Check whether a saved position points to a valid slide in the sequence. */
+export function resolveResumeSlide(
+  slides: readonly Slide[],
+  saved?: PresentSavedPosition | null,
+): { slideIndex: number; slideNumber: number } | null {
+  if (!saved || slides.length === 0) return null;
+  const slideIndex = findSlideIndexByAreaId(slides, saved.areaId);
+  if (slideIndex < 0) return null;
+  return { slideIndex, slideNumber: slideIndex + 1 };
+}
+

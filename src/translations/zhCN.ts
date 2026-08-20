@@ -305,6 +305,8 @@ const zhCN = {
   "Remove from slideshow": "移出演示",
   "Slide ${n}": "第 ${n} 页",
   "Start slideshow": "开始演示",
+  "Start slideshow from here": "从这里开始演示",
+  "Resume slideshow (slide ${n})": "继续上次演示（第 ${n} 页）",
   "Exit slideshow": "退出演示",
   "Slideshow outline": "演示大纲",
   "Right-click a section to add it to the slideshow":

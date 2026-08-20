@@ -2,13 +2,22 @@ import type { WhiteboardArea } from "./areas.ts";
 import {
   buildSlides,
   clampCursor,
+  findSlideIndexByAreaId,
+  resolveInitialCursor,
+  resolveResumeSlide,
   revealState,
   stepCard,
   stepSlide,
   toggleZoom,
   type PresentCard,
   type PresentCursor,
+  type PresentSavedPosition,
 } from "./presentation.ts";
+import {
+  getRememberedPresentation,
+  rememberPresentation,
+  clearPresentationMemory,
+} from "./presentationMemory.ts";
 
 function check(cond: boolean, msg: string): void {
   if (!cond) throw new Error(msg);
@@ -309,6 +318,76 @@ check(
   clampCursor(validCursor, slides) === validCursor,
   "clampCursor preserves reference for valid cursor",
 );
+
+// 7. findSlideIndexByAreaId
+check(findSlideIndexByAreaId(slides, "a1") === 0, "findSlideIndexByAreaId finds a1 at 0");
+check(findSlideIndexByAreaId(slides, "a2") === 1, "findSlideIndexByAreaId finds a2 at 1");
+check(findSlideIndexByAreaId(slides, "a3") === 2, "findSlideIndexByAreaId finds a3 at 2");
+check(findSlideIndexByAreaId(slides, "a4") === -1, "findSlideIndexByAreaId returns -1 for non-slided area");
+check(findSlideIndexByAreaId(slides, "non-existent") === -1, "findSlideIndexByAreaId returns -1 for missing area");
+check(findSlideIndexByAreaId([], "a1") === -1, "findSlideIndexByAreaId on empty slides returns -1");
+
+// 8. resolveInitialCursor
+// Default: first slide
+const initDefault = resolveInitialCursor(slides, {});
+check(
+  initDefault?.slideIndex === 0 && initDefault?.cardIndex === -1 && initDefault?.zoomed === false,
+  "resolveInitialCursor with no opts starts at slide 0",
+);
+
+// Specific areaId
+const initFromArea2 = resolveInitialCursor(slides, { areaId: "a2" });
+check(
+  initFromArea2?.slideIndex === 1 && initFromArea2?.cardIndex === -1 && initFromArea2?.zoomed === false,
+  "resolveInitialCursor with areaId starts at that slide",
+);
+
+// Specific areaId not in slides falls back to 0
+const initFromMissing = resolveInitialCursor(slides, { areaId: "unknown" });
+check(
+  initFromMissing?.slideIndex === 0 && initFromMissing?.cardIndex === -1 && initFromMissing?.zoomed === false,
+  "resolveInitialCursor with missing areaId falls back to slide 0",
+);
+
+// Resume with saved position
+const savedPos: PresentSavedPosition = { areaId: "a2", cardIndex: 0, zoomed: true };
+const initResume = resolveInitialCursor(slides, { resume: true }, savedPos);
+check(
+  initResume?.slideIndex === 1 && initResume?.cardIndex === 0 && initResume?.zoomed === true,
+  "resolveInitialCursor with resume restores slide, cardIndex, and zoomed",
+);
+
+// Resume when saved area was removed falls back to slide 0
+const savedMissing: PresentSavedPosition = { areaId: "removed", cardIndex: 2, zoomed: true };
+const initResumeMissing = resolveInitialCursor(slides, { resume: true }, savedMissing);
+check(
+  initResumeMissing?.slideIndex === 0 && initResumeMissing?.cardIndex === -1 && initResumeMissing?.zoomed === false,
+  "resolveInitialCursor with removed area falls back to slide 0",
+);
+
+// 9. resolveResumeSlide
+check(
+  resolveResumeSlide(slides, undefined) === null,
+  "resolveResumeSlide with undefined saved returns null",
+);
+const resumeResult = resolveResumeSlide(slides, savedPos);
+check(
+  resumeResult !== null && resumeResult.slideIndex === 1 && resumeResult.slideNumber === 2,
+  "resolveResumeSlide returns correct 0-based slideIndex and 1-based slideNumber (2)",
+);
+check(
+  resolveResumeSlide(slides, savedMissing) === null,
+  "resolveResumeSlide returns null if saved area is not in current slides",
+);
+
+// 10. presentationMemory
+clearPresentationMemory();
+check(getRememberedPresentation(1001) === null, "getRememberedPresentation starts empty");
+rememberPresentation(1001, { areaId: "a2", cardIndex: 0, zoomed: false });
+const mem = getRememberedPresentation(1001);
+check(mem?.areaId === "a2" && mem?.cardIndex === 0 && mem?.zoomed === false, "rememberPresentation stores position");
+clearPresentationMemory();
+check(getRememberedPresentation(1001) === null, "clearPresentationMemory clears map");
 
 console.log("presentation.test.ts ok");
 

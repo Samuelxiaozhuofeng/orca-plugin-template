@@ -106,6 +106,7 @@ export default function BoardPanel({ panelId, blockId }: Props) {
   areasRef.current = areas;
 
   const presentation = usePresentation({
+    boardBlockId: blockId,
     areas,
     cards,
     view,
